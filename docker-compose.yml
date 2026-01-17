@@ -1,0 +1,56 @@
+services:
+  chrome-webtop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chrome-webtop
+    security_opt:
+      - seccomp:unconfined  # Required for Chrome sandboxing
+    shm_size: "16gb"        # Chrome needs large shared memory
+    deploy:
+      resources:
+        limits:
+          cpus: '10.0'
+          memory: 16G
+    environment:
+      # User/System
+      - PUID=1000
+      - PGID=1000
+      - TZ=Africa/Algiers
+      - TITLE=Chrome Browser
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+      # Selkies Streaming Configuration
+      - SELKIES_ENCODER=h264
+      - SELKIES_FRAMERATE=50
+      - SELKIES_VIDEO_BITRATE=8000
+      - SELKIES_ENABLE_RESIZE=true
+      - SELKIES_AUDIO_BITRATE=128000
+      # Selkies UI - Hide sidebar and file transfers
+      - SELKIES_FILE_TRANSFERS=
+      - SELKIES_UI_SIDEBAR_SHOW_FILES=false
+      - SELKIES_UI_SIDEBAR_SHOW_APPS=false
+      - SELKIES_COMMAND_ENABLED=false
+      - SELKIES_ENABLE_BASIC_UI=false
+      - SELKIES_BASIC_SETTINGS_ENABLE_AUDIO=true
+      - SELKIES_BASIC_SETTINGS_ENABLE_CLIPBOARD=true
+    volumes:
+      - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
+      - ./custom-cont-init.d:/custom-cont-init.d:ro
+      - webtop_data:/config
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    ports:
+      - "3070:3000"   # HTTP
+      - "3071:3001"   # HTTPS
+    devices:
+      - /dev/dri:/dev/dri  # GPU acceleration
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "/opt/google/chrome/chrome"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  webtop_data:

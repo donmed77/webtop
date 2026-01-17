@@ -1,0 +1,9 @@
+# Plan/chat logs
+plan.md
+
+# Docker volumes
+webtop-config/
+
+# OS files
+.DS_Store
+*.log
