@@ -1,0 +1,20 @@
+2026/01/18-00:49:13.298 71a Creating DB /config/.config/google-chrome/Default/IndexedDB/https_www.speedtest.net_0.indexeddb.leveldb since it was missing.
+2026/01/18-00:49:13.300 71a Reusing MANIFEST /config/.config/google-chrome/Default/IndexedDB/https_www.speedtest.net_0.indexeddb.leveldb/MANIFEST-000001
+2026/01/18-00:49:13.306 71e Level-0 table #5: started
+2026/01/18-00:49:13.307 71e Level-0 table #5: 1735 bytes OK
+2026/01/18-00:49:13.307 71e Delete type=0 #3
+2026/01/18-00:49:13.308 71a Manual compaction at level-0 from '\x00\x02\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x03\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/01/18-00:49:13.313 71d Level-0 table #7: started
+2026/01/18-00:49:13.313 71d Level-0 table #7: 5026 bytes OK
+2026/01/18-00:49:13.314 71d Delete type=0 #4
+2026/01/18-00:49:13.314 71d Manual compaction at level-0 from '\x00\x04\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x05\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/01/18-00:49:13.315 71a Level-0 table #9: started
+2026/01/18-00:49:13.316 71a Level-0 table #9: 3033 bytes OK
+2026/01/18-00:49:13.317 71a Delete type=0 #6
+2026/01/18-00:49:13.317 71a Manual compaction at level-0 from '\x00\x05\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x06\x00\x00\x00' @ 0 : 0; will stop at '\x00\x05\x00\x00\xc8\x18\x00u\x00s\x00e\x00r\x00_\x00U\x00n\x00i\x00v\x00S\x00p\x00e\x00e\x00d\x00T\x00e\x00s\x00t\x00R\x00e\x00s\x00u\x00l\x00t' @ 636 : 0
+2026/01/18-00:49:13.317 71a Compacting 1@0 + 1@1 files
+2026/01/18-00:49:13.318 71a Generated table #10@0: 152 keys, 1985 bytes
+2026/01/18-00:49:13.318 71a Compacted 1@0 + 1@1 files => 1985 bytes
+2026/01/18-00:49:13.318 71a compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/01/18-00:49:13.318 71a Delete type=2 #9
+2026/01/18-00:49:13.318 71a Manual compaction at level-0 from '\x00\x05\x00\x00\xc8\x18\x00u\x00s\x00e\x00r\x00_\x00U\x00n\x00i\x00v\x00S\x00p\x00e\x00e\x00d\x00T\x00e\x00s\x00t\x00R\x00e\x00s\x00u\x00l\x00t' @ 636 : 0 .. '\x00\x06\x00\x00\x00' @ 0 : 0; will stop at (end)
