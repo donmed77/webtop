@@ -131,8 +131,8 @@ default_border none
 default_floating_border none
 for_window [class=".*"] border none
 
-# Autostart Brave browser
-exec --no-startup-id brave-browser --no-sandbox --disable-gpu-sandbox --ignore-gpu-blocklist --enable-gpu-rasterization --enable-webgpu-developer-features --start-maximized --no-first-run --disable-infobars --disable-session-crashed-bubble --noerrdialogs --disable-features=TranslateUI,PasswordManagerOnboarding,BraveRewards,BraveWallet,BraveVPN,BraveTalk,BraveAIChat --disable-brave-update --disable-component-update --disable-background-networking --disable-sync
+# Autostart Brave browser with auto-restart loop
+exec --no-startup-id bash -c 'while true; do brave-browser --no-sandbox --disable-gpu-sandbox --ignore-gpu-blocklist --enable-gpu-rasterization --enable-webgpu-developer-features --start-maximized --no-first-run --disable-infobars --disable-session-crashed-bubble --noerrdialogs --disable-features=TranslateUI,PasswordManagerOnboarding,BraveRewards,BraveWallet,BraveVPN,BraveTalk,BraveAIChat --disable-brave-update --disable-component-update --disable-background-networking --disable-sync; sleep 1; done'
 EOF
     
     chown -R abc:abc "$I3_CONFIG_DIR"
