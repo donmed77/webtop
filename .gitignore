@@ -3,6 +3,7 @@ plan.md
 
 # Docker volumes
 webtop-config/
+Brave-alpine-i3/config/
 
 # OS files
 .DS_Store

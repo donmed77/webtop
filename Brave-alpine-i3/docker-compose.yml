@@ -1,0 +1,45 @@
+services:
+  brave-webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-i3
+    container_name: brave-webtop
+    security_opt:
+      - seccomp:unconfined
+    shm_size: "16gb"
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 12G
+    environment:
+      # User/System
+      - PUID=1000
+      - PGID=1000
+      - TZ=Africa/Algiers
+      - TITLE=Brave Browser
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+      # Selkies Streaming Configuration
+      - SELKIES_ENCODER=h264
+      - SELKIES_FRAMERATE=50
+      - SELKIES_VIDEO_BITRATE=8000
+      - SELKIES_ENABLE_RESIZE=true
+      - SELKIES_AUDIO_BITRATE=128000
+      # Selkies UI - Hide sidebar and file transfers
+      - SELKIES_FILE_TRANSFERS=
+      - SELKIES_UI_SIDEBAR_SHOW_FILES=false
+      - SELKIES_UI_SIDEBAR_SHOW_APPS=false
+      - SELKIES_COMMAND_ENABLED=false
+      - SELKIES_ENABLE_BASIC_UI=false
+      - SELKIES_BASIC_SETTINGS_ENABLE_AUDIO=true
+      - SELKIES_BASIC_SETTINGS_ENABLE_CLIPBOARD=true
+    volumes:
+      - ./policies.json:/etc/brave/policies/managed/policies.json:ro
+      - ./config:/config
+      - ./custom-cont-init.d:/custom-cont-init.d:ro
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    ports:
+      - "3080:3000"
+      - "3081:3001"
+    devices:
+      - /dev/dri:/dev/dri
+    restart: unless-stopped
