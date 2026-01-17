@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Install Brave browser on Ubuntu
-if ! command -v brave-browser &> /dev/null; then
-    echo "**** Installing Brave browser ****"
+# Install Google Chrome on Ubuntu
+if ! command -v google-chrome &> /dev/null; then
+    echo "**** Installing Google Chrome ****"
     apt-get update
-    apt-get install -y curl
-    curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
+    apt-get install -y curl wget gnupg
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
     apt-get update
-    apt-get install -y brave-browser
-    echo "**** Brave browser installed ****"
+    apt-get install -y google-chrome-stable
+    echo "**** Google Chrome installed ****"
 fi
 
 # Pre-configure i3 to skip first-run wizard
@@ -131,46 +131,24 @@ default_border none
 default_floating_border none
 for_window [class=".*"] border none
 
-# Autostart Brave browser with auto-restart loop
-exec --no-startup-id bash -c 'while true; do brave-browser --no-sandbox --disable-gpu-sandbox --ignore-gpu-blocklist --enable-gpu-rasterization --enable-webgpu-developer-features --start-maximized --no-first-run --disable-infobars --disable-session-crashed-bubble --noerrdialogs --disable-features=TranslateUI,PasswordManagerOnboarding,BraveRewards,BraveWallet,BraveVPN,BraveTalk,BraveAIChat --disable-brave-update --disable-component-update --disable-background-networking --disable-sync; sleep 1; done'
+# Autostart Chrome browser with auto-restart loop (dark mode enabled)
+exec --no-startup-id bash -c 'while true; do google-chrome --no-sandbox --disable-gpu-sandbox --ignore-gpu-blocklist --enable-gpu-rasterization --enable-webgpu-developer-features --start-maximized --no-first-run --disable-infobars --disable-session-crashed-bubble --noerrdialogs --force-dark-mode --enable-features=WebUIDarkMode --disable-features=TranslateUI,PasswordManagerOnboarding --disable-component-update --disable-background-networking --disable-sync; sleep 1; done'
 EOF
     
     chown -R abc:abc "$I3_CONFIG_DIR"
     echo "**** i3 config created ****"
 fi
 
-# Pre-configure Brave preferences to disable P3A and other notifications
-BRAVE_CONFIG_DIR="/config/.config/BraveSoftware/Brave-Browser"
-mkdir -p "$BRAVE_CONFIG_DIR/Default"
+# Pre-configure Chrome preferences
+CHROME_CONFIG_DIR="/config/.config/google-chrome"
+mkdir -p "$CHROME_CONFIG_DIR/Default"
 
-# Create Local State to disable P3A notice (only if it doesn't exist)
-if [ ! -f "$BRAVE_CONFIG_DIR/Local State" ]; then
-    cat > "$BRAVE_CONFIG_DIR/Local State" << 'EOF'
+# Create Local State
+if [ ! -f "$CHROME_CONFIG_DIR/Local State" ]; then
+    cat > "$CHROME_CONFIG_DIR/Local State" << 'EOF'
 {
   "browser": {
     "enabled_labs_experiments": []
-  },
-  "brave": {
-    "p3a": {
-      "enabled": false,
-      "notice_acknowledged": true
-    },
-    "stats": {
-      "reporting_enabled": false
-    },
-    "webtorrent_enabled": false,
-    "hangouts_enabled": false,
-    "new_tab_page": {
-      "show_background_image": false,
-      "show_branded_background_image": false,
-      "show_together": false,
-      "show_rewards": false,
-      "show_binance": false,
-      "show_gemini": false,
-      "show_cryptoDotCom": false,
-      "show_brave_news": false,
-      "show_brave_talk": false
-    }
   },
   "user_experience_metrics": {
     "reporting_enabled": false
@@ -179,46 +157,12 @@ if [ ! -f "$BRAVE_CONFIG_DIR/Local State" ]; then
 EOF
 fi
 
-# Create Default preferences (only if it doesn't exist)
-if [ ! -f "$BRAVE_CONFIG_DIR/Default/Preferences" ]; then
-    cat > "$BRAVE_CONFIG_DIR/Default/Preferences" << 'EOF'
+# Create Default preferences
+if [ ! -f "$CHROME_CONFIG_DIR/Default/Preferences" ]; then
+    cat > "$CHROME_CONFIG_DIR/Default/Preferences" << 'EOF'
 {
-  "brave": {
-    "p3a": {
-      "enabled": false,
-      "notice_acknowledged": true
-    },
-    "rewards": {
-      "enabled": false
-    },
-    "wallet": {
-      "show_wallet_icon_on_toolbar": false
-    },
-    "new_tab_page": {
-      "show_background_image": true,
-      "show_branded_background_image": false,
-      "show_together": false,
-      "show_rewards": false,
-      "shows_options": 1,
-      "selected_custom_background_index": 3
-    },
-    "brave_news": {
-      "show_on_ntp": false,
-      "was_ever_enabled": false
-    },
-    "brave_talk": {
-      "enabled": false
-    },
-    "today": {
-      "should_show_on_ntp": false
-    },
-    "dark_mode": 1,
-    "theme": {
-      "color": "#7C4DFF"
-    }
-  },
   "session": {
-    "restore_on_startup": 5
+    "restore_on_startup": 4
   },
   "browser": {
     "show_home_button": false,
@@ -237,6 +181,14 @@ if [ ! -f "$BRAVE_CONFIG_DIR/Default/Preferences" ]; then
       "use_system": false
     }
   },
+  "profile": {
+    "default_content_setting_values": {}
+  },
+  "autogenerated": {
+    "theme": {
+      "color": -7864065
+    }
+  },
   "webkit": {
     "webprefs": {
       "darkModeEnabled": true
@@ -246,5 +198,35 @@ if [ ! -f "$BRAVE_CONFIG_DIR/Default/Preferences" ]; then
 EOF
 fi
 
-chown -R abc:abc "$BRAVE_CONFIG_DIR"
-echo "**** Brave preferences configured ****"
+chown -R abc:abc "$CHROME_CONFIG_DIR"
+echo "**** Chrome preferences configured ****"
+
+# Install new Adwaita cursor theme (GNOME 45+)
+echo "**** Installing new Adwaita cursor theme ****"
+apt-get install -y adwaita-icon-theme-full 2>/dev/null || apt-get install -y adwaita-icon-theme
+
+# Configure cursor theme
+CURSOR_THEME="Adwaita"
+echo "**** Configuring cursor theme ****"
+mkdir -p /config/.config/gtk-3.0
+cat > /config/.config/gtk-3.0/settings.ini << EOF
+[Settings]
+gtk-cursor-theme-name=$CURSOR_THEME
+gtk-cursor-theme-size=24
+gtk-theme-name=Adwaita-dark
+gtk-application-prefer-dark-theme=true
+EOF
+
+mkdir -p /config/.icons/default
+cat > /config/.icons/default/index.theme << EOF
+[Icon Theme]
+Inherits=$CURSOR_THEME
+EOF
+
+cat > /config/.Xresources << EOF
+Xcursor.theme: $CURSOR_THEME
+Xcursor.size: 24
+EOF
+
+chown -R abc:abc /config/.config/gtk-3.0 /config/.icons /config/.Xresources
+echo "**** Cursor theme configured ****"

@@ -33,10 +33,9 @@ services:
       - SELKIES_BASIC_SETTINGS_ENABLE_AUDIO=true
       - SELKIES_BASIC_SETTINGS_ENABLE_CLIPBOARD=true
     volumes:
-      - ./policies.json:/etc/brave/policies/managed/policies.json:ro
+      - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
       - ./config:/config
       - ./custom-cont-init.d:/custom-cont-init.d:ro
-      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
     ports:
       - "3080:3000"
       - "3081:3001"

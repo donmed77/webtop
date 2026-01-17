@@ -59,4 +59,40 @@ echo "Cleaning apt cache..."
 apt-get clean 2>/dev/null || true
 rm -rf /var/lib/apt/lists/* 2>/dev/null || true
 
+# ============================================================
+# FILESYSTEM PERMISSION RESTRICTIONS
+# Block the 'abc' user from accessing sensitive system paths
+# Note: /etc must remain readable for system functionality
+# ============================================================
+echo "Applying filesystem permission restrictions..."
+
+# Make sensitive directories inaccessible to abc user (chmod 700 = owner only)
+chmod 700 /root 2>/dev/null || true
+chmod 700 /boot 2>/dev/null || true
+
+# /etc MUST be readable (755) or Chrome won't start - can't lock this down
+# /var MUST be readable for Chrome temp files
+# /run MUST be accessible for IPC
+
+# Block access to our configuration scripts
+chmod 700 /custom-cont-init.d 2>/dev/null || true
+
+# Remove execute permission on bin directories listing (711 = execute only, no list)
+# This prevents 'ls /bin' but allows running programs
+chmod 711 /bin 2>/dev/null || true
+chmod 711 /sbin 2>/dev/null || true  
+chmod 711 /usr/bin 2>/dev/null || true
+chmod 711 /usr/sbin 2>/dev/null || true
+chmod 711 /usr/local/bin 2>/dev/null || true
+
+# Ensure /config is accessible (user's home) and /tmp for temporary files
+chmod 755 /config 2>/dev/null || true
+chmod 1777 /tmp 2>/dev/null || true
+
+# Create Downloads directory
+mkdir -p /config/Downloads 2>/dev/null || true
+chown -R abc:abc /config 2>/dev/null || true
+
+echo "**** Filesystem permissions restricted ****"
 echo "**** Security hardening complete ****"
+

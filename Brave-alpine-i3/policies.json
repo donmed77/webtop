@@ -1,17 +1,7 @@
 {
     "CommandLineFlagSecurityWarningsEnabled": false,
-    "BraveRewardsDisabled": true,
-    "BraveWalletDisabled": true,
-    "BraveVPNDisabled": true,
-    "BraveSyncDisabled": false,
-    "BraveAIChatEnabled": false,
-    "BraveAdsEnabled": false,
-    "TorDisabled": true,
-    "IPFSEnabled": false,
     "DnsOverHttpsMode": "off",
-    "PrivateNetworkAccessRestrictionsEnabled": false,
     "MetricsReportingEnabled": false,
-    "HideFirstRunSignIn": true,
     "PasswordManagerEnabled": false,
     "RestoreOnStartup": 4,
     "RestoreOnStartupURLs": [
@@ -31,17 +21,14 @@
     "CloudReportingEnabled": false,
     "DefaultSearchProviderEnabled": true,
     "DefaultSearchProviderName": "Google",
-    "DefaultSearchProviderSearchURL": "https://www.google.com/search?q={searchTerms}",
+    "DefaultSearchProviderSearchURL": "https://www.google.com/search?q={searchTerms}&hl=en&gl=us",
     "BuiltInDnsClientEnabled": false,
     "SpellCheckServiceEnabled": false,
     "SpellcheckEnabled": false,
     "SearchSuggestEnabled": false,
-    "BraveP3AEnabled": false,
-    "BraveNewsEnabled": false,
     "DefaultPopupsSetting": 2,
     "DefaultCookiesSetting": 1,
     "BlockThirdPartyCookies": true,
-    "DefaultThirdPartyCookieBlockingSetting": 1,
     "DefaultGeolocationSetting": 2,
     "DefaultNotificationsSetting": 2,
     "DefaultWebBluetoothGuardSetting": 2,
@@ -53,9 +40,12 @@
     "DefaultInsecureContentSetting": 2,
     "SafeBrowsingProtectionLevel": 1,
     "AdsSettingForIntrusiveAdsSites": 2,
-    "DownloadRestrictions": 0,
+    "DownloadRestrictions": 3,
     "DefaultDownloadDirectory": "/config/Downloads",
     "PromptForDownloadLocation": false,
     "DownloadDirectory": "/config/Downloads",
-    "AllowFileSelectionDialogs": false
+    "AllowFileSelectionDialogs": false,
+    "SpellcheckLanguage": [
+        "en-US"
+    ]
 }
