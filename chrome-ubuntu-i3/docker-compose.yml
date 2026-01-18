@@ -1,7 +1,7 @@
 services:
-  chrome-ubuntu-i3:
+  chrome-ubuntu-i3-llm:
     image: lscr.io/linuxserver/webtop:ubuntu-i3
-    container_name: chrome-ubuntu-i3
+    container_name: chrome-ubuntu-i3-llm
     security_opt:
       - seccomp:unconfined
     # Security: Drop all capabilities, add only needed ones
@@ -25,7 +25,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Africa/Algiers
-      - TITLE=Chrome Browser
+      - TITLE=Chrome Browser LLM
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
       # Selkies Streaming Configuration
@@ -48,8 +48,8 @@ services:
     tmpfs:
       - /tmp:size=2G,mode=1777
     ports:
-      - "3080:3000"
-      - "3081:3001"
+      - "3082:3000"
+      - "3083:3001"
     devices:
       - /dev/dri:/dev/dri
     restart: unless-stopped
