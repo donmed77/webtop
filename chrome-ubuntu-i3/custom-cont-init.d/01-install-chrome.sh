@@ -131,8 +131,35 @@ default_border none
 default_floating_border none
 for_window [class=".*"] border none
 
-# Autostart Chrome browser with auto-restart loop (dark mode enabled)
-exec --no-startup-id bash -c 'while true; do google-chrome --no-sandbox --disable-gpu-sandbox --ignore-gpu-blocklist --enable-gpu-rasterization --enable-webgpu-developer-features --start-maximized --no-first-run --disable-infobars --disable-session-crashed-bubble --noerrdialogs --force-dark-mode --enable-features=WebUIDarkMode --disable-features=TranslateUI,PasswordManagerOnboarding --disable-component-update --disable-background-networking --disable-sync; sleep 1; done'
+# Autostart Chrome browser with auto-restart loop (optimized - disabled unused features)
+exec --no-startup-id bash -c 'while true; do google-chrome \
+  --no-sandbox \
+  --disable-gpu-sandbox \
+  --ignore-gpu-blocklist \
+  --enable-gpu-rasterization \
+  --enable-webgpu-developer-features \
+  --start-maximized \
+  --no-first-run \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --noerrdialogs \
+  --force-dark-mode \
+  --enable-features=WebUIDarkMode \
+  --disable-features=TranslateUI,PasswordManagerOnboarding,MediaRouter \
+  --disable-component-update \
+  --disable-background-networking \
+  --disable-sync \
+  --disable-extensions \
+  --disable-default-apps \
+  --disable-background-mode \
+  --disable-prompt-on-repost \
+  --disable-domain-reliability \
+  --disable-breakpad \
+  --metrics-recording-only \
+  --no-default-browser-check \
+  --no-pings \
+  --disk-cache-dir=/tmp/chrome-cache \
+  --disk-cache-size=1073741824; sleep 1; done'
 EOF
     
     chown -R abc:abc "$I3_CONFIG_DIR"

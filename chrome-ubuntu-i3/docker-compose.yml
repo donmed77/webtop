@@ -4,7 +4,17 @@ services:
     container_name: chrome-ubuntu-i3
     security_opt:
       - seccomp:unconfined
-    shm_size: "16gb"
+    # Security: Drop all capabilities, add only needed ones
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_ADMIN      # Required for Chrome sandbox
+      - NET_BIND_SERVICE
+      - CHOWN          # Required for container init
+      - SETUID         # Required for container init
+      - SETGID         # Required for container init
+      - DAC_OVERRIDE   # Required for file operations
+    shm_size: "12gb"
     deploy:
       resources:
         limits:
@@ -19,9 +29,7 @@ services:
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
       # Selkies Streaming Configuration
-      - SELKIES_ENCODER=h264
-      - SELKIES_FRAMERATE=50
-      - SELKIES_VIDEO_BITRATE=8000
+
       - SELKIES_ENABLE_RESIZE=true
       - SELKIES_AUDIO_BITRATE=128000
       # Selkies UI - Hide sidebar and file transfers
@@ -36,6 +44,9 @@ services:
       - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
       - ./config:/config
       - ./custom-cont-init.d:/custom-cont-init.d:ro
+    # tmpfs for cache and temp files (faster, memory-based)
+    tmpfs:
+      - /tmp:size=2G,mode=1777
     ports:
       - "3080:3000"
       - "3081:3001"
