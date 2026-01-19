@@ -12,7 +12,25 @@ if ! command -v google-chrome &> /dev/null; then
     echo "**** Google Chrome installed ****"
 fi
 
-# Pre-configure i3 to skip first-run wizard
+# Install Python and Guard AI Summarizer backend
+if ! command -v python3 &> /dev/null || ! python3 -c "import fastapi" 2>/dev/null; then
+    echo "**** Installing Python and Guard AI backend dependencies ****"
+    apt-get update
+    apt-get install -y python3 python3-pip python3-venv
+    pip3 install --break-system-packages fastapi uvicorn httpx mitmproxy
+    echo "**** Guard AI dependencies installed ****"
+fi
+
+# Start Guard AI backend service
+echo "**** Starting Guard AI Summarizer backend ****"
+nohup python3 /guard-backend/summarizer_backend.py > /tmp/guard-backend.log 2>&1 &
+echo "**** Guard AI backend started on port 8765 ****"
+
+# Start mitmproxy for script injection (MUST start before Chrome)
+echo "**** Starting Guard AI proxy injection ****"
+nohup mitmdump -s /guard-backend/inject_guard.py -p 8080 --set block_global=false --set ssl_insecure=true > /tmp/mitmproxy.log 2>&1 &
+sleep 2
+echo "**** Guard AI proxy started on port 8080 ****"
 I3_CONFIG_DIR="/config/.config/i3"
 if [ ! -f "$I3_CONFIG_DIR/config" ]; then
     echo "**** Creating default i3 config ****"
@@ -131,8 +149,12 @@ default_border none
 default_floating_border none
 for_window [class=".*"] border none
 
-# Autostart Chrome browser with auto-restart loop (optimized - disabled unused features)
-exec --no-startup-id bash -c 'while true; do google-chrome \
+# Autostart Chrome browser with Guard AI proxy injection
+exec --no-startup-id bash -c 'exec > /tmp/chrome_launch.log 2>&1; \
+  echo "Waiting for proxy on 8080..."; \
+  while ! timeout 1 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/8080" 2>/dev/null; do sleep 1; done; \
+  echo "Proxy is up, launching Chrome..."; \
+  while true; do google-chrome \
   --no-sandbox \
   --disable-gpu-sandbox \
   --ignore-gpu-blocklist \
@@ -149,18 +171,33 @@ exec --no-startup-id bash -c 'while true; do google-chrome \
   --disable-component-update \
   --disable-background-networking \
   --disable-sync \
-  --disable-extensions \
   --disable-default-apps \
   --disable-background-mode \
   --disable-prompt-on-repost \
   --disable-domain-reliability \
   --disable-breakpad \
+  --disable-extensions \
   --metrics-recording-only \
   --no-default-browser-check \
   --no-pings \
+  --proxy-server=http://127.0.0.1:8080 \
+  --proxy-bypass-list=localhost,127.0.0.1 \
+  --ignore-certificate-errors \
+  --test-type \
+  --disable-features=Translate,OptimizationGuide,MediaRouter,DialMediaRouteProvider \
   --disk-cache-dir=/tmp/chrome-cache \
-  --disk-cache-size=1073741824; sleep 1; done'
+  --disk-cache-size=1073741824; \
+  echo "Chrome exited with $?, restarting..."; \
+  sleep 1; done'
 EOF
+
+    # Force "Normal" exit type to prevent "Restore pages" bubble
+    PREFS_FILE="/config/.config/google-chrome/Default/Preferences"
+    if [ -f "$PREFS_FILE" ]; then
+        sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/' "$PREFS_FILE"
+        sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' "$PREFS_FILE"
+    fi
+
     
     chown -R abc:abc "$I3_CONFIG_DIR"
     echo "**** i3 config created ****"

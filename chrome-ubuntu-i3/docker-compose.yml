@@ -44,12 +44,15 @@ services:
       - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
       - ./config:/config
       - ./custom-cont-init.d:/custom-cont-init.d:ro
+      - ./ai-summarizer:/guard-backend:ro
     # tmpfs for cache and temp files (faster, memory-based)
     tmpfs:
       - /tmp:size=2G,mode=1777
     ports:
       - "3082:3000"
       - "3083:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     devices:
       - /dev/dri:/dev/dri
     restart: unless-stopped
