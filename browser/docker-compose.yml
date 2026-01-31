@@ -36,6 +36,7 @@ services:
       - SELKIES_UI_SHOW_LOGO=false
       - SELKIES_UI_SIDEBAR_SHOW_GAMEPADS=false
       - SELKIES_UI_SIDEBAR_SHOW_GAMING_MODE=false
+      - NO_GAMEPAD=true
       - SELKIES_USE_BROWSER_CURSORS=true
       - SELKIES_USE_CPU=true
       - SELKIES_H264_STREAMING_MODE=true
