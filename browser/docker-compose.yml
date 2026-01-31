@@ -58,10 +58,14 @@ services:
       - SELKIES_ENABLE_PLAYER2=false
       - SELKIES_ENABLE_PLAYER3=false
       - SELKIES_ENABLE_PLAYER4=false
+      # Watermark
+      - WATERMARK_PNG=/assets/logo.png
+      - WATERMARK_LOCATION=4
     volumes:
       - ./chrome-policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
       - ./config:/config
       - ./scripts:/custom-cont-init.d:ro
+      - ./assets:/assets:ro
     # tmpfs for cache and temp files (faster, memory-based)
     tmpfs:
       - /tmp:size=2G,mode=1777
