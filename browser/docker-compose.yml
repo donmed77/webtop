@@ -1,6 +1,9 @@
 services:
   webtop-browser:
-    image: lscr.io/linuxserver/webtop:ubuntu-i3
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: webtop-browser:latest
     container_name: webtop-browser
     security_opt:
       - seccomp:unconfined

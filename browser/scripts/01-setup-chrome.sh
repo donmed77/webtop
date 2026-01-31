@@ -1,25 +1,9 @@
 #!/bin/bash
-set -e  # Exit on error
-
 # =============================================================================
-# Chrome Browser Setup Script
-# Installs Chrome, configures i3 window manager, and sets up user preferences
+# i3 and Chrome Configuration Script (Optimized for pre-built image)
+# Chrome and security hardening are already baked into the Docker image
+# This script only handles runtime configuration
 # =============================================================================
-
-# Install Google Chrome on Ubuntu
-if ! command -v google-chrome &> /dev/null; then
-    echo "**** Installing Google Chrome ****"
-    apt-get update
-    apt-get install -y curl wget gnupg
-    
-    # Modern GPG keyring method (apt-key is deprecated)
-    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
-    
-    apt-get update
-    apt-get install -y google-chrome-stable
-    echo "**** Google Chrome installed ****"
-fi
 
 # Pre-configure i3 to skip first-run wizard
 I3_CONFIG_DIR="/config/.config/i3"
@@ -138,7 +122,7 @@ default_border none
 default_floating_border none
 for_window [class=".*"] border none
 
-# Autostart Chrome browser with auto-restart loop (optimized - disabled unused features)
+# Autostart Chrome browser with auto-restart loop
 exec --no-startup-id bash -c 'while true; do google-chrome \
   --no-sandbox \
   --disable-gpu-sandbox \
@@ -201,10 +185,6 @@ if [ ! -f "$CHROME_CONFIG_DIR/Default/Preferences" ]; then
     "check_default_browser": false,
     "custom_chrome_frame": false
   },
-  "ntp": {
-    "custom_background_dict": {},
-    "num_personal_suggestions": 0
-  },
   "omnibox": {
     "prevent_url_elisions": true
   },
@@ -231,15 +211,9 @@ EOF
 fi
 
 chown -R abc:abc "$CHROME_CONFIG_DIR"
-echo "**** Chrome preferences configured ****"
-
-# Install new Adwaita cursor theme (GNOME 45+)
-echo "**** Installing new Adwaita cursor theme ****"
-apt-get install -y adwaita-icon-theme-full 2>/dev/null || apt-get install -y adwaita-icon-theme
 
 # Configure cursor theme
 CURSOR_THEME="Adwaita"
-echo "**** Configuring cursor theme ****"
 mkdir -p /config/.config/gtk-3.0
 cat > /config/.config/gtk-3.0/settings.ini << EOF
 [Settings]
@@ -261,4 +235,14 @@ Xcursor.size: 24
 EOF
 
 chown -R abc:abc /config/.config/gtk-3.0 /config/.icons /config/.Xresources
-echo "**** Cursor theme configured ****"
+
+# Final runtime security lockdown
+chmod 700 /root /boot 2>/dev/null || true
+chmod 700 /custom-cont-init.d 2>/dev/null || true
+chmod 711 /bin /sbin /usr/bin /usr/sbin /usr/local/bin 2>/dev/null || true
+chmod 755 /config 2>/dev/null || true
+chmod 1777 /tmp 2>/dev/null || true
+mkdir -p /config/Downloads 2>/dev/null || true
+chown -R abc:abc /config 2>/dev/null || true
+
+echo "**** Chrome and i3 configured ****"
