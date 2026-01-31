@@ -41,11 +41,9 @@
     "DefaultInsecureContentSetting": 2,
     "SafeBrowsingProtectionLevel": 1,
     "AdsSettingForIntrusiveAdsSites": 2,
-    "DownloadRestrictions": 3,
     "DownloadsDisabled": true,
     "DefaultDownloadDirectory": "/config/Downloads",
     "PromptForDownloadLocation": false,
-    "DownloadDirectory": "/config/Downloads",
     "AllowFileSelectionDialogs": false,
     "SaveFileAsDisabled": true,
     "SpellcheckLanguage": [

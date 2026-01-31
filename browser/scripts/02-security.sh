@@ -1,6 +1,10 @@
 #!/bin/bash
-# Security Hardening Script - Runs last to lock down the system
-# This script removes dangerous tools that could allow users to escape the browser
+set -e  # Exit on error
+
+# =============================================================================
+# Security Hardening Script
+# Runs last to lock down the system and remove dangerous tools
+# =============================================================================
 
 echo "**** Applying security hardening ****"
 
@@ -52,12 +56,8 @@ rm -f /usr/bin/make /usr/bin/cmake 2>/dev/null || true
 rm -f /usr/bin/perl 2>/dev/null || true
 rm -f /usr/bin/pip /usr/bin/pip3 2>/dev/null || true
 
-# NOTE: Python removal is COMMENTED OUT because Selkies DEPENDS on Python
-# Removing Python breaks the streaming service completely
-# echo "Removing Python interpreters..."
-# rm -rf /lsiopy/bin/python* 2>/dev/null || true
-# rm -f /usr/bin/python /usr/bin/python3 /usr/bin/python3.* 2>/dev/null || true
-# rm -rf /proot-apps/*/python* 2>/dev/null || true
+# NOTE: Python and shells must remain accessible for Selkies to function
+# Users don't have direct access anyway (terminals are removed)
 
 # Remove i3-msg to prevent programmatic i3 control
 echo "Restricting i3 control..."
@@ -68,13 +68,6 @@ chmod 000 /usr/bin/i3-nagbar 2>/dev/null || true
 echo "Removing editor access..."
 rm -f /usr/bin/sensible-editor /usr/bin/i3-sensible-editor /usr/bin/select-editor /usr/bin/editor 2>/dev/null || true
 rm -f /usr/bin/sudoedit 2>/dev/null || true
-
-# NOTE: Shells MUST remain accessible (755) or Selkies/system services won't work
-# The container runs many scripts via sh/bash that need to be executable
-# Users don't have direct terminal access anyway (terminals are removed)
-
-# NOTE: /etc/passwd MUST remain readable (644) or dbus/Chrome won't work
-# User enumeration is low risk compared to broken container
 
 # Clean up apt cache to prevent offline installs
 echo "Cleaning apt cache..."
@@ -117,4 +110,3 @@ chown -R abc:abc /config 2>/dev/null || true
 
 echo "**** Filesystem permissions restricted ****"
 echo "**** Security hardening complete ****"
-

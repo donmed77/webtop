@@ -15,7 +15,7 @@ services:
       - SETUID         # Required for container init
       - SETGID         # Required for container init
       - DAC_OVERRIDE   # Required for file operations
-    shm_size: "12gb"
+    shm_size: "12gb"  # Chrome requires large shared memory for tabs
     deploy:
       resources:
         limits:
@@ -26,7 +26,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Africa/Algiers
-      - TITLE=Unshort_Link
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
       # Selkies
@@ -41,8 +40,7 @@ services:
       - SELKIES_H264_STREAMING_MODE=true
       - SELKIES_ENABLE_RESIZE=true
       - SELKIES_AUDIO_BITRATE=128000
-      # Selkies UI - Hide sidebar and file transfers
-      - SELKIES_FILE_TRANSFERS=
+      # Selkies UI - Hide file transfers and apps
       - SELKIES_UI_SIDEBAR_SHOW_FILES=false
       - SELKIES_UI_SIDEBAR_SHOW_APPS=false
       - SELKIES_COMMAND_ENABLED=false

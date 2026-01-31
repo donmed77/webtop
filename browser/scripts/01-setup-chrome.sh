@@ -1,12 +1,21 @@
 #!/bin/bash
+set -e  # Exit on error
+
+# =============================================================================
+# Chrome Browser Setup Script
+# Installs Chrome, configures i3 window manager, and sets up user preferences
+# =============================================================================
 
 # Install Google Chrome on Ubuntu
 if ! command -v google-chrome &> /dev/null; then
     echo "**** Installing Google Chrome ****"
     apt-get update
     apt-get install -y curl wget gnupg
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+    
+    # Modern GPG keyring method (apt-key is deprecated)
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+    
     apt-get update
     apt-get install -y google-chrome-stable
     echo "**** Google Chrome installed ****"
@@ -123,8 +132,6 @@ mode "resize" {
     bindsym $mod+r mode "default"
 }
 bindsym $mod+r mode "resize"
-
-
 
 # Remove window decorations (title bars with buttons)
 default_border none
