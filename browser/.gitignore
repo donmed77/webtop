@@ -1,0 +1,6 @@
+# Auto-generated user data
+config/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,7 +1,7 @@
 services:
-  chrome-ubuntu-i3:
+  webtop-browser:
     image: lscr.io/linuxserver/webtop:ubuntu-i3
-    container_name: chrome-ubuntu-i3
+    container_name: webtop-browser
     security_opt:
       - seccomp:unconfined
       - no-new-privileges:true
@@ -58,9 +58,9 @@ services:
       - SELKIES_ENABLE_PLAYER3=false
       - SELKIES_ENABLE_PLAYER4=false
     volumes:
-      - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
+      - ./chrome-policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
       - ./config:/config
-      - ./custom-cont-init.d:/custom-cont-init.d:ro
+      - ./scripts:/custom-cont-init.d:ro
     # tmpfs for cache and temp files (faster, memory-based)
     tmpfs:
       - /tmp:size=2G,mode=1777
