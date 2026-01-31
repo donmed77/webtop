@@ -33,7 +33,7 @@ services:
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
       # Selkies
-      - SELKIES_UI_SHOW_SIDEBAR=true
+      - SELKIES_UI_SHOW_SIDEBAR=false
       # Selkies Streaming Configuration
       - SELKIES_UI_TITLE=Unshort_Link
       - SELKIES_UI_SHOW_LOGO=false
