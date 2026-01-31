@@ -147,9 +147,7 @@ exec --no-startup-id bash -c 'while true; do google-chrome \
   --enable-features=WebUIDarkMode \
   --disable-features=TranslateUI,PasswordManagerOnboarding,MediaRouter \
   --disable-component-update \
-  --disable-background-networking \
   --disable-sync \
-  --disable-extensions \
   --disable-default-apps \
   --disable-background-mode \
   --disable-prompt-on-repost \

@@ -6,8 +6,11 @@ echo "**** Applying security hardening ****"
 
 # Remove terminal emulators
 echo "Removing terminal emulators..."
-apt-get remove -y --purge xterm rxvt-unicode gnome-terminal konsole terminator 2>/dev/null || true
+apt-get remove -y --purge xterm rxvt-unicode gnome-terminal konsole terminator lxterminal st alacritty kitty tilix guake yakuake tilda 2>/dev/null || true
 rm -f /usr/bin/xterm /usr/bin/rxvt /usr/bin/urxvt /usr/bin/gnome-terminal /usr/bin/konsole /usr/bin/terminator 2>/dev/null || true
+rm -f /usr/bin/lxterminal /usr/bin/st /usr/bin/alacritty /usr/bin/kitty /usr/bin/tilix /usr/bin/guake /usr/bin/yakuake /usr/bin/tilda 2>/dev/null || true
+# Also remove xfce4-terminal if present
+rm -f /usr/bin/xfce4-terminal 2>/dev/null || true
 
 # Remove sudo and su
 echo "Removing sudo and su..."
@@ -17,6 +20,11 @@ rm -f /usr/bin/sudo /bin/su /usr/bin/su 2>/dev/null || true
 # Remove dmenu and other launchers
 echo "Removing application launchers..."
 apt-get remove -y --purge dmenu rofi 2>/dev/null || true
+
+# Remove file managers
+echo "Removing file managers..."
+apt-get remove -y --purge nautilus thunar pcmanfm dolphin nemo caja 2>/dev/null || true
+rm -f /usr/bin/nautilus /usr/bin/thunar /usr/bin/pcmanfm /usr/bin/dolphin /usr/bin/nemo /usr/bin/caja 2>/dev/null || true
 
 # Remove dangerous network tools (keep minimal for browser functionality)
 echo "Removing dangerous network tools..."
@@ -42,17 +50,31 @@ echo "Removing compilers and interpreters..."
 rm -f /usr/bin/gcc /usr/bin/g++ /usr/bin/cc 2>/dev/null || true
 rm -f /usr/bin/make /usr/bin/cmake 2>/dev/null || true
 rm -f /usr/bin/perl 2>/dev/null || true
-# Keep python as it may be needed for system scripts, but remove pip
 rm -f /usr/bin/pip /usr/bin/pip3 2>/dev/null || true
+
+# NOTE: Python removal is COMMENTED OUT because Selkies DEPENDS on Python
+# Removing Python breaks the streaming service completely
+# echo "Removing Python interpreters..."
+# rm -rf /lsiopy/bin/python* 2>/dev/null || true
+# rm -f /usr/bin/python /usr/bin/python3 /usr/bin/python3.* 2>/dev/null || true
+# rm -rf /proot-apps/*/python* 2>/dev/null || true
 
 # Remove i3-msg to prevent programmatic i3 control
 echo "Restricting i3 control..."
 chmod 000 /usr/bin/i3-msg 2>/dev/null || true
 chmod 000 /usr/bin/i3-nagbar 2>/dev/null || true
 
-# Make shells non-executable for regular users (keep for root/system)
-# Note: This may break things, commenting out for safety
-# chmod 700 /bin/bash /bin/sh /bin/dash 2>/dev/null || true
+# Remove sensible-editor symlinks to prevent editor access
+echo "Removing editor access..."
+rm -f /usr/bin/sensible-editor /usr/bin/i3-sensible-editor /usr/bin/select-editor /usr/bin/editor 2>/dev/null || true
+rm -f /usr/bin/sudoedit 2>/dev/null || true
+
+# NOTE: Shells MUST remain accessible (755) or Selkies/system services won't work
+# The container runs many scripts via sh/bash that need to be executable
+# Users don't have direct terminal access anyway (terminals are removed)
+
+# NOTE: /etc/passwd MUST remain readable (644) or dbus/Chrome won't work
+# User enumeration is low risk compared to broken container
 
 # Clean up apt cache to prevent offline installs
 echo "Cleaning apt cache..."

@@ -4,6 +4,7 @@ services:
     container_name: chrome-ubuntu-i3
     security_opt:
       - seccomp:unconfined
+      - no-new-privileges:true
     # Security: Drop all capabilities, add only needed ones
     cap_drop:
       - ALL
@@ -25,11 +26,19 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Africa/Algiers
-      - TITLE=Chrome Browser
+      - TITLE=Unshort_Link
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
+      # Selkies
+      - SELKIES_UI_SHOW_SIDEBAR=true
       # Selkies Streaming Configuration
-
+      - SELKIES_UI_TITLE=Unshort_Link
+      - SELKIES_UI_SHOW_LOGO=false
+      - SELKIES_UI_SIDEBAR_SHOW_GAMEPADS=false
+      - SELKIES_UI_SIDEBAR_SHOW_GAMING_MODE=false
+      - SELKIES_USE_BROWSER_CURSORS=true
+      - SELKIES_USE_CPU=true
+      - SELKIES_H264_STREAMING_MODE=true
       - SELKIES_ENABLE_RESIZE=true
       - SELKIES_AUDIO_BITRATE=128000
       # Selkies UI - Hide sidebar and file transfers
@@ -40,6 +49,14 @@ services:
       - SELKIES_ENABLE_BASIC_UI=false
       - SELKIES_BASIC_SETTINGS_ENABLE_AUDIO=true
       - SELKIES_BASIC_SETTINGS_ENABLE_CLIPBOARD=true
+      # Selkies Shared
+      - SELKIES_ENABLE_SHARING=true
+      - SELKIES_ENABLE_COLLAB=false
+      - SELKIES_ENABLE_SHARED=true
+      # Disable controller sharing (Player 2/3/4)
+      - SELKIES_ENABLE_PLAYER2=false
+      - SELKIES_ENABLE_PLAYER3=false
+      - SELKIES_ENABLE_PLAYER4=false
     volumes:
       - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
       - ./config:/config

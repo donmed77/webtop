@@ -1,4 +1,5 @@
 {
+    "DeveloperToolsAvailability": 2,
     "CommandLineFlagSecurityWarningsEnabled": false,
     "DnsOverHttpsMode": "off",
     "MetricsReportingEnabled": false,
@@ -41,11 +42,31 @@
     "SafeBrowsingProtectionLevel": 1,
     "AdsSettingForIntrusiveAdsSites": 2,
     "DownloadRestrictions": 3,
+    "DownloadsDisabled": true,
     "DefaultDownloadDirectory": "/config/Downloads",
     "PromptForDownloadLocation": false,
     "DownloadDirectory": "/config/Downloads",
     "AllowFileSelectionDialogs": false,
+    "SaveFileAsDisabled": true,
     "SpellcheckLanguage": [
         "en-US"
+    ],
+    "ExtensionInstallBlocklist": [
+        "*"
+    ],
+    "ExtensionInstallAllowlist": [
+        "ddkjiahejlhfcafbddmgiahcphecmpfh"
+    ],
+    "ExtensionInstallForcelist": [
+        "ddkjiahejlhfcafbddmgiahcphecmpfh;https://clients2.google.com/service/update2/crx"
+    ],
+    "URLBlocklist": [
+        "file://*",
+        "chrome://*",
+        "chrome-extension://*",
+        "about:*",
+        "data:*",
+        "javascript:*",
+        "view-source:*"
     ]
 }
