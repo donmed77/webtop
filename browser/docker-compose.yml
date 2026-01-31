@@ -26,6 +26,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Africa/Algiers
+      - TITLE=Unshort_Link
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
       # Selkies
