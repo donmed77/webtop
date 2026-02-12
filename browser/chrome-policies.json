@@ -4,10 +4,7 @@
     "DnsOverHttpsMode": "off",
     "MetricsReportingEnabled": false,
     "PasswordManagerEnabled": false,
-    "RestoreOnStartup": 4,
-    "RestoreOnStartupURLs": [
-        "https://www.google.com/?hl=en&gl=us"
-    ],
+    "RestoreOnStartup": 5,
     "ShowFullUrlsInAddressBar": true,
     "ShowHomeButton": false,
     "BookmarkBarEnabled": false,

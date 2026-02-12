@@ -55,5 +55,11 @@ RUN \
 COPY scripts/01-setup-chrome.sh /custom-cont-init.d/01-setup-chrome.sh
 RUN chmod +x /custom-cont-init.d/01-setup-chrome.sh
 
-# Note: 02-security.sh is now baked into the image above
-# Only the i3 config and Chrome preferences setup runs at container start
+# =============================================================================
+# Copy Chrome launcher script (called via docker exec when session starts)
+# =============================================================================
+COPY scripts/launch-chrome.sh /usr/local/bin/launch-chrome.sh
+RUN chmod +x /usr/local/bin/launch-chrome.sh
+
+# Note: Chrome is NOT auto-started. It launches via docker exec with URL argument.
+

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: cloud-browser-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloud-browser-backend
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_PATH=/app/data/cloudbrowser.db
+      - SESSION_DURATION=300
+      - POOL_SIZE=3
+      - PORT_RANGE_START=4000
+      - PORT_RANGE_END=4100
+      - RATE_LIMIT_PER_DAY=10
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - CONTAINER_IMAGE=webtop-browser:latest
+      - FRONTEND_URL=https://test.unshortlink.com
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - backend_data:/app/data
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cloud-browser-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=https://test.unshortlink.com/api
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:
+  backend_data:
