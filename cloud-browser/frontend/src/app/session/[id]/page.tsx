@@ -4,39 +4,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { io, Socket } from "socket.io-client";
-import { Decoder, Reader, tools } from "ts-ebml";
+import fixWebmDuration from "fix-webm-duration";
 
 type SessionStatus = "connecting" | "reconnecting" | "active" | "ended" | "error" | "not_found" | "taken_over";
-
-/**
- * Remux a WebM blob to be fully seekable — adds Duration, SeekHead, and Cues.
- * ts-ebml parses every Cluster, builds a seek index, and rewrites the header.
- * Falls back to the original blob if anything fails.
- */
-async function makeWebmSeekable(blob: Blob): Promise<Blob> {
-    try {
-        const buf = await blob.arrayBuffer();
-        const decoder = new Decoder();
-        const reader = new Reader();
-
-        const elms = decoder.decode(buf);
-        for (const elm of elms) {
-            reader.read(elm);
-        }
-        reader.stop();
-
-        const seekableMetadata = tools.makeMetadataSeekable(
-            reader.metadatas,
-            reader.duration,
-            reader.cues
-        );
-        const body = buf.slice(reader.metadataSize);
-
-        return new Blob([seekableMetadata, body], { type: blob.type });
-    } catch {
-        return blob; // If anything fails, return original
-    }
-}
 
 export default function SessionPage() {
     const router = useRouter();
@@ -291,7 +261,9 @@ export default function SessionPage() {
             };
             recorder.onstop = async () => {
                 const rawBlob = new Blob(recordingChunksRef.current, { type: "video/webm" });
-                const blob = await makeWebmSeekable(rawBlob);
+                // Calculate actual duration accounting for pauses
+                const durationMs = Date.now() - recordingStartTimeRef.current - recordingPausedMsRef.current;
+                const blob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
                 setRecordingBlob(blob);
                 setRecordingSize(blob.size);
                 setRecordingState("ready");
@@ -611,7 +583,7 @@ export default function SessionPage() {
                     ref={iframeRef}
                     src={`/browser/${port}/`}
                     className="flex-1 w-full border-0"
-                    allow="clipboard-read; clipboard-write"
+                    allow="clipboard-read; clipboard-write; autoplay"
                     onLoad={handleIframeLoad}
                 />
             )}
