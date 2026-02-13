@@ -9,30 +9,70 @@ type SessionStatus = "connecting" | "reconnecting" | "active" | "ended" | "error
 
 /**
  * Patch WebM blob header with the correct duration so the file is seekable.
- * MediaRecorder leaves duration as "unknown" — this finds the EBML Duration
- * element (0x4489) in the first 4KB and writes the actual value.
+ * Chrome's MediaRecorder omits the Duration element entirely — this finds the
+ * Info section (0x1549A966), inserts a Duration element, and adjusts sizes.
  */
 async function fixWebmDuration(blob: Blob, durationMs: number): Promise<Blob> {
-    const searchSize = Math.min(blob.size, 4096);
-    const headerBuffer = await blob.slice(0, searchSize).arrayBuffer();
-    const view = new DataView(headerBuffer);
+    try {
+        const headerSize = Math.min(blob.size, 4096);
+        const buf = await blob.slice(0, headerSize).arrayBuffer();
+        const bytes = new Uint8Array(buf);
 
-    for (let i = 0; i < headerBuffer.byteLength - 11; i++) {
-        // Duration element ID = 0x44 0x89
-        if (view.getUint8(i) === 0x44 && view.getUint8(i + 1) === 0x89) {
-            const sizeByte = view.getUint8(i + 2);
-            if (sizeByte === 0x88) {
-                // 8-byte float64 duration
-                view.setFloat64(i + 3, durationMs, false);
-                return new Blob([headerBuffer, blob.slice(searchSize)], { type: blob.type });
-            } else if (sizeByte === 0x84) {
-                // 4-byte float32 duration
-                view.setFloat32(i + 3, durationMs, false);
-                return new Blob([headerBuffer, blob.slice(searchSize)], { type: blob.type });
+        // Find Info element (ID: 0x15 0x49 0xA9 0x66)
+        let infoPos = -1;
+        for (let i = 0; i < bytes.length - 4; i++) {
+            if (bytes[i] === 0x15 && bytes[i + 1] === 0x49 && bytes[i + 2] === 0xA9 && bytes[i + 3] === 0x66) {
+                infoPos = i;
+                break;
             }
         }
+        if (infoPos === -1) return blob;
+
+        // Read Info section VINT size
+        const sizeStart = infoPos + 4;
+        const firstByte = bytes[sizeStart];
+        let vintLen = 0;
+        for (let bit = 7; bit >= 0; bit--) {
+            if (firstByte & (1 << bit)) { vintLen = 8 - bit; break; }
+        }
+        if (vintLen === 0) return blob;
+
+        // Decode current Info size
+        let infoSize = firstByte & ((1 << (8 - vintLen)) - 1);
+        for (let j = 1; j < vintLen; j++) {
+            infoSize = (infoSize * 256) + bytes[sizeStart + j];
+        }
+
+        const infoDataStart = sizeStart + vintLen;
+        const infoEnd = infoDataStart + infoSize;
+
+        // Build Duration element: ID (2) + size VINT (1) + float64 (8) = 11 bytes
+        const durationElement = new Uint8Array(11);
+        durationElement[0] = 0x44; // Duration ID
+        durationElement[1] = 0x89;
+        durationElement[2] = 0x88; // VINT size = 8
+        const dv = new DataView(durationElement.buffer);
+        dv.setFloat64(3, durationMs, false);
+
+        // Encode new Info size (original + 11)
+        const newInfoSize = infoSize + 11;
+        const newSizeBytes = new Uint8Array(vintLen);
+        let remaining = newInfoSize;
+        for (let j = vintLen - 1; j >= 0; j--) {
+            newSizeBytes[j] = remaining & 0xFF;
+            remaining = Math.floor(remaining / 256);
+        }
+        newSizeBytes[0] |= (1 << (8 - vintLen)); // Set VINT marker bit
+
+        // Assemble: [before Info size] + [new size] + [Info content] + [Duration] + [rest of file]
+        const beforeSize = buf.slice(0, sizeStart);
+        const infoContent = buf.slice(infoDataStart, infoEnd);
+        const afterInfo = blob.slice(infoEnd);
+
+        return new Blob([beforeSize, newSizeBytes, infoContent, durationElement, afterInfo], { type: blob.type });
+    } catch {
+        return blob; // If anything fails, return original
     }
-    return blob; // Duration element not found, return as-is
 }
 
 export default function SessionPage() {
