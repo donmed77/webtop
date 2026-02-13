@@ -117,13 +117,14 @@ export class SessionService {
             }
         }
 
+        // Generate session ID first, then assign to container
+        const sessionId = uuidv4();
+
         // Acquire a warm container (fast - container already running without Chrome)
-        const container = await this.containerService.acquireContainer(uuidv4());
+        const container = await this.containerService.acquireContainer(sessionId);
         if (!container) {
             return { queued: true };
         }
-
-        const sessionId = uuidv4();
         const now = new Date();
         const expiresAt = new Date(now.getTime() + this.sessionDuration * 1000);
 
