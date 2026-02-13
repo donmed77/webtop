@@ -337,26 +337,7 @@ export default function SessionPage() {
             return;
         }
         ctx.drawImage(videoCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
-        // Play shutter sound
-        try {
-            const audioCtx = new AudioContext();
-            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.15, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < data.length; i++) {
-                data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.02));
-            }
-            const source = audioCtx.createBufferSource();
-            source.buffer = buffer;
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = "bandpass";
-            filter.frequency.value = 800;
-            filter.Q.value = 1;
-            source.connect(filter);
-            filter.connect(audioCtx.destination);
-            source.start();
-            source.onended = () => audioCtx.close();
-        } catch { /* audio not available */ }
-
+        new Audio("/sounds/shutter.mp3").play().catch(() => { });
         tempCanvas.toBlob((blob) => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
