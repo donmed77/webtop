@@ -64,7 +64,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                 if (clients.size === 0) {
                     this.sessionClients.delete(sessionId);
                     // Grace period before ending session (only if no viewers either)
-                    setTimeout(() => this.checkSessionAbandoned(sessionId), 30000);
+                    setTimeout(() => this.checkSessionAbandoned(sessionId), 35000);
                 }
             }
         }
