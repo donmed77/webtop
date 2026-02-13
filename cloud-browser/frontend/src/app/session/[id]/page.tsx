@@ -50,6 +50,14 @@ export default function SessionPage() {
     const recordingPausedMsRef = useRef(0);
     const pauseStartRef = useRef(0);
     const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+    const shutterSoundRef = useRef<HTMLAudioElement | null>(null);
+
+    // Preload shutter sound once
+    useEffect(() => {
+        const audio = new Audio("/sounds/shutter.mp3");
+        audio.preload = "auto";
+        shutterSoundRef.current = audio;
+    }, []);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 
@@ -337,7 +345,10 @@ export default function SessionPage() {
             return;
         }
         ctx.drawImage(videoCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
-        new Audio("/sounds/shutter.mp3").play().catch(() => { });
+        if (shutterSoundRef.current) {
+            shutterSoundRef.current.currentTime = 0;
+            shutterSoundRef.current.play().catch(() => { });
+        }
         tempCanvas.toBlob((blob) => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
