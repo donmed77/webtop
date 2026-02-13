@@ -20,11 +20,7 @@ export default function Home() {
     setError("");
 
     try {
-      // Add https:// if no protocol
-      let finalUrl = url.trim();
-      if (!finalUrl.match(/^https?:\/\//)) {
-        finalUrl = `https://${finalUrl}`;
-      }
+      const finalUrl = url.trim();
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/session`, {
         method: "POST",
