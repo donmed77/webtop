@@ -440,39 +440,44 @@ export default function SessionPage() {
         );
     }
 
-    // Ended state — show download option if recording was in progress
+    // Ended state — if recording was in progress, show download prompt before navigating
     if (status === "ended") {
+        // No recording was active — go straight to the real session-ended page
+        if (recordingState === "idle" || recordingState === "ready") {
+            if (recordingState === "idle") {
+                router.push("/session-ended");
+                return null;
+            }
+        }
+
         return (
             <main className="min-h-screen bg-background flex items-center justify-center p-4">
-                <div className="text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                            <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                        </div>
-                    </div>
-                    <h2 className="text-xl font-semibold mb-2">Session Ended</h2>
-                    {(recordingState === "ready" || recordingState === "recording" || recordingState === "paused") && (
-                        <div className="mb-4">
-                            {recordingBlob ? (
-                                <button
-                                    onClick={downloadRecording}
-                                    className="flex items-center gap-2 mx-auto px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors cursor-pointer"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    <span>Download Recording ({formatSize(recordingSize)})</span>
-                                </button>
-                            ) : (
-                                <p className="text-muted-foreground text-sm">Finalizing recording...</p>
-                            )}
-                        </div>
+                <div className="text-center max-w-sm">
+                    <p className="text-muted-foreground mb-1">Your session has ended.</p>
+                    {recordingBlob ? (
+                        <>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Your recording is ready — download it before leaving.
+                            </p>
+                            <Button
+                                onClick={downloadRecording}
+                                className="w-full mb-3 cursor-pointer"
+                            >
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Download Recording ({formatSize(recordingSize)})
+                            </Button>
+                        </>
+                    ) : (
+                        <p className="text-sm text-muted-foreground mb-4">Finalizing your recording...</p>
                     )}
-                    <Button onClick={() => router.push("/session-ended")} className="cursor-pointer">
-                        {recordingBlob ? "Continue" : "Start New Session"}
-                    </Button>
+                    <button
+                        onClick={() => router.push("/session-ended")}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                        {recordingBlob ? "Skip & continue →" : ""}
+                    </button>
                 </div>
             </main>
         );
