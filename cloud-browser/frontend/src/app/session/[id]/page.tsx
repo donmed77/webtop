@@ -281,6 +281,7 @@ export default function SessionPage() {
     };
 
     const handleScreenshotMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        e.preventDefault(); // prevent text selection during drag
         const rect = e.currentTarget.getBoundingClientRect();
         setSelectionStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
         setSelectionEnd(null);
@@ -858,7 +859,7 @@ export default function SessionPage() {
             {screenshotMode && (
                 <div
                     ref={selectionOverlayRef}
-                    className="absolute inset-0 z-[60] cursor-crosshair"
+                    className="absolute inset-0 z-[60] cursor-crosshair select-none"
                     style={{ top: iframeRef.current?.offsetTop || 0 }}
                     onMouseDown={handleScreenshotMouseDown}
                     onMouseMove={handleScreenshotMouseMove}
@@ -867,7 +868,7 @@ export default function SessionPage() {
                     {/* Dimmed background */}
                     <div className="absolute inset-0 bg-black/40" />
                     {/* Instructions */}
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
                         <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-3 shadow-lg">
                             <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
