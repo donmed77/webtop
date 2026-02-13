@@ -158,7 +158,8 @@ export default function SessionPage() {
                     originalLog.apply(this, args);
                     const msg = args.join(" ");
                     if (msg.includes("Stream started")) {
-                        setStreamReady(true);
+                        // Brief delay to let the browser finish fullscreen layout
+                        setTimeout(() => setStreamReady(true), 1500);
                     }
                 };
             }
