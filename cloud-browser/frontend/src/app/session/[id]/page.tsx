@@ -29,6 +29,10 @@ export default function SessionPage() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [viewerCount, setViewerCount] = useState(0);
     const [showShareToast, setShowShareToast] = useState(false);
+    const [screenshotMode, setScreenshotMode] = useState(false);
+    const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
+    const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
+    const selectionOverlayRef = useRef<HTMLDivElement>(null);
 
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
@@ -267,6 +271,93 @@ export default function SessionPage() {
             setTimeout(() => setShowShareToast(false), 2000);
         }).catch(() => { });
     };
+
+    // --- Screenshot functions ---
+    const startScreenshotMode = () => setScreenshotMode(true);
+    const cancelScreenshot = () => {
+        setScreenshotMode(false);
+        setSelectionStart(null);
+        setSelectionEnd(null);
+    };
+
+    const handleScreenshotMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setSelectionStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        setSelectionEnd(null);
+    };
+
+    const handleScreenshotMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!selectionStart) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        setSelectionEnd({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    };
+
+    const handleScreenshotMouseUp = () => {
+        if (!selectionStart || !selectionEnd) {
+            cancelScreenshot();
+            return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const iframeWindow = iframeRef.current?.contentWindow as any;
+        const videoCanvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
+        const iframeEl = iframeRef.current;
+        if (!videoCanvas || !iframeEl) {
+            cancelScreenshot();
+            return;
+        }
+
+        const iframeRect = iframeEl.getBoundingClientRect();
+        const scaleX = videoCanvas.width / iframeRect.width;
+        const scaleY = videoCanvas.height / iframeRect.height;
+
+        // Normalize so x/y is always top-left
+        const x = Math.min(selectionStart.x, selectionEnd.x);
+        const y = Math.min(selectionStart.y, selectionEnd.y);
+        const w = Math.abs(selectionEnd.x - selectionStart.x);
+        const h = Math.abs(selectionEnd.y - selectionStart.y);
+
+        // Minimum size guard
+        if (w < 10 || h < 10) {
+            cancelScreenshot();
+            return;
+        }
+
+        const sx = Math.round(x * scaleX);
+        const sy = Math.round(y * scaleY);
+        const sw = Math.round(w * scaleX);
+        const sh = Math.round(h * scaleY);
+
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = sw;
+        tempCanvas.height = sh;
+        const ctx = tempCanvas.getContext("2d");
+        if (!ctx) {
+            cancelScreenshot();
+            return;
+        }
+        ctx.drawImage(videoCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+        tempCanvas.toBlob((blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `screenshot-${sessionId.slice(0, 8)}-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }, "image/png");
+
+        cancelScreenshot();
+    };
+
+    // ESC to cancel screenshot mode
+    useEffect(() => {
+        if (!screenshotMode) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") cancelScreenshot();
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [screenshotMode]);
 
     // --- Recording functions ---
     const formatSize = (bytes: number) => {
@@ -683,6 +774,21 @@ export default function SessionPage() {
 
                         <div className="w-px h-5 bg-white/20" />
 
+                        {/* Screenshot Button */}
+                        <button
+                            onClick={startScreenshotMode}
+                            className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
+                            title="Take area screenshot"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span className="text-xs">Screenshot</span>
+                        </button>
+
+                        <div className="w-px h-5 bg-white/20" />
+
                         {/* Share Button */}
                         <button
                             onClick={copyShareLink}
@@ -746,6 +852,64 @@ export default function SessionPage() {
                     allow="clipboard-read; clipboard-write; autoplay"
                     onLoad={handleIframeLoad}
                 />
+            )}
+
+            {/* Screenshot selection overlay */}
+            {screenshotMode && (
+                <div
+                    ref={selectionOverlayRef}
+                    className="absolute inset-0 z-[60] cursor-crosshair"
+                    style={{ top: iframeRef.current?.offsetTop || 0 }}
+                    onMouseDown={handleScreenshotMouseDown}
+                    onMouseMove={handleScreenshotMouseMove}
+                    onMouseUp={handleScreenshotMouseUp}
+                >
+                    {/* Dimmed background */}
+                    <div className="absolute inset-0 bg-black/40" />
+                    {/* Instructions */}
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                        <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-3 shadow-lg">
+                            <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span className="text-white/90 text-sm">Drag to select area</span>
+                            <span className="text-white/40 text-xs">ESC to cancel</span>
+                        </div>
+                    </div>
+                    {/* Selection rectangle */}
+                    {selectionStart && selectionEnd && (() => {
+                        const x = Math.min(selectionStart.x, selectionEnd.x);
+                        const y = Math.min(selectionStart.y, selectionEnd.y);
+                        const w = Math.abs(selectionEnd.x - selectionStart.x);
+                        const h = Math.abs(selectionEnd.y - selectionStart.y);
+                        return (
+                            <>
+                                {/* Clear window in the dim overlay */}
+                                <div
+                                    className="absolute bg-transparent border-2 border-white/80 border-dashed"
+                                    style={{ left: x, top: y, width: w, height: h }}
+                                />
+                                {/* Re-dim everything except the selection using clip-path */}
+                                <div
+                                    className="absolute inset-0 bg-black/40"
+                                    style={{
+                                        clipPath: `polygon(0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y}px, ${x + w}px ${y}px, ${x + w}px ${y + h}px, ${x}px ${y + h}px, ${x}px 100%, 100% 100%, 100% 0%)`,
+                                    }}
+                                />
+                                {/* Dimension label */}
+                                {w > 60 && h > 30 && (
+                                    <div
+                                        className="absolute text-xs text-white/70 bg-black/60 rounded px-1.5 py-0.5"
+                                        style={{ left: x + w / 2 - 20, top: y + h + 4 }}
+                                    >
+                                        {Math.round(w)}×{Math.round(h)}
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
+                </div>
             )}
 
             {/* Share link copied toast */}
