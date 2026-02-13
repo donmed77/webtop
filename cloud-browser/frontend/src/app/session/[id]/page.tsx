@@ -859,7 +859,7 @@ export default function SessionPage() {
             {screenshotMode && (
                 <div
                     ref={selectionOverlayRef}
-                    className="absolute inset-0 z-[60] cursor-crosshair select-none"
+                    className="absolute inset-0 z-[60] cursor-crosshair select-none overflow-hidden"
                     style={{ top: iframeRef.current?.offsetTop || 0 }}
                     onMouseDown={handleScreenshotMouseDown}
                     onMouseMove={handleScreenshotMouseMove}
