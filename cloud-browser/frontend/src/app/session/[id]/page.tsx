@@ -7,6 +7,34 @@ import { io, Socket } from "socket.io-client";
 
 type SessionStatus = "connecting" | "reconnecting" | "active" | "ended" | "error" | "not_found" | "taken_over";
 
+/**
+ * Patch WebM blob header with the correct duration so the file is seekable.
+ * MediaRecorder leaves duration as "unknown" — this finds the EBML Duration
+ * element (0x4489) in the first 4KB and writes the actual value.
+ */
+async function fixWebmDuration(blob: Blob, durationMs: number): Promise<Blob> {
+    const searchSize = Math.min(blob.size, 4096);
+    const headerBuffer = await blob.slice(0, searchSize).arrayBuffer();
+    const view = new DataView(headerBuffer);
+
+    for (let i = 0; i < headerBuffer.byteLength - 11; i++) {
+        // Duration element ID = 0x44 0x89
+        if (view.getUint8(i) === 0x44 && view.getUint8(i + 1) === 0x89) {
+            const sizeByte = view.getUint8(i + 2);
+            if (sizeByte === 0x88) {
+                // 8-byte float64 duration
+                view.setFloat64(i + 3, durationMs, false);
+                return new Blob([headerBuffer, blob.slice(searchSize)], { type: blob.type });
+            } else if (sizeByte === 0x84) {
+                // 4-byte float32 duration
+                view.setFloat32(i + 3, durationMs, false);
+                return new Blob([headerBuffer, blob.slice(searchSize)], { type: blob.type });
+            }
+        }
+    }
+    return blob; // Duration element not found, return as-is
+}
+
 export default function SessionPage() {
     const router = useRouter();
     const params = useParams();
@@ -249,8 +277,10 @@ export default function SessionPage() {
                     setRecordingSize(prev => prev + e.data.size);
                 }
             };
-            recorder.onstop = () => {
-                const blob = new Blob(recordingChunksRef.current, { type: "video/webm" });
+            recorder.onstop = async () => {
+                const rawBlob = new Blob(recordingChunksRef.current, { type: "video/webm" });
+                const elapsed = recordingElapsed;
+                const blob = await fixWebmDuration(rawBlob, elapsed * 1000);
                 setRecordingBlob(blob);
                 setRecordingSize(blob.size);
                 setRecordingState("ready");
