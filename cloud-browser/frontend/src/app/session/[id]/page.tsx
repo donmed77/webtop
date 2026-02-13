@@ -108,12 +108,17 @@ export default function SessionPage() {
             socket.on("session:ended", () => {
                 if (hasNavigated.current) return;
                 hasNavigated.current = true;
-                // Auto-stop recording before navigating away
-                if (mediaRecorderRef.current?.state === "recording") {
+                localStorage.removeItem(`session_${sessionId}`);
+                // If recording is active, stop it and let onstop handler finalize the blob
+                // The ended UI will show download option
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                    if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
+                        recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
+                    }
+                    recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
                     mediaRecorderRef.current.stop();
                 }
-                localStorage.removeItem(`session_${sessionId}`);
-                router.push("/session-ended");
+                setStatus("ended");
             });
 
             socket.on("session:error", (data) => {
@@ -210,17 +215,20 @@ export default function SessionPage() {
     const handleEndSession = () => {
         if (hasNavigated.current) return;
         hasNavigated.current = true;
-        // Auto-stop recording before navigating away
+        localStorage.removeItem(`session_${sessionId}`);
+        // Fire and forget — don't block on container teardown
+        fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => { });
+        // If recording is active, stop it and show ended UI with download option
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
                 recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
             }
+            recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
             mediaRecorderRef.current.stop();
+            setStatus("ended");
+        } else {
+            router.push("/session-ended");
         }
-        localStorage.removeItem(`session_${sessionId}`);
-        router.push("/session-ended");
-        // Fire and forget — don't block navigation on container teardown
-        fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => { });
     };
 
     // --- Recording functions ---
@@ -244,7 +252,7 @@ export default function SessionPage() {
             recordingStreamRef.current = stream;
             const recorder = new MediaRecorder(stream, {
                 mimeType,
-                videoBitsPerSecond: 5_000_000,
+                videoBitsPerSecond: 2_500_000,
             });
 
             recordingChunksRef.current = [];
@@ -432,13 +440,39 @@ export default function SessionPage() {
         );
     }
 
-    // Ended state
+    // Ended state — show download option if recording was in progress
     if (status === "ended") {
         return (
             <main className="min-h-screen bg-background flex items-center justify-center p-4">
                 <div className="text-center">
-                    <p className="text-muted-foreground mb-4">Session has ended</p>
-                    <Button onClick={() => router.push("/")}>Start New Session</Button>
+                    <div className="flex justify-center mb-4">
+                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                    </div>
+                    <h2 className="text-xl font-semibold mb-2">Session Ended</h2>
+                    {(recordingState === "ready" || recordingState === "recording" || recordingState === "paused") && (
+                        <div className="mb-4">
+                            {recordingBlob ? (
+                                <button
+                                    onClick={downloadRecording}
+                                    className="flex items-center gap-2 mx-auto px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors cursor-pointer"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    <span>Download Recording ({formatSize(recordingSize)})</span>
+                                </button>
+                            ) : (
+                                <p className="text-muted-foreground text-sm">Finalizing recording...</p>
+                            )}
+                        </div>
+                    )}
+                    <Button onClick={() => router.push("/session-ended")} className="cursor-pointer">
+                        {recordingBlob ? "Continue" : "Start New Session"}
+                    </Button>
                 </div>
             </main>
         );
@@ -574,6 +608,9 @@ export default function SessionPage() {
                     title="Show toolbar"
                 >
                     <span className="font-mono text-sm font-semibold">{formatTime(timeRemaining)}</span>
+                    {(recordingState === "recording" || recordingState === "paused") && (
+                        <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black/40 ${recordingState === "recording" ? "bg-red-500 animate-pulse" : "bg-yellow-500"}`} />
+                    )}
                 </button>
             ) : null}
 
