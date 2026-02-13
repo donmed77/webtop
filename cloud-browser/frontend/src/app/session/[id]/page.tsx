@@ -17,9 +17,11 @@ export default function SessionPage() {
     const [status, setStatus] = useState<SessionStatus>("connecting");
     const [error, setError] = useState("");
     const hasNavigated = useRef(false);
+    const [streamReady, setStreamReady] = useState(false);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
     const [reconnectAttempts, setReconnectAttempts] = useState(0);
     const socketRef = useRef<Socket | null>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 
@@ -135,6 +137,36 @@ export default function SessionPage() {
         };
     }, [sessionId, apiUrl, router, checkSession]);
 
+    // Fallback timeout: if stream detection fails, reveal after 15s
+    useEffect(() => {
+        if (status === "active" && !streamReady) {
+            const fallbackTimer = setTimeout(() => {
+                setStreamReady(true);
+            }, 15000);
+            return () => clearTimeout(fallbackTimer);
+        }
+    }, [status, streamReady]);
+
+    // Hook into iframe console.log to detect "Stream started"
+    const handleIframeLoad = () => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const iframeWindow = iframeRef.current?.contentWindow as any;
+            if (iframeWindow?.console) {
+                const originalLog = iframeWindow.console.log;
+                iframeWindow.console.log = function (...args: unknown[]) {
+                    originalLog.apply(this, args);
+                    const msg = args.join(" ");
+                    if (msg.includes("Stream started")) {
+                        setStreamReady(true);
+                    }
+                };
+            }
+        } catch {
+            // Cross-origin fallback — rely on the 15s timeout
+        }
+    };
+
     const handleEndSession = () => {
         if (hasNavigated.current) return;
         hasNavigated.current = true;
@@ -174,17 +206,8 @@ export default function SessionPage() {
 
     const isFlashing = timeRemaining <= 10;
 
-    // Connecting state - simple spinner (progress shown on queue page)
-    if (status === "connecting") {
-        return (
-            <main className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                    <p className="text-muted-foreground">Loading session...</p>
-                </div>
-            </main>
-        );
-    }
+    // Show loading overlay (connecting or stream not ready yet)
+    const showLoading = status === "connecting" || (status === "active" && !streamReady);
 
     // Reconnecting state
     if (status === "reconnecting") {
@@ -254,8 +277,18 @@ export default function SessionPage() {
 
     return (
         <main className="min-h-screen bg-background flex flex-col relative">
-            {/* Toolbar - top center, glassmorphic, max-width fit */}
-            {!isToolbarMinimized ? (
+            {/* Loading overlay — stays until WebRTC stream is ready */}
+            {showLoading && (
+                <div className="absolute inset-0 z-40 bg-background flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+                        <p className="text-muted-foreground">Loading session...</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Toolbar - only visible when stream is ready */}
+            {streamReady && !isToolbarMinimized ? (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
                         {/* Timer */}
@@ -289,7 +322,7 @@ export default function SessionPage() {
                         </button>
                     </div>
                 </div>
-            ) : (
+            ) : streamReady && isToolbarMinimized ? (
                 /* Minimized: small icon in top-right corner */
                 <button
                     onClick={() => setIsToolbarMinimized(false)}
@@ -298,14 +331,16 @@ export default function SessionPage() {
                 >
                     <span className="font-mono text-sm font-semibold">{formatTime(timeRemaining)}</span>
                 </button>
-            )}
+            ) : null}
 
-            {/* Browser iframe */}
+            {/* Browser iframe — loads behind overlay when port is available */}
             {port && (
                 <iframe
+                    ref={iframeRef}
                     src={`/browser/${port}/`}
                     className="flex-1 w-full border-0"
                     allow="clipboard-read; clipboard-write"
+                    onLoad={handleIframeLoad}
                 />
             )}
 
