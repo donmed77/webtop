@@ -507,9 +507,11 @@ export default function AdminPage() {
                                                 key={container.id}
                                                 className={`p-4 rounded-lg border ${container.status === "warm"
                                                     ? "border-green-500 bg-green-500/10"
-                                                    : container.status === "active"
-                                                        ? "border-yellow-500 bg-yellow-500/10"
-                                                        : "border-gray-500 bg-gray-500/10"
+                                                    : container.status === "reconnecting"
+                                                        ? "border-orange-500 bg-orange-500/10 animate-pulse"
+                                                        : container.status === "active"
+                                                            ? "border-yellow-500 bg-yellow-500/10"
+                                                            : "border-gray-500 bg-gray-500/10"
                                                     }`}
                                             >
                                                 <div className="font-mono text-sm">{container.id.slice(0, 12)}...</div>
@@ -518,7 +520,9 @@ export default function AdminPage() {
                                                     <span
                                                         className={`text-xs px-2 py-1 rounded ${container.status === "warm"
                                                             ? "bg-green-500/20 text-green-400"
-                                                            : "bg-yellow-500/20 text-yellow-400"
+                                                            : container.status === "reconnecting"
+                                                                ? "bg-orange-500/20 text-orange-400"
+                                                                : "bg-yellow-500/20 text-yellow-400"
                                                             }`}
                                                     >
                                                         {container.status}

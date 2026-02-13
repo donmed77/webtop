@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Delete, Param, Body, UseGuards, Query } from '@nestjs/common';
 import { SessionService } from '../session/session.service';
+import { SessionGateway } from '../session/session.gateway';
 import { QueueService } from '../queue/queue.service';
 import { ContainerService } from '../container/container.service';
 import { LoggingService } from '../logging/logging.service';
@@ -10,6 +11,7 @@ import { AdminGuard } from './admin.guard';
 export class AdminController {
     constructor(
         private sessionService: SessionService,
+        private sessionGateway: SessionGateway,
         private queueService: QueueService,
         private containerService: ContainerService,
         private loggingService: LoggingService,
@@ -47,7 +49,16 @@ export class AdminController {
 
     @Get('pool')
     getPoolStatus() {
-        return this.containerService.getPoolStatus();
+        const pool = this.containerService.getPoolStatus();
+        const reconnecting = this.sessionGateway.getReconnectingSessions();
+        // Enrich container status with reconnecting info
+        const containers = pool.containers.map(c => ({
+            ...c,
+            status: c.status === 'active' && c.sessionId && reconnecting.has(c.sessionId)
+                ? 'reconnecting' as const
+                : c.status,
+        }));
+        return { ...pool, containers };
     }
 
     // ---- DT5: Stats / Metrics ----

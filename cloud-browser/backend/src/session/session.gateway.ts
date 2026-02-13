@@ -26,6 +26,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     private sessionPrimary: Map<string, string> = new Map(); // sessionId -> primary socketId (EC1)
     private sessionViewers: Map<string, Set<string>> = new Map(); // sessionId -> Set<viewer socketId>
     private clientIsViewer: Map<string, boolean> = new Map(); // socketId -> isViewer
+    private reconnectingSessions: Set<string> = new Set(); // sessions in grace period
 
     constructor(private sessionService: SessionService) {
         // Send timer updates every second
@@ -63,6 +64,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                 }
                 if (clients.size === 0) {
                     this.sessionClients.delete(sessionId);
+                    this.reconnectingSessions.add(sessionId);
                     // Grace period before ending session (only if no viewers either)
                     setTimeout(() => this.checkSessionAbandoned(sessionId), 35000);
                 }
@@ -73,12 +75,17 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     private checkSessionAbandoned(sessionId: string) {
         const clients = this.sessionClients.get(sessionId);
         if (!clients || clients.size === 0) {
+            this.reconnectingSessions.delete(sessionId);
             const session = this.sessionService.getSession(sessionId);
             if (session && session.status === 'active') {
                 this.logger.log(`Session ${sessionId} abandoned, ending...`);
                 this.sessionService.endSession(sessionId, 'abandoned');
             }
         }
+    }
+
+    getReconnectingSessions(): Set<string> {
+        return this.reconnectingSessions;
     }
 
     @SubscribeMessage('session:join')
@@ -97,6 +104,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
             this.sessionClients.set(data.sessionId, new Set());
         }
         this.sessionClients.get(data.sessionId)!.add(client.id);
+        this.reconnectingSessions.delete(data.sessionId);
 
         // Viewer mode: join without takeover
         if (data.viewer) {

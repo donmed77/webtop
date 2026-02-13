@@ -594,6 +594,7 @@ export default function SessionPage() {
             hasNavigated.current = true;
             socketRef.current?.disconnect();
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
+            setPort(null); // unmount iframe so last frame doesn't show through
             router.push("/session-ended");
         }
     }, [reconnectCountdown, status]);

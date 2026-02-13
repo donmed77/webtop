@@ -8,6 +8,6 @@ import { QueueModule } from '../queue/queue.module';
     imports: [forwardRef(() => QueueModule)],
     controllers: [SessionController],
     providers: [SessionService, SessionGateway],
-    exports: [SessionService],
+    exports: [SessionService, SessionGateway],
 })
 export class SessionModule { }
