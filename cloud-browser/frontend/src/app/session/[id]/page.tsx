@@ -105,6 +105,9 @@ export default function SessionPage() {
     const recordingStreamRef = useRef<MediaStream | null>(null);
     const recordingChunksRef = useRef<Blob[]>([]);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const recordingStartTimeRef = useRef(0);
+    const recordingPausedMsRef = useRef(0);
+    const pauseStartRef = useRef(0);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 
@@ -310,6 +313,9 @@ export default function SessionPage() {
 
             recordingChunksRef.current = [];
             setRecordingSize(0);
+            recordingStartTimeRef.current = Date.now();
+            recordingPausedMsRef.current = 0;
+            pauseStartRef.current = 0;
 
             recorder.ondataavailable = (e) => {
                 if (e.data.size > 0) {
@@ -319,8 +325,8 @@ export default function SessionPage() {
             };
             recorder.onstop = async () => {
                 const rawBlob = new Blob(recordingChunksRef.current, { type: "video/webm" });
-                const elapsed = recordingElapsed;
-                const blob = await fixWebmDuration(rawBlob, elapsed * 1000);
+                const durationMs = Date.now() - recordingStartTimeRef.current - recordingPausedMsRef.current;
+                const blob = await fixWebmDuration(rawBlob, durationMs);
                 setRecordingBlob(blob);
                 setRecordingSize(blob.size);
                 setRecordingState("ready");
@@ -354,6 +360,7 @@ export default function SessionPage() {
             mediaRecorderRef.current.pause();
             // Disable stream tracks to prevent frame buffering during pause
             recordingStreamRef.current?.getTracks().forEach(t => t.enabled = false);
+            pauseStartRef.current = Date.now();
             setRecordingState("paused");
             if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         }
@@ -361,6 +368,8 @@ export default function SessionPage() {
 
     const resumeRecording = () => {
         if (mediaRecorderRef.current?.state === "paused") {
+            // Accumulate paused duration
+            recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
             // Re-enable stream tracks before resuming
             recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
             mediaRecorderRef.current.resume();
