@@ -26,7 +26,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     private sessionPrimary: Map<string, string> = new Map(); // sessionId -> primary socketId (EC1)
     private sessionViewers: Map<string, Set<string>> = new Map(); // sessionId -> Set<viewer socketId>
     private clientIsViewer: Map<string, boolean> = new Map(); // socketId -> isViewer
-    private reconnectingSessions: Set<string> = new Set(); // sessions in grace period
+    private reconnectingSessions: Map<string, { disconnectedAt: number; timer: NodeJS.Timeout }> = new Map();
 
     constructor(private sessionService: SessionService) {
         // Send timer updates every second
@@ -64,9 +64,12 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                 }
                 if (clients.size === 0) {
                     this.sessionClients.delete(sessionId);
-                    this.reconnectingSessions.add(sessionId);
-                    // Grace period before ending session (only if no viewers either)
-                    setTimeout(() => this.checkSessionAbandoned(sessionId), 35000);
+                    // Cancel any stale timer from a previous disconnect
+                    const existing = this.reconnectingSessions.get(sessionId);
+                    if (existing) clearTimeout(existing.timer);
+                    // Start fresh grace period
+                    const timer = setTimeout(() => this.checkSessionAbandoned(sessionId), 35000);
+                    this.reconnectingSessions.set(sessionId, { disconnectedAt: Date.now(), timer });
                 }
             }
         }
@@ -81,11 +84,19 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                 this.logger.log(`Session ${sessionId} abandoned, ending...`);
                 this.sessionService.endSession(sessionId, 'abandoned');
             }
+        } else {
+            // Client reconnected before timer fired — just clean up
+            this.reconnectingSessions.delete(sessionId);
         }
     }
 
-    getReconnectingSessions(): Set<string> {
-        return this.reconnectingSessions;
+    getReconnectingSessions(): Map<string, { disconnectedAt: number }> {
+        // Return a simplified view (without the timer handle)
+        const result = new Map<string, { disconnectedAt: number }>();
+        for (const [id, info] of this.reconnectingSessions) {
+            result.set(id, { disconnectedAt: info.disconnectedAt });
+        }
+        return result;
     }
 
     @SubscribeMessage('session:join')
@@ -104,7 +115,12 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
             this.sessionClients.set(data.sessionId, new Set());
         }
         this.sessionClients.get(data.sessionId)!.add(client.id);
-        this.reconnectingSessions.delete(data.sessionId);
+        // Cancel grace period timer if reconnecting
+        const reconnectInfo = this.reconnectingSessions.get(data.sessionId);
+        if (reconnectInfo) {
+            clearTimeout(reconnectInfo.timer);
+            this.reconnectingSessions.delete(data.sessionId);
+        }
 
         // Viewer mode: join without takeover
         if (data.viewer) {

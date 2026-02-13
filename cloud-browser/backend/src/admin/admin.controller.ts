@@ -51,13 +51,15 @@ export class AdminController {
     getPoolStatus() {
         const pool = this.containerService.getPoolStatus();
         const reconnecting = this.sessionGateway.getReconnectingSessions();
-        // Enrich container status with reconnecting info
-        const containers = pool.containers.map(c => ({
-            ...c,
-            status: c.status === 'active' && c.sessionId && reconnecting.has(c.sessionId)
-                ? 'reconnecting' as const
-                : c.status,
-        }));
+        // Enrich container status with reconnecting info + disconnectedAt
+        const containers = pool.containers.map(c => {
+            const info = c.sessionId ? reconnecting.get(c.sessionId) : undefined;
+            return {
+                ...c,
+                status: c.status === 'active' && info ? 'reconnecting' as const : c.status,
+                disconnectedAt: info?.disconnectedAt ?? null,
+            };
+        });
         return { ...pool, containers };
     }
 

@@ -25,7 +25,7 @@ interface PoolStatus {
     total: number;
     warm: number;
     active: number;
-    containers: Array<{ id: string; port: number; status: string }>;
+    containers: Array<{ id: string; port: number; status: string; disconnectedAt: number | null }>;
 }
 
 interface Stats {
@@ -217,7 +217,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (!authenticated) return;
-        const interval = setInterval(fetchAll, 5000);
+        const interval = setInterval(fetchAll, 3000);
         return () => clearInterval(interval);
     }, [authenticated]);
 
@@ -516,7 +516,7 @@ export default function AdminPage() {
                                             >
                                                 <div className="font-mono text-sm">{container.id.slice(0, 12)}...</div>
                                                 <div className="text-sm text-muted-foreground">Port: {container.port}</div>
-                                                <div className="mt-1">
+                                                <div className="mt-1 flex items-center gap-2">
                                                     <span
                                                         className={`text-xs px-2 py-1 rounded ${container.status === "warm"
                                                             ? "bg-green-500/20 text-green-400"
@@ -527,6 +527,11 @@ export default function AdminPage() {
                                                     >
                                                         {container.status}
                                                     </span>
+                                                    {container.status === "reconnecting" && container.disconnectedAt && (
+                                                        <span className="text-xs text-orange-400 font-mono">
+                                                            {Math.max(0, 35 - Math.floor((Date.now() - container.disconnectedAt) / 1000))}s
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
