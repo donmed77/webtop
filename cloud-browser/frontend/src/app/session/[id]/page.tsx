@@ -25,6 +25,17 @@ export default function SessionPage() {
     const socketRef = useRef<Socket | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
+    // Recording state
+    type RecordingState = "idle" | "recording" | "ready";
+    const [recordingState, setRecordingState] = useState<RecordingState>("idle");
+    const [recordingElapsed, setRecordingElapsed] = useState(0);
+    const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+    const [showPrivacyToast, setShowPrivacyToast] = useState(false);
+    const [hasShownToast, setHasShownToast] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordingChunksRef = useRef<Blob[]>([]);
+    const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 
     // Check if session is still valid
@@ -91,6 +102,10 @@ export default function SessionPage() {
             socket.on("session:ended", () => {
                 if (hasNavigated.current) return;
                 hasNavigated.current = true;
+                // Auto-stop recording before navigating away
+                if (mediaRecorderRef.current?.state === "recording") {
+                    mediaRecorderRef.current.stop();
+                }
                 localStorage.removeItem(`session_${sessionId}`);
                 router.push("/session-ended");
             });
@@ -139,6 +154,12 @@ export default function SessionPage() {
             if (latencyIntervalRef.current) {
                 clearInterval(latencyIntervalRef.current);
             }
+            if (recordingTimerRef.current) {
+                clearInterval(recordingTimerRef.current);
+            }
+            if (mediaRecorderRef.current?.state === "recording") {
+                mediaRecorderRef.current.stop();
+            }
         };
     }, [sessionId, apiUrl, router, checkSession]);
 
@@ -183,10 +204,122 @@ export default function SessionPage() {
     const handleEndSession = () => {
         if (hasNavigated.current) return;
         hasNavigated.current = true;
+        // Auto-stop recording before navigating away
+        if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+        }
         localStorage.removeItem(`session_${sessionId}`);
         router.push("/session-ended");
         // Fire and forget — don't block navigation on container teardown
         fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => { });
+    };
+
+    // --- Recording functions ---
+    const startRecording = () => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const iframeWindow = iframeRef.current?.contentWindow as any;
+            const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
+            if (!canvas) return;
+
+            const stream = canvas.captureStream(0);
+            const recorder = new MediaRecorder(stream, {
+                mimeType: "video/webm;codecs=vp9",
+                videoBitsPerSecond: 5_000_000,
+            });
+
+            recordingChunksRef.current = [];
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+            };
+            recorder.onstop = () => {
+                const blob = new Blob(recordingChunksRef.current, { type: "video/webm" });
+                setRecordingBlob(blob);
+                setRecordingState("ready");
+                if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+            };
+
+            recorder.start(1000); // Collect data every second
+            mediaRecorderRef.current = recorder;
+            setRecordingState("recording");
+            setRecordingElapsed(0);
+            setRecordingBlob(null);
+
+            // Elapsed time counter
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingElapsed((prev) => prev + 1);
+            }, 1000);
+
+            // Show privacy toast once per session
+            if (!hasShownToast) {
+                setShowPrivacyToast(true);
+                setHasShownToast(true);
+                setTimeout(() => setShowPrivacyToast(false), 4000);
+            }
+        } catch {
+            // Fallback: VP8 if VP9 not supported
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const iframeWindow = iframeRef.current?.contentWindow as any;
+                const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
+                if (!canvas) return;
+
+                const stream = canvas.captureStream(0);
+                const recorder = new MediaRecorder(stream, {
+                    mimeType: "video/webm",
+                    videoBitsPerSecond: 5_000_000,
+                });
+
+                recordingChunksRef.current = [];
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+                };
+                recorder.onstop = () => {
+                    const blob = new Blob(recordingChunksRef.current, { type: "video/webm" });
+                    setRecordingBlob(blob);
+                    setRecordingState("ready");
+                    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+                };
+
+                recorder.start(1000);
+                mediaRecorderRef.current = recorder;
+                setRecordingState("recording");
+                setRecordingElapsed(0);
+                setRecordingBlob(null);
+
+                recordingTimerRef.current = setInterval(() => {
+                    setRecordingElapsed((prev) => prev + 1);
+                }, 1000);
+
+                if (!hasShownToast) {
+                    setShowPrivacyToast(true);
+                    setHasShownToast(true);
+                    setTimeout(() => setShowPrivacyToast(false), 4000);
+                }
+            } catch {
+                // Recording not supported
+            }
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+        }
+    };
+
+    const downloadRecording = () => {
+        if (!recordingBlob) return;
+        const url = URL.createObjectURL(recordingBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `session-${sessionId.slice(0, 8)}-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+        // Reset to idle after download
+        setRecordingState("idle");
+        setRecordingBlob(null);
+        setRecordingElapsed(0);
     };
 
     const handleRetry = () => {
@@ -322,6 +455,42 @@ export default function SessionPage() {
                         {/* Divider */}
                         <div className="w-px h-5 bg-white/20" />
 
+                        {/* Record Button */}
+                        {recordingState === "idle" && (
+                            <button
+                                onClick={startRecording}
+                                className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
+                                title="Record session"
+                            >
+                                <div className="w-3 h-3 rounded-full border-2 border-current" />
+                                <span className="text-xs">Record</span>
+                            </button>
+                        )}
+                        {recordingState === "recording" && (
+                            <button
+                                onClick={stopRecording}
+                                className="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                title="Stop recording"
+                            >
+                                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                                <span className="text-xs font-mono">{formatTime(recordingElapsed)}</span>
+                            </button>
+                        )}
+                        {recordingState === "ready" && (
+                            <button
+                                onClick={downloadRecording}
+                                className="flex items-center gap-1.5 text-green-400 hover:text-green-300 transition-colors cursor-pointer"
+                                title="Download recording"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span className="text-xs">Download</span>
+                            </button>
+                        )}
+
+                        <div className="w-px h-5 bg-white/20" />
+
                         {/* End Session Button */}
                         <Button
                             variant="destructive"
@@ -365,11 +534,25 @@ export default function SessionPage() {
                 />
             )}
 
-            {/* Custom flash animation */}
+            {/* Privacy toast notification */}
+            {showPrivacyToast && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_0.3s_ease-out]">
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
+                        <span className="text-sm">🔒</span>
+                        <p className="text-white/90 text-sm">Recording is saved locally on your device only. We do not store any recordings.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom animations */}
             <style jsx>{`
                 @keyframes flash {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.3; }
+                }
+                @keyframes slideUp {
+                    from { opacity: 0; transform: translate(-50%, 20px); }
+                    to { opacity: 1; transform: translate(-50%, 0); }
                 }
             `}</style>
         </main>
