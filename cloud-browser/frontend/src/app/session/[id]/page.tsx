@@ -41,6 +41,7 @@ export default function SessionPage() {
     const recordingStartTimeRef = useRef(0);
     const recordingPausedMsRef = useRef(0);
     const pauseStartRef = useRef(0);
+    const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 
@@ -59,7 +60,6 @@ export default function SessionPage() {
 
     // Handle socket connection and reconnection
     useEffect(() => {
-        let reconnectTimer: NodeJS.Timeout;
 
         const connectSocket = async () => {
             // First check if session exists
@@ -111,13 +111,7 @@ export default function SessionPage() {
                 localStorage.removeItem(`session_${sessionId}`);
                 // If recording is active, stop it and let onstop handler finalize the blob
                 // The ended UI will show download option
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-                    if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
-                        recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
-                    }
-                    recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
-                    mediaRecorderRef.current.stop();
-                }
+                stopRecorderGracefully();
                 setStatus("ended");
             });
 
@@ -242,12 +236,8 @@ export default function SessionPage() {
         // Fire and forget — don't block on container teardown
         fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => { });
         // If recording is active, stop it and show ended UI with download option
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
-                recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
-            }
-            recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
-            mediaRecorderRef.current.stop();
+        const wasRecording = stopRecorderGracefully();
+        if (wasRecording) {
             setStatus("ended");
         } else {
             router.push("/session-ended");
@@ -279,6 +269,7 @@ export default function SessionPage() {
                 const gainNode = iframeWindow?.__audioGain;
                 if (audioCtx && gainNode && audioCtx.state === "running") {
                     const dest = audioCtx.createMediaStreamDestination();
+                    audioDestRef.current = dest;
                     gainNode.connect(dest);
                     dest.stream.getAudioTracks().forEach((track: MediaStreamTrack) => {
                         stream.addTrack(track);
@@ -310,6 +301,15 @@ export default function SessionPage() {
                 }
             };
             recorder.onstop = async () => {
+                // Clean up audio destination node
+                if (audioDestRef.current) {
+                    try { audioDestRef.current.disconnect(); } catch { /* already disconnected */ }
+                    audioDestRef.current = null;
+                }
+                // Stop all stream tracks
+                recordingStreamRef.current?.getTracks().forEach(t => t.stop());
+                recordingStreamRef.current = null;
+
                 const rawBlob = new Blob(recordingChunksRef.current, { type: "video/webm" });
                 // Calculate actual duration accounting for pauses
                 const durationMs = Date.now() - recordingStartTimeRef.current - recordingPausedMsRef.current;
@@ -367,16 +367,19 @@ export default function SessionPage() {
         }
     };
 
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            // If stopped while paused, accumulate the final pause duration
-            if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
-                recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
-            }
-            // Re-enable tracks if paused so the final data flush works
-            recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
-            mediaRecorderRef.current.stop();
+    /** Stop the MediaRecorder gracefully, accumulating pause time. Returns true if recorder was active. */
+    const stopRecorderGracefully = (): boolean => {
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return false;
+        if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
+            recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
         }
+        recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
+        mediaRecorderRef.current.stop();
+        return true;
+    };
+
+    const stopRecording = () => {
+        stopRecorderGracefully();
     };
 
     const downloadRecording = () => {
@@ -485,11 +488,9 @@ export default function SessionPage() {
     // Ended state — if recording was in progress, show download prompt before navigating
     if (status === "ended") {
         // No recording was active — go straight to the real session-ended page
-        if (recordingState === "idle" || recordingState === "ready") {
-            if (recordingState === "idle") {
-                router.push("/session-ended");
-                return null;
-            }
+        if (recordingState === "idle") {
+            router.push("/session-ended");
+            return null;
         }
 
         return (
