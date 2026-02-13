@@ -22,7 +22,8 @@ export default function SessionPage() {
     const hasNavigated = useRef(false);
     const [streamReady, setStreamReady] = useState(false);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
-    const [reconnectAttempts, setReconnectAttempts] = useState(0);
+    const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
+    const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [latency, setLatency] = useState<number | null>(null);
     const latencyIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const socketRef = useRef<Socket | null>(null);
@@ -94,16 +95,20 @@ export default function SessionPage() {
             // Session exists, connect via WebSocket
             const socket = io(apiUrl, {
                 reconnection: true,
-                reconnectionAttempts: 8,
+                reconnectionAttempts: 30,
                 reconnectionDelay: 1000,
-                reconnectionDelayMax: 5000,
+                reconnectionDelayMax: 2000,
             });
 
             socketRef.current = socket;
 
             socket.on("connect", () => {
                 socket.emit("session:join", { sessionId, viewer: isViewer });
-                setReconnectAttempts(0);
+                setReconnectCountdown(null);
+                if (reconnectTimerRef.current) {
+                    clearInterval(reconnectTimerRef.current);
+                    reconnectTimerRef.current = null;
+                }
             });
 
             socket.on("session:joined", (data) => {
@@ -163,17 +168,33 @@ export default function SessionPage() {
                     // Server disconnected us, session might have ended
                     setStatus("ended");
                 } else {
-                    // Connectivity issue, try to reconnect
+                    // Connectivity issue — start 30s countdown
                     setStatus("reconnecting");
+                    setReconnectCountdown(30);
+                    if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current);
+                    reconnectTimerRef.current = setInterval(() => {
+                        setReconnectCountdown(prev => {
+                            if (prev === null || prev <= 1) {
+                                if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current);
+                                reconnectTimerRef.current = null;
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
                 }
             });
 
-            socket.on("reconnect_attempt", (attempt) => {
-                setReconnectAttempts(attempt);
+            socket.on("reconnect_attempt", () => {
                 setStatus("reconnecting");
             });
 
             socket.on("reconnect", () => {
+                setReconnectCountdown(null);
+                if (reconnectTimerRef.current) {
+                    clearInterval(reconnectTimerRef.current);
+                    reconnectTimerRef.current = null;
+                }
                 socket.emit("session:join", { sessionId, viewer: isViewer });
             });
 
@@ -566,18 +587,16 @@ export default function SessionPage() {
     // Show loading overlay (connecting or stream not ready yet)
     const showLoading = status === "connecting" || (status === "active" && !streamReady);
 
-    // Reconnecting state
-    if (status === "reconnecting") {
-        return (
-            <main className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                    <p className="text-yellow-500 mb-2">Connection lost. Reconnecting...</p>
-                    <p className="text-muted-foreground text-sm">Attempt {reconnectAttempts}/5</p>
-                </div>
-            </main>
-        );
-    }
+    // Reconnect countdown — redirect when it hits 0
+    useEffect(() => {
+        if (reconnectCountdown === 0 && status === "reconnecting") {
+            if (hasNavigated.current) return;
+            hasNavigated.current = true;
+            socketRef.current?.disconnect();
+            if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
+            router.push("/session-ended");
+        }
+    }, [reconnectCountdown, status]);
 
     // Session not found
     if (status === "not_found") {
@@ -928,6 +947,32 @@ export default function SessionPage() {
                             </>
                         );
                     })()}
+                </div>
+            )}
+
+            {/* Reconnection countdown overlay — stream stays visible behind */}
+            {status === "reconnecting" && reconnectCountdown !== null && (
+                <div className="absolute inset-0 z-[55] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="text-center">
+                        {/* Circular countdown */}
+                        <div className="relative w-20 h-20 mx-auto mb-4">
+                            <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                                <circle cx="40" cy="40" r="36" fill="none" stroke="white" strokeOpacity="0.1" strokeWidth="4" />
+                                <circle
+                                    cx="40" cy="40" r="36" fill="none"
+                                    stroke="#eab308" strokeWidth="4" strokeLinecap="round"
+                                    strokeDasharray={`${2 * Math.PI * 36}`}
+                                    strokeDashoffset={`${2 * Math.PI * 36 * (1 - reconnectCountdown / 30)}`}
+                                    className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+                                />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-yellow-500">
+                                {reconnectCountdown}
+                            </span>
+                        </div>
+                        <p className="text-yellow-500 font-medium mb-1">Connection lost</p>
+                        <p className="text-white/50 text-sm">Reconnecting...</p>
+                    </div>
                 </div>
             )}
 
