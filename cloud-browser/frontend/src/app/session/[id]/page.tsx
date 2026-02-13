@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { io, Socket } from "socket.io-client";
 import fixWebmDuration from "fix-webm-duration";
@@ -11,7 +11,9 @@ type SessionStatus = "connecting" | "reconnecting" | "active" | "ended" | "error
 export default function SessionPage() {
     const router = useRouter();
     const params = useParams();
+    const searchParams = useSearchParams();
     const sessionId = params.id as string;
+    const isViewer = searchParams.get("viewer") === "true";
 
     const [port, setPort] = useState<number | null>(null);
     const [timeRemaining, setTimeRemaining] = useState(300);
@@ -25,6 +27,8 @@ export default function SessionPage() {
     const latencyIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const socketRef = useRef<Socket | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [viewerCount, setViewerCount] = useState(0);
+    const [showShareToast, setShowShareToast] = useState(false);
 
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
@@ -81,7 +85,7 @@ export default function SessionPage() {
             socketRef.current = socket;
 
             socket.on("connect", () => {
-                socket.emit("session:join", { sessionId });
+                socket.emit("session:join", { sessionId, viewer: isViewer });
                 setReconnectAttempts(0);
             });
 
@@ -90,11 +94,13 @@ export default function SessionPage() {
                 setTimeRemaining(data.timeRemaining);
                 setStatus("active");
 
-                // Store session info for reconnection
-                localStorage.setItem(`session_${sessionId}`, JSON.stringify({
-                    port: data.port,
-                    connectedAt: Date.now(),
-                }));
+                // Only store session info for controller (not viewer)
+                if (!isViewer) {
+                    localStorage.setItem(`session_${sessionId}`, JSON.stringify({
+                        port: data.port,
+                        connectedAt: Date.now(),
+                    }));
+                }
             });
 
             socket.on("session:timer", (data) => {
@@ -108,11 +114,21 @@ export default function SessionPage() {
             socket.on("session:ended", () => {
                 if (hasNavigated.current) return;
                 hasNavigated.current = true;
-                localStorage.removeItem(`session_${sessionId}`);
+                if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
+                // Viewers just navigate away on session end
+                if (isViewer) {
+                    router.push("/session-ended");
+                    return;
+                }
                 // If recording is active, stop it and let onstop handler finalize the blob
                 // The ended UI will show download option
                 stopRecorderGracefully();
                 setStatus("ended");
+            });
+
+            // Viewer count updates (controller only)
+            socket.on("session:viewer-count", (data) => {
+                setViewerCount(data.count);
             });
 
             socket.on("session:error", (data) => {
@@ -141,7 +157,7 @@ export default function SessionPage() {
             });
 
             socket.on("reconnect", () => {
-                socket.emit("session:join", { sessionId });
+                socket.emit("session:join", { sessionId, viewer: isViewer });
             });
 
             socket.on("reconnect_failed", () => {
@@ -166,7 +182,7 @@ export default function SessionPage() {
                 mediaRecorderRef.current.stop();
             }
         };
-    }, [sessionId, apiUrl, router, checkSession]);
+    }, [sessionId, apiUrl, router, checkSession, isViewer]);
 
     // Fallback timeout: if stream detection fails, reveal after 15s
     useEffect(() => {
@@ -230,7 +246,7 @@ export default function SessionPage() {
     };
 
     const handleEndSession = () => {
-        if (hasNavigated.current) return;
+        if (isViewer || hasNavigated.current) return;
         hasNavigated.current = true;
         localStorage.removeItem(`session_${sessionId}`);
         // Fire and forget — don't block on container teardown
@@ -242,6 +258,14 @@ export default function SessionPage() {
         } else {
             router.push("/session-ended");
         }
+    };
+
+    const copyShareLink = () => {
+        const url = `${window.location.origin}/session/${sessionId}?viewer=true`;
+        navigator.clipboard.writeText(url).then(() => {
+            setShowShareToast(true);
+            setTimeout(() => setShowShareToast(false), 2000);
+        }).catch(() => { });
     };
 
     // --- Recording functions ---
@@ -539,7 +563,39 @@ export default function SessionPage() {
             )}
 
             {/* Toolbar - only visible when stream is ready */}
-            {streamReady && !isToolbarMinimized ? (
+            {streamReady && !isToolbarMinimized && isViewer ? (
+                /* Viewer toolbar: minimal — timer + latency + viewing label */
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
+                    <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
+                        <span
+                            className={`font-mono text-lg font-semibold ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                        >
+                            {formatTime(timeRemaining)}
+                        </span>
+                        <div className="w-px h-5 bg-white/20" />
+                        <span className={`text-xs font-mono ${latency === null ? "text-white/40" : latency < 50 ? "text-green-400" : latency < 100 ? "text-yellow-400" : "text-red-400"}`}>
+                            {latency !== null ? `${latency}ms` : "—ms"}
+                        </span>
+                        <div className="w-px h-5 bg-white/20" />
+                        <span className="text-xs text-white/50 flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Viewing
+                        </span>
+                        <button
+                            onClick={() => setIsToolbarMinimized(true)}
+                            className="text-white/60 hover:text-white transition-colors cursor-pointer"
+                            title="Minimize"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            ) : streamReady && !isToolbarMinimized ? (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
                         {/* Timer */}
@@ -627,6 +683,25 @@ export default function SessionPage() {
 
                         <div className="w-px h-5 bg-white/20" />
 
+                        {/* Share Button */}
+                        <button
+                            onClick={copyShareLink}
+                            className="relative flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
+                            title="Copy viewer link"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            <span className="text-xs">Share</span>
+                            {viewerCount > 0 && (
+                                <span className="absolute -top-1.5 -right-2 bg-blue-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                                    {viewerCount}
+                                </span>
+                            )}
+                        </button>
+
+                        <div className="w-px h-5 bg-white/20" />
+
                         {/* End Session Button */}
                         <Button
                             variant="destructive"
@@ -666,11 +741,21 @@ export default function SessionPage() {
             {port && (
                 <iframe
                     ref={iframeRef}
-                    src={`/browser/${port}/`}
+                    src={`/browser/${port}/${isViewer ? "#shared" : ""}`}
                     className="flex-1 w-full border-0"
                     allow="clipboard-read; clipboard-write; autoplay"
                     onLoad={handleIframeLoad}
                 />
+            )}
+
+            {/* Share link copied toast */}
+            {showShareToast && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_0.3s_ease-out]">
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
+                        <span className="text-sm">🔗</span>
+                        <p className="text-white/90 text-sm">Viewer link copied to clipboard!</p>
+                    </div>
+                </div>
             )}
 
             {/* Privacy toast notification */}

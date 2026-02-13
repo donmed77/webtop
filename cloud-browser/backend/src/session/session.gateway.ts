@@ -24,6 +24,8 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     private clientSessions: Map<string, string> = new Map(); // socketId -> sessionId
     private sessionClients: Map<string, Set<string>> = new Map(); // sessionId -> Set<socketId>
     private sessionPrimary: Map<string, string> = new Map(); // sessionId -> primary socketId (EC1)
+    private sessionViewers: Map<string, Set<string>> = new Map(); // sessionId -> Set<viewer socketId>
+    private clientIsViewer: Map<string, boolean> = new Map(); // socketId -> isViewer
 
     constructor(private sessionService: SessionService) {
         // Send timer updates every second
@@ -39,6 +41,19 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
         const sessionId = this.clientSessions.get(client.id);
         if (sessionId) {
             this.clientSessions.delete(client.id);
+            const isViewer = this.clientIsViewer.get(client.id);
+            this.clientIsViewer.delete(client.id);
+
+            // Clean up from viewers set
+            if (isViewer) {
+                const viewers = this.sessionViewers.get(sessionId);
+                if (viewers) {
+                    viewers.delete(client.id);
+                    if (viewers.size === 0) this.sessionViewers.delete(sessionId);
+                }
+                this.emitViewerCount(sessionId);
+            }
+
             const clients = this.sessionClients.get(sessionId);
             if (clients) {
                 clients.delete(client.id);
@@ -48,7 +63,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                 }
                 if (clients.size === 0) {
                     this.sessionClients.delete(sessionId);
-                    // Grace period before ending session
+                    // Grace period before ending session (only if no viewers either)
                     setTimeout(() => this.checkSessionAbandoned(sessionId), 30000);
                 }
             }
@@ -69,7 +84,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @SubscribeMessage('session:join')
     handleJoinSession(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { sessionId: string },
+        @MessageBody() data: { sessionId: string; viewer?: boolean },
     ) {
         const session = this.sessionService.getSession(data.sessionId);
         if (!session || session.status !== 'active') {
@@ -82,6 +97,26 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
             this.sessionClients.set(data.sessionId, new Set());
         }
         this.sessionClients.get(data.sessionId)!.add(client.id);
+
+        // Viewer mode: join without takeover
+        if (data.viewer) {
+            this.clientIsViewer.set(client.id, true);
+            if (!this.sessionViewers.has(data.sessionId)) {
+                this.sessionViewers.set(data.sessionId, new Set());
+            }
+            this.sessionViewers.get(data.sessionId)!.add(client.id);
+
+            client.emit('session:joined', {
+                sessionId: session.id,
+                port: session.port,
+                timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
+                isViewer: true,
+            });
+
+            this.emitViewerCount(data.sessionId);
+            this.logger.log(`Client ${client.id} joined session ${data.sessionId} as viewer`);
+            return;
+        }
 
         // EC1: Single-tab enforcement - new tab becomes primary, old tab gets takeover
         const currentPrimary = this.sessionPrimary.get(data.sessionId);
@@ -100,6 +135,8 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
             isPrimary: true,
         });
 
+        // Send current viewer count to the new primary
+        this.emitViewerCount(data.sessionId);
         this.logger.log(`Client ${client.id} joined session ${data.sessionId} as primary`);
     }
 
@@ -150,6 +187,17 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                 if (socket) {
                     socket.emit('session:ended', { reason });
                 }
+            }
+        }
+    }
+
+    private emitViewerCount(sessionId: string) {
+        const count = this.sessionViewers.get(sessionId)?.size || 0;
+        const primaryId = this.sessionPrimary.get(sessionId);
+        if (primaryId) {
+            const socket = this.server.sockets.sockets.get(primaryId);
+            if (socket) {
+                socket.emit('session:viewer-count', { count });
             }
         }
     }
