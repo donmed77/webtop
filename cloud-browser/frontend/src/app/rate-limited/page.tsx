@@ -1,0 +1,88 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+interface RateLimitInfo {
+    used: number;
+    remaining: number;
+    limit: number;
+}
+
+export default function RateLimitedPage() {
+    const router = useRouter();
+    const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
+
+    useEffect(() => {
+        fetch(`${apiUrl}/api/session/rate-limit/status`)
+            .then((res) => res.json())
+            .then((data) => setRateLimit(data))
+            .catch(() => setRateLimit(null));
+    }, [apiUrl]);
+
+    return (
+        <main className="min-h-screen bg-background flex items-center justify-center p-4">
+            <Card className="w-full max-w-md">
+                <CardContent className="pt-8 pb-8 text-center">
+                    {/* Icon */}
+                    <div className="flex justify-center mb-4">
+                        <div className="h-16 w-16 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Title */}
+                    <h1 className="text-2xl font-bold mb-2">Daily Limit Reached</h1>
+
+                    {/* Message */}
+                    <p className="text-muted-foreground mb-4">
+                        You&apos;ve used all your free sessions for today.
+                    </p>
+
+                    {/* Usage info */}
+                    {rateLimit !== null && (
+                        <div className="mb-6">
+                            <p className="text-muted-foreground mb-3">
+                                <span className="font-semibold text-foreground">{rateLimit.used}</span> of{" "}
+                                <span className="font-semibold text-foreground">{rateLimit.limit}</span> sessions used today
+                            </p>
+
+                            {/* Progress bar */}
+                            <div className="w-full bg-muted rounded-full h-2 mb-4">
+                                <div
+                                    className="h-2 rounded-full bg-red-500 transition-all"
+                                    style={{ width: `${Math.min(100, (rateLimit.used / rateLimit.limit) * 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Upgrade CTA */}
+                    <a
+                        href="mailto:upgrade@unshortlink.com?subject=I'd like more sessions"
+                        className="block w-full"
+                    >
+                        <Button className="w-full mb-3 cursor-pointer">
+                            Get More Sessions
+                        </Button>
+                    </a>
+
+                    {/* Back home */}
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push("/")}
+                        className="w-full cursor-pointer"
+                    >
+                        Back to Home
+                    </Button>
+                </CardContent>
+            </Card>
+        </main>
+    );
+}
