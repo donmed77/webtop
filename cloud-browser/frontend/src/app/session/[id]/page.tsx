@@ -50,13 +50,19 @@ export default function SessionPage() {
     const recordingPausedMsRef = useRef(0);
     const pauseStartRef = useRef(0);
     const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
-    const shutterSoundRef = useRef<HTMLAudioElement | null>(null);
+    const shutterCtxRef = useRef<AudioContext | null>(null);
+    const shutterBufferRef = useRef<AudioBuffer | null>(null);
 
-    // Preload shutter sound once
+    // Preload + decode shutter sound into AudioBuffer for instant playback
     useEffect(() => {
-        const audio = new Audio("/sounds/shutter.mp3");
-        audio.preload = "auto";
-        shutterSoundRef.current = audio;
+        const ctx = new AudioContext();
+        shutterCtxRef.current = ctx;
+        fetch("/sounds/shutter.mp3")
+            .then(r => r.arrayBuffer())
+            .then(buf => ctx.decodeAudioData(buf))
+            .then(decoded => { shutterBufferRef.current = decoded; })
+            .catch(() => { });
+        return () => { ctx.close().catch(() => { }); };
     }, []);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
@@ -345,9 +351,11 @@ export default function SessionPage() {
             return;
         }
         ctx.drawImage(videoCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
-        if (shutterSoundRef.current) {
-            shutterSoundRef.current.currentTime = 0;
-            shutterSoundRef.current.play().catch(() => { });
+        if (shutterCtxRef.current && shutterBufferRef.current) {
+            const source = shutterCtxRef.current.createBufferSource();
+            source.buffer = shutterBufferRef.current;
+            source.connect(shutterCtxRef.current.destination);
+            source.start();
         }
         tempCanvas.toBlob((blob) => {
             if (!blob) return;
