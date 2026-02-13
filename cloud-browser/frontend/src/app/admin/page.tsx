@@ -529,7 +529,7 @@ export default function AdminPage() {
                                                     </span>
                                                     {container.status === "reconnecting" && container.disconnectedAt && (
                                                         <span className="text-xs text-orange-400 font-mono">
-                                                            {Math.max(0, 35 - Math.floor((Date.now() - container.disconnectedAt) / 1000))}s
+                                                            {Math.max(0, 30 - Math.floor((Date.now() - container.disconnectedAt) / 1000))}s
                                                         </span>
                                                     )}
                                                 </div>
