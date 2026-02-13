@@ -34,6 +34,7 @@ export default function SessionPage() {
     const [showPrivacyToast, setShowPrivacyToast] = useState(false);
     const [hasShownToast, setHasShownToast] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordingStreamRef = useRef<MediaStream | null>(null);
     const recordingChunksRef = useRef<Blob[]>([]);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -233,6 +234,7 @@ export default function SessionPage() {
 
         try {
             const stream = canvas.captureStream(60);
+            recordingStreamRef.current = stream;
             const recorder = new MediaRecorder(stream, {
                 mimeType,
                 videoBitsPerSecond: 5_000_000,
@@ -280,6 +282,8 @@ export default function SessionPage() {
     const pauseRecording = () => {
         if (mediaRecorderRef.current?.state === "recording") {
             mediaRecorderRef.current.pause();
+            // Disable stream tracks to prevent frame buffering during pause
+            recordingStreamRef.current?.getTracks().forEach(t => t.enabled = false);
             setRecordingState("paused");
             if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         }
@@ -287,6 +291,8 @@ export default function SessionPage() {
 
     const resumeRecording = () => {
         if (mediaRecorderRef.current?.state === "paused") {
+            // Re-enable stream tracks before resuming
+            recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
             mediaRecorderRef.current.resume();
             setRecordingState("recording");
             recordingTimerRef.current = setInterval(() => {
@@ -297,6 +303,8 @@ export default function SessionPage() {
 
     const stopRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            // Re-enable tracks if paused so the final data flush works
+            recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
             mediaRecorderRef.current.stop();
         }
     };
