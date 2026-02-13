@@ -313,15 +313,11 @@ export default function SessionPage() {
                         </span>
 
                         {/* Latency */}
-                        {latency !== null && (
-                            <>
-                                <div className="w-px h-5 bg-white/20" />
-                                <span className={`text-xs font-mono ${latency < 50 ? "text-green-400" : latency < 100 ? "text-yellow-400" : "text-red-400"
-                                    }`}>
-                                    {latency}ms
-                                </span>
-                            </>
-                        )}
+                        <div className="w-px h-5 bg-white/20" />
+                        <span className={`text-xs font-mono ${latency === null ? "text-white/40" : latency < 50 ? "text-green-400" : latency < 100 ? "text-yellow-400" : "text-red-400"
+                            }`}>
+                            {latency !== null ? `${latency}ms` : "—ms"}
+                        </span>
 
                         {/* Divider */}
                         <div className="w-px h-5 bg-white/20" />
