@@ -20,6 +20,8 @@ export default function SessionPage() {
     const [streamReady, setStreamReady] = useState(false);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
     const [reconnectAttempts, setReconnectAttempts] = useState(0);
+    const [latency, setLatency] = useState<number | null>(null);
+    const latencyIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const socketRef = useRef<Socket | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -134,6 +136,9 @@ export default function SessionPage() {
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
+            if (latencyIntervalRef.current) {
+                clearInterval(latencyIntervalRef.current);
+            }
         };
     }, [sessionId, apiUrl, router, checkSession]);
 
@@ -147,7 +152,7 @@ export default function SessionPage() {
         }
     }, [status, streamReady]);
 
-    // Hook into iframe console.log to detect "Stream started"
+    // Hook into iframe console.log to detect "Stream started" + poll latency
     const handleIframeLoad = () => {
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,6 +168,13 @@ export default function SessionPage() {
                     }
                 };
             }
+
+            // Poll Selkies' network_stats for latency
+            if (latencyIntervalRef.current) clearInterval(latencyIntervalRef.current);
+            latencyIntervalRef.current = setInterval(() => {
+                const ms = iframeWindow?.network_stats?.latency_ms;
+                if (ms !== undefined && ms !== null) setLatency(Math.round(ms));
+            }, 1000);
         } catch {
             // Cross-origin fallback — rely on the 15s timeout
         }
@@ -299,6 +311,17 @@ export default function SessionPage() {
                         >
                             {formatTime(timeRemaining)}
                         </span>
+
+                        {/* Latency */}
+                        {latency !== null && (
+                            <>
+                                <div className="w-px h-5 bg-white/20" />
+                                <span className={`text-xs font-mono ${latency < 50 ? "text-green-400" : latency < 100 ? "text-yellow-400" : "text-red-400"
+                                    }`}>
+                                    {latency}ms
+                                </span>
+                            </>
+                        )}
 
                         {/* Divider */}
                         <div className="w-px h-5 bg-white/20" />
