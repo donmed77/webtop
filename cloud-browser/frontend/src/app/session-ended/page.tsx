@@ -1,23 +1,33 @@
 "use client";
 
-import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+interface RateLimitInfo {
+    used: number;
+    remaining: number;
+    limit: number;
+}
+
 function SessionEndedContent() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const duration = searchParams.get("duration") || "300";
-    const reason = searchParams.get("reason") || "ended";
-    const rateLimited = searchParams.get("rateLimited") === "true";
+    const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
 
-    const formatDuration = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, "0")}`;
-    };
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
+
+    useEffect(() => {
+        fetch(`${apiUrl}/api/session/rate-limit/status`)
+            .then((res) => res.json())
+            .then((data) => setRateLimit(data))
+            .catch(() => {
+                // Fallback if endpoint is unavailable
+                setRateLimit(null);
+            });
+    }, [apiUrl]);
+
+    const isLimited = rateLimit !== null && rateLimit.remaining <= 0;
 
     return (
         <Card className="w-full max-w-md">
@@ -31,34 +41,46 @@ function SessionEndedContent() {
                     </div>
                 </div>
 
-                {/* E1: Title */}
+                {/* Title */}
                 <h1 className="text-2xl font-bold mb-2">Session Ended</h1>
 
-                {/* E1: Duration */}
-                <p className="text-muted-foreground mb-6">
-                    You browsed for {formatDuration(parseInt(duration))}
-                </p>
+                {/* Rate limit info */}
+                {rateLimit !== null ? (
+                    <div className="mb-6">
+                        <p className="text-muted-foreground mb-3">
+                            You&apos;ve used <span className="font-semibold text-foreground">{rateLimit.used}</span> of{" "}
+                            <span className="font-semibold text-foreground">{rateLimit.limit}</span> sessions today
+                        </p>
 
-                {/* E4: Rate limit info if applicable */}
-                {rateLimited && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-6">
-                        <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                            You've reached your daily limit of 10 sessions.
-                            Come back tomorrow for more!
+                        {/* Progress bar */}
+                        <div className="w-full bg-muted rounded-full h-2 mb-2">
+                            <div
+                                className={`h-2 rounded-full transition-all ${isLimited ? "bg-red-500" : rateLimit.remaining <= 2 ? "bg-yellow-500" : "bg-primary"
+                                    }`}
+                                style={{ width: `${Math.min(100, (rateLimit.used / rateLimit.limit) * 100)}%` }}
+                            />
+                        </div>
+
+                        <p className="text-sm text-muted-foreground">
+                            {isLimited
+                                ? "You've reached your daily limit. Come back tomorrow!"
+                                : `${rateLimit.remaining} session${rateLimit.remaining !== 1 ? "s" : ""} remaining today`}
                         </p>
                     </div>
+                ) : (
+                    <p className="text-muted-foreground mb-6">Thanks for using Cloud Browser!</p>
                 )}
 
-                {/* E1: Start New Session button */}
+                {/* Start New Session button */}
                 <Button
                     onClick={() => router.push("/")}
                     className="w-full mb-3 cursor-pointer"
-                    disabled={rateLimited}
+                    disabled={isLimited}
                 >
                     Start New Session
                 </Button>
 
-                {/* E1: Feedback link */}
+                {/* Feedback link */}
                 <a
                     href="mailto:feedback@unshortlink.com?subject=Session Feedback"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors"

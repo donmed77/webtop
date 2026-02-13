@@ -36,14 +36,15 @@ export default function Home() {
 
       if (!response.ok) {
         setError(data.message || "Failed to start session");
+        setLoading(false);
         return;
       }
 
       // Always navigate to queue page - unified flow
+      // Don't reset loading — keep button disabled until page transitions
       router.push(`/queue/${data.queueId}`);
     } catch (err) {
       setError("Failed to connect to server");
-    } finally {
       setLoading(false);
     }
   };
@@ -71,7 +72,7 @@ export default function Home() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full cursor-pointer"
               disabled={loading || !url.trim()}
             >
               {loading ? "Starting..." : "Browse"}

@@ -273,6 +273,10 @@ export class SessionService {
         return this.sessionDuration;
     }
 
+    getRateLimitPerDay(): number {
+        return this.rateLimitPerDay;
+    }
+
     // ---- DT2: IP Management ----
 
     blockIp(ip: string): void {

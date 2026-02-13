@@ -62,6 +62,16 @@ export class SessionController {
         };
     }
 
+    @Get('rate-limit/status')
+    getRateLimitStatus(@Ip() clientIp: string) {
+        const info = this.sessionService.checkRateLimit(clientIp);
+        return {
+            used: this.sessionService.getRateLimitPerDay() - info.remaining,
+            remaining: info.remaining,
+            limit: this.sessionService.getRateLimitPerDay(),
+        };
+    }
+
     @Delete(':id')
     async endSession(@Param('id') id: string) {
         const success = await this.sessionService.endSession(id, 'user_ended');

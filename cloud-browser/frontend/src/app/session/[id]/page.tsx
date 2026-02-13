@@ -16,6 +16,7 @@ export default function SessionPage() {
     const [timeRemaining, setTimeRemaining] = useState(300);
     const [status, setStatus] = useState<SessionStatus>("connecting");
     const [error, setError] = useState("");
+    const hasNavigated = useRef(false);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
     const [reconnectAttempts, setReconnectAttempts] = useState(0);
     const socketRef = useRef<Socket | null>(null);
@@ -84,8 +85,10 @@ export default function SessionPage() {
             });
 
             socket.on("session:ended", () => {
+                if (hasNavigated.current) return;
+                hasNavigated.current = true;
                 localStorage.removeItem(`session_${sessionId}`);
-                router.push(`/session-ended?duration=${300 - timeRemaining}`);
+                router.push("/session-ended");
             });
 
             socket.on("session:error", (data) => {
@@ -132,16 +135,13 @@ export default function SessionPage() {
         };
     }, [sessionId, apiUrl, router, checkSession]);
 
-    const handleEndSession = async () => {
-        try {
-            await fetch(`${apiUrl}/api/session/${sessionId}`, {
-                method: "DELETE",
-            });
-            localStorage.removeItem(`session_${sessionId}`);
-            router.push("/session-ended");
-        } catch (err) {
-            console.error(err);
-        }
+    const handleEndSession = () => {
+        if (hasNavigated.current) return;
+        hasNavigated.current = true;
+        localStorage.removeItem(`session_${sessionId}`);
+        router.push("/session-ended");
+        // Fire and forget — don't block navigation on container teardown
+        fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => { });
     };
 
     const handleRetry = () => {
