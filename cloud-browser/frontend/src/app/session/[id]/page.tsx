@@ -185,6 +185,7 @@ export default function SessionPage() {
 
     // EC1: Resume session from taken-over tab
     const handleResume = () => {
+        setStreamReady(false);
         setStatus("connecting");
         if (socketRef.current?.connected) {
             socketRef.current.emit("session:join", { sessionId });
