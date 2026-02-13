@@ -432,7 +432,7 @@ export default function SessionPage() {
         setStreamReady(false);
         setStatus("connecting");
         if (socketRef.current?.connected) {
-            socketRef.current.emit("session:join", { sessionId });
+            socketRef.current.emit("session:join", { sessionId, viewer: isViewer });
         } else {
             socketRef.current?.connect();
         }

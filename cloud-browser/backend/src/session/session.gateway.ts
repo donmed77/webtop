@@ -143,7 +143,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @SubscribeMessage('session:reconnect')
     handleReconnect(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { sessionId: string },
+        @MessageBody() data: { sessionId: string; viewer?: boolean },
     ) {
         return this.handleJoinSession(client, data);
     }
@@ -160,8 +160,10 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                     if (socket) {
                         socket.emit('session:ended', { reason: 'expired' });
                     }
+                    this.clientIsViewer.delete(clientId);
                 }
                 this.sessionClients.delete(sessionId);
+                this.sessionViewers.delete(sessionId);
                 continue;
             }
 
