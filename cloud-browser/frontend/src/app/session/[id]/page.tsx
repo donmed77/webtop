@@ -26,9 +26,10 @@ export default function SessionPage() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Recording state
-    type RecordingState = "idle" | "recording" | "ready";
+    type RecordingState = "idle" | "recording" | "paused" | "ready";
     const [recordingState, setRecordingState] = useState<RecordingState>("idle");
     const [recordingElapsed, setRecordingElapsed] = useState(0);
+    const [recordingSize, setRecordingSize] = useState(0);
     const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
     const [showPrivacyToast, setShowPrivacyToast] = useState(false);
     const [hasShownToast, setHasShownToast] = useState(false);
@@ -205,7 +206,7 @@ export default function SessionPage() {
         if (hasNavigated.current) return;
         hasNavigated.current = true;
         // Auto-stop recording before navigating away
-        if (mediaRecorderRef.current?.state === "recording") {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             mediaRecorderRef.current.stop();
         }
         localStorage.removeItem(`session_${sessionId}`);
@@ -215,26 +216,41 @@ export default function SessionPage() {
     };
 
     // --- Recording functions ---
-    const startRecording = () => {
-        try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const iframeWindow = iframeRef.current?.contentWindow as any;
-            const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
-            if (!canvas) return;
+    const formatSize = (bytes: number) => {
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
 
-            const stream = canvas.captureStream(30);
+    const startRecording = () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const iframeWindow = iframeRef.current?.contentWindow as any;
+        const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
+        if (!canvas) return;
+
+        // Try VP8 first (best compatibility with canvas capture), fallback to plain webm
+        const mimeTypes = ["video/webm;codecs=vp8", "video/webm"];
+        const mimeType = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || "video/webm";
+
+        try {
+            const stream = canvas.captureStream(60);
             const recorder = new MediaRecorder(stream, {
-                mimeType: "video/webm;codecs=vp8",
+                mimeType,
                 videoBitsPerSecond: 5_000_000,
             });
 
             recordingChunksRef.current = [];
+            setRecordingSize(0);
+
             recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+                if (e.data.size > 0) {
+                    recordingChunksRef.current.push(e.data);
+                    setRecordingSize(prev => prev + e.data.size);
+                }
             };
             recorder.onstop = () => {
                 const blob = new Blob(recordingChunksRef.current, { type: "video/webm" });
                 setRecordingBlob(blob);
+                setRecordingSize(blob.size);
                 setRecordingState("ready");
                 if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
             };
@@ -257,53 +273,30 @@ export default function SessionPage() {
                 setTimeout(() => setShowPrivacyToast(false), 4000);
             }
         } catch {
-            // Fallback: VP8 if VP9 not supported
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const iframeWindow = iframeRef.current?.contentWindow as any;
-                const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
-                if (!canvas) return;
+            // Recording not supported
+        }
+    };
 
-                const stream = canvas.captureStream(30);
-                const recorder = new MediaRecorder(stream, {
-                    mimeType: "video/webm",
-                    videoBitsPerSecond: 5_000_000,
-                });
+    const pauseRecording = () => {
+        if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.pause();
+            setRecordingState("paused");
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        }
+    };
 
-                recordingChunksRef.current = [];
-                recorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordingChunksRef.current.push(e.data);
-                };
-                recorder.onstop = () => {
-                    const blob = new Blob(recordingChunksRef.current, { type: "video/webm" });
-                    setRecordingBlob(blob);
-                    setRecordingState("ready");
-                    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-                };
-
-                recorder.start(1000);
-                mediaRecorderRef.current = recorder;
-                setRecordingState("recording");
-                setRecordingElapsed(0);
-                setRecordingBlob(null);
-
-                recordingTimerRef.current = setInterval(() => {
-                    setRecordingElapsed((prev) => prev + 1);
-                }, 1000);
-
-                if (!hasShownToast) {
-                    setShowPrivacyToast(true);
-                    setHasShownToast(true);
-                    setTimeout(() => setShowPrivacyToast(false), 4000);
-                }
-            } catch {
-                // Recording not supported
-            }
+    const resumeRecording = () => {
+        if (mediaRecorderRef.current?.state === "paused") {
+            mediaRecorderRef.current.resume();
+            setRecordingState("recording");
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingElapsed((prev) => prev + 1);
+            }, 1000);
         }
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current?.state === "recording") {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             mediaRecorderRef.current.stop();
         }
     };
@@ -320,6 +313,7 @@ export default function SessionPage() {
         setRecordingState("idle");
         setRecordingBlob(null);
         setRecordingElapsed(0);
+        setRecordingSize(0);
     };
 
     const handleRetry = () => {
@@ -466,15 +460,47 @@ export default function SessionPage() {
                                 <span className="text-xs">Record</span>
                             </button>
                         )}
-                        {recordingState === "recording" && (
-                            <button
-                                onClick={stopRecording}
-                                className="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                                title="Stop recording"
-                            >
-                                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                                <span className="text-xs font-mono">{formatTime(recordingElapsed)}</span>
-                            </button>
+                        {(recordingState === "recording" || recordingState === "paused") && (
+                            <div className="flex items-center gap-2">
+                                {/* Pause/Resume */}
+                                <button
+                                    onClick={recordingState === "recording" ? pauseRecording : resumeRecording}
+                                    className="flex items-center gap-1 text-white/70 hover:text-white transition-colors cursor-pointer"
+                                    title={recordingState === "recording" ? "Pause" : "Resume"}
+                                >
+                                    {recordingState === "recording" ? (
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                            <rect x="6" y="4" width="4" height="16" />
+                                            <rect x="14" y="4" width="4" height="16" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                            <polygon points="5,3 19,12 5,21" />
+                                        </svg>
+                                    )}
+                                </button>
+                                {/* Recording indicator + time + size */}
+                                <div className="flex items-center gap-1.5">
+                                    <div className={`w-2.5 h-2.5 rounded-full ${recordingState === "recording" ? "bg-red-500 animate-pulse" : "bg-yellow-500"}`} />
+                                    <span className="text-xs font-mono text-red-400">
+                                        {formatTime(recordingElapsed)}
+                                    </span>
+                                    <span className="text-xs text-white/40">·</span>
+                                    <span className="text-xs text-white/50 font-mono">
+                                        {formatSize(recordingSize)}
+                                    </span>
+                                </div>
+                                {/* Stop */}
+                                <button
+                                    onClick={stopRecording}
+                                    className="flex items-center text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                    title="Stop recording"
+                                >
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                                    </svg>
+                                </button>
+                            </div>
                         )}
                         {recordingState === "ready" && (
                             <button
@@ -485,7 +511,7 @@ export default function SessionPage() {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
-                                <span className="text-xs">Download</span>
+                                <span className="text-xs">{formatSize(recordingSize)}</span>
                             </button>
                         )}
 
