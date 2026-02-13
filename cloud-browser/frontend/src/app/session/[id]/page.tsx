@@ -201,6 +201,29 @@ export default function SessionPage() {
                 };
             }
 
+            // Monkey-patch AudioContext so Selkies' private instance is accessible
+            // Selkies creates AudioContext inside a closure — this intercepts construction
+            if (iframeWindow && !iframeWindow.__audioCtxPatched) {
+                const OrigAudioContext = iframeWindow.AudioContext || iframeWindow.webkitAudioContext;
+                if (OrigAudioContext) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    iframeWindow.AudioContext = function (...args: any[]) {
+                        const ctx = new OrigAudioContext(...args);
+                        iframeWindow.__audioCtx = ctx;
+                        // Also intercept createGain to capture the gain node
+                        const origCreateGain = ctx.createGain.bind(ctx);
+                        ctx.createGain = function () {
+                            const gain = origCreateGain();
+                            iframeWindow.__audioGain = gain;
+                            return gain;
+                        };
+                        return ctx;
+                    };
+                    iframeWindow.AudioContext.prototype = OrigAudioContext.prototype;
+                    iframeWindow.__audioCtxPatched = true;
+                }
+            }
+
             // Poll Selkies' network_stats for latency
             if (latencyIntervalRef.current) clearInterval(latencyIntervalRef.current);
             latencyIntervalRef.current = setInterval(() => {
@@ -243,12 +266,31 @@ export default function SessionPage() {
         const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
         if (!canvas) return;
 
-        // Try VP8 first (best compatibility with canvas capture), fallback to plain webm
-        const mimeTypes = ["video/webm;codecs=vp8", "video/webm"];
+        // Try VP8+Opus (video+audio), then VP8-only, then plain webm
+        const mimeTypes = ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp8", "video/webm"];
         const mimeType = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || "video/webm";
 
         try {
             const stream = canvas.captureStream(60);
+
+            // Try to capture audio from Selkies' AudioContext (exposed via monkey-patch)
+            try {
+                const audioCtx = iframeWindow?.__audioCtx;
+                const gainNode = iframeWindow?.__audioGain;
+                if (audioCtx && gainNode && audioCtx.state === "running") {
+                    const dest = audioCtx.createMediaStreamDestination();
+                    gainNode.connect(dest);
+                    dest.stream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+                        stream.addTrack(track);
+                    });
+                    console.log("[Recording] Audio capture attached");
+                } else {
+                    console.log("[Recording] No audio context available, recording video only");
+                }
+            } catch (audioErr) {
+                console.log("[Recording] Audio capture failed, recording video only", audioErr);
+            }
+
             recordingStreamRef.current = stream;
             const recorder = new MediaRecorder(stream, {
                 mimeType,
