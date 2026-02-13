@@ -222,9 +222,9 @@ export default function SessionPage() {
             const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
             if (!canvas) return;
 
-            const stream = canvas.captureStream(0);
+            const stream = canvas.captureStream(30);
             const recorder = new MediaRecorder(stream, {
-                mimeType: "video/webm;codecs=vp9",
+                mimeType: "video/webm;codecs=vp8",
                 videoBitsPerSecond: 5_000_000,
             });
 
@@ -264,7 +264,7 @@ export default function SessionPage() {
                 const canvas = iframeWindow?.document?.getElementById("videoCanvas") as HTMLCanvasElement | null;
                 if (!canvas) return;
 
-                const stream = canvas.captureStream(0);
+                const stream = canvas.captureStream(30);
                 const recorder = new MediaRecorder(stream, {
                     mimeType: "video/webm",
                     videoBitsPerSecond: 5_000_000,
