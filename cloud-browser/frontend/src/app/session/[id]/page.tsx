@@ -32,7 +32,6 @@ export default function SessionPage() {
     const [screenshotMode, setScreenshotMode] = useState(false);
     const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
     const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
-    const selectionOverlayRef = useRef<HTMLDivElement>(null);
 
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
@@ -878,7 +877,6 @@ export default function SessionPage() {
             {/* Screenshot selection overlay */}
             {screenshotMode && (
                 <div
-                    ref={selectionOverlayRef}
                     className="absolute inset-0 z-[60] cursor-crosshair select-none overflow-hidden"
                     style={{ top: iframeRef.current?.offsetTop || 0 }}
                     onMouseDown={handleScreenshotMouseDown}
