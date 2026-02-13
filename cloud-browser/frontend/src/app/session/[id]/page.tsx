@@ -279,6 +279,9 @@ export default function SessionPage() {
         hasNavigated.current = true;
         // Auto-stop recording before navigating away
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
+                recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
+            }
             mediaRecorderRef.current.stop();
         }
         localStorage.removeItem(`session_${sessionId}`);
@@ -382,6 +385,10 @@ export default function SessionPage() {
 
     const stopRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            // If stopped while paused, accumulate the final pause duration
+            if (mediaRecorderRef.current.state === "paused" && pauseStartRef.current > 0) {
+                recordingPausedMsRef.current += Date.now() - pauseStartRef.current;
+            }
             // Re-enable tracks if paused so the final data flush works
             recordingStreamRef.current?.getTracks().forEach(t => t.enabled = true);
             mediaRecorderRef.current.stop();
