@@ -34,8 +34,20 @@ export class SessionController {
             );
         }
 
-        // E4: Always queue — rate limit is checked during queue processing
-        // This way user sees the queue page, then gets the limit message
+        // Check rate limit BEFORE entering queue — don't waste a slot
+        const rateLimit = this.sessionService.checkRateLimit(clientIp);
+        if (!rateLimit.allowed) {
+            throw new HttpException(
+                {
+                    message: `You've reached your daily limit of ${this.sessionService.getRateLimitPerDay()} sessions. Come back tomorrow!`,
+                    rateLimited: true,
+                    remaining: rateLimit.remaining,
+                    limit: this.sessionService.getRateLimitPerDay(),
+                },
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+
         const queueEntry = this.queueService.addToQueue(dto.url, clientIp);
 
         return {

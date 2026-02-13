@@ -35,7 +35,9 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Failed to start session");
+        setError(data.rateLimited
+          ? `You've reached your daily limit of ${data.limit} sessions. Come back tomorrow!`
+          : data.message || "Failed to start session");
         setLoading(false);
         return;
       }
