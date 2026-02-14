@@ -17,13 +17,17 @@ export default function QueuePage() {
     const [position, setPosition] = useState(0);
     const [totalInQueue, setTotalInQueue] = useState(0);
     const [estimatedWait, setEstimatedWait] = useState(0);
-    const [error, setError] = useState("");
 
     useEffect(() => {
         const socket: Socket = io(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005");
 
         socket.on("connect", () => {
             socket.emit("queue:join", { queueId });
+        });
+
+        // If queue ticket is invalid/consumed, redirect home
+        socket.on("queue:invalid", () => {
+            router.replace("/");
         });
 
         socket.on("queue:joined", (data) => {
@@ -42,15 +46,14 @@ export default function QueuePage() {
 
         socket.on("queue:ready", (data) => {
             setStatus("ready");
-            // Auto-start session immediately (Q8)
+            // Auto-start session immediately (Q8) — replace to prevent back-button issues
             setTimeout(() => {
-                router.push(`/session/${data.sessionId}`);
+                router.replace(`/session/${data.sessionId}`);
             }, 300);
         });
 
-        socket.on("queue:error", (data) => {
-            setError(data.error);
-            setStatus("error");
+        socket.on("queue:error", () => {
+            router.replace("/");
         });
 
         return () => {
@@ -77,22 +80,7 @@ export default function QueuePage() {
         return `~${mins} minute${mins > 1 ? 's' : ''}`;
     };
 
-    // Error state
-    if (status === "error") {
-        return (
-            <main className="min-h-screen bg-background flex items-center justify-center p-4">
-                <Card className="w-full max-w-md">
-                    <CardContent className="pt-6 text-center">
-                        <div className="text-4xl mb-4">❌</div>
-                        <p className="text-destructive mb-4">{error}</p>
-                        <Button onClick={() => router.push("/")} className="cursor-pointer">
-                            Back to Home
-                        </Button>
-                    </CardContent>
-                </Card>
-            </main>
-        );
-    }
+    // Error state — queue:error redirects to home
 
     // E4: Rate limit reached — shown after queue processing
     if (status === "rate_limited") {

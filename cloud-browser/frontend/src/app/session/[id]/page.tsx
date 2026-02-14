@@ -99,8 +99,7 @@ export default function SessionPage() {
             // First check if session exists
             const sessionData = await checkSession();
             if (!sessionData) {
-                setStatus("not_found");
-                setError("Session not found or has ended");
+                router.replace("/session-ended?reason=not_found");
                 return;
             }
 
@@ -159,9 +158,8 @@ export default function SessionPage() {
                 setViewerCount(data.count);
             });
 
-            socket.on("session:error", (data) => {
-                setError(data.error);
-                setStatus("error");
+            socket.on("session:error", () => {
+                router.replace("/session-ended?reason=not_found");
             });
 
             // EC1: Another tab took over this session
@@ -596,32 +594,9 @@ export default function SessionPage() {
         }
     }, [reconnectCountdown, status]);
 
-    // Session not found
-    if (status === "not_found") {
-        return (
-            <main className="min-h-screen bg-background flex items-center justify-center p-4">
-                <div className="text-center">
-                    <p className="text-muted-foreground mb-4">This session has ended or doesn't exist</p>
-                    <Button onClick={() => router.push("/")}>Start New Session</Button>
-                </div>
-            </main>
-        );
-    }
+    // Session not found — handled by redirect in connectSocket
 
-    // Error state
-    if (status === "error") {
-        return (
-            <main className="min-h-screen bg-background flex items-center justify-center p-4">
-                <div className="text-center">
-                    <p className="text-destructive mb-4">{error}</p>
-                    <div className="flex gap-2 justify-center">
-                        <Button variant="outline" onClick={handleRetry}>Retry</Button>
-                        <Button onClick={() => router.push("/")}>Back to Home</Button>
-                    </div>
-                </div>
-            </main>
-        );
-    }
+    // Error state — handled by redirect in session:error handler
 
     // EC1: Taken over by another tab
     if (status === "taken_over") {
