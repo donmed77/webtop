@@ -20,6 +20,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @WebSocketServer()
     server: Server;
 
+    private static readonly GRACE_PERIOD_MS = 35_000; // 30s user countdown + 5s buffer
     private readonly logger = new Logger(SessionGateway.name);
     private clientSessions: Map<string, string> = new Map(); // socketId -> sessionId
     private sessionClients: Map<string, Set<string>> = new Map(); // sessionId -> Set<socketId>
@@ -68,7 +69,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
                     const existing = this.reconnectingSessions.get(sessionId);
                     if (existing) clearTimeout(existing.timer);
                     // Start fresh grace period
-                    const timer = setTimeout(() => this.checkSessionAbandoned(sessionId), 35000);
+                    const timer = setTimeout(() => this.checkSessionAbandoned(sessionId), SessionGateway.GRACE_PERIOD_MS);
                     this.reconnectingSessions.set(sessionId, { disconnectedAt: Date.now(), timer });
                 }
             }

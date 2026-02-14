@@ -8,6 +8,10 @@ import fixWebmDuration from "fix-webm-duration";
 
 type SessionStatus = "connecting" | "reconnecting" | "active" | "ended" | "error" | "not_found" | "taken_over";
 
+const RECONNECT_COUNTDOWN_SECONDS = 30;
+const SVG_RADIUS = 36;
+const SVG_CIRCUMFERENCE = 2 * Math.PI * SVG_RADIUS;
+
 export default function SessionPage() {
     const router = useRouter();
     const params = useParams();
@@ -80,6 +84,14 @@ export default function SessionPage() {
         }
     }, [sessionId, apiUrl]);
 
+    const clearReconnectTimer = () => {
+        setReconnectCountdown(null);
+        if (reconnectTimerRef.current) {
+            clearInterval(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+        }
+    };
+
     // Handle socket connection and reconnection
     useEffect(() => {
 
@@ -104,11 +116,7 @@ export default function SessionPage() {
 
             socket.on("connect", () => {
                 socket.emit("session:join", { sessionId, viewer: isViewer });
-                setReconnectCountdown(null);
-                if (reconnectTimerRef.current) {
-                    clearInterval(reconnectTimerRef.current);
-                    reconnectTimerRef.current = null;
-                }
+                clearReconnectTimer();
             });
 
             socket.on("session:joined", (data) => {
@@ -129,9 +137,7 @@ export default function SessionPage() {
                 setTimeRemaining(data.timeRemaining);
             });
 
-            socket.on("session:warning", () => {
-                // Timer flashing handled via CSS
-            });
+            // session:warning — timer flashing handled via CSS in render
 
             socket.on("session:ended", () => {
                 if (hasNavigated.current) return;
@@ -168,15 +174,14 @@ export default function SessionPage() {
                     // Server disconnected us, session might have ended
                     setStatus("ended");
                 } else {
-                    // Connectivity issue — start 30s countdown
+                    // Connectivity issue — start countdown
                     setStatus("reconnecting");
-                    setReconnectCountdown(30);
-                    if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current);
+                    setReconnectCountdown(RECONNECT_COUNTDOWN_SECONDS);
+                    clearReconnectTimer();
                     reconnectTimerRef.current = setInterval(() => {
                         setReconnectCountdown(prev => {
                             if (prev === null || prev <= 1) {
-                                if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current);
-                                reconnectTimerRef.current = null;
+                                clearReconnectTimer();
                                 return 0;
                             }
                             return prev - 1;
@@ -185,22 +190,9 @@ export default function SessionPage() {
                 }
             });
 
-            socket.on("reconnect_attempt", () => {
-                setStatus("reconnecting");
-            });
-
             socket.on("reconnect", () => {
-                setReconnectCountdown(null);
-                if (reconnectTimerRef.current) {
-                    clearInterval(reconnectTimerRef.current);
-                    reconnectTimerRef.current = null;
-                }
+                clearReconnectTimer();
                 socket.emit("session:join", { sessionId, viewer: isViewer });
-            });
-
-            socket.on("reconnect_failed", () => {
-                setStatus("error");
-                setError("Connection lost. Please refresh or start a new session.");
             });
         };
 
@@ -210,6 +202,7 @@ export default function SessionPage() {
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
+            clearReconnectTimer();
             if (latencyIntervalRef.current) {
                 clearInterval(latencyIntervalRef.current);
             }
@@ -962,8 +955,8 @@ export default function SessionPage() {
                                 <circle
                                     cx="40" cy="40" r="36" fill="none"
                                     stroke="#eab308" strokeWidth="4" strokeLinecap="round"
-                                    strokeDasharray={`${2 * Math.PI * 36}`}
-                                    strokeDashoffset={`${2 * Math.PI * 36 * (1 - reconnectCountdown / 30)}`}
+                                    strokeDasharray={`${SVG_CIRCUMFERENCE}`}
+                                    strokeDashoffset={`${SVG_CIRCUMFERENCE * (1 - reconnectCountdown / RECONNECT_COUNTDOWN_SECONDS)}`}
                                     className="transition-[stroke-dashoffset] duration-1000 ease-linear"
                                 />
                             </svg>
