@@ -176,8 +176,12 @@ export default function SessionPage() {
                 } else {
                     // Connectivity issue — start countdown
                     setStatus("reconnecting");
+                    // Clear any stale interval (but don't null the countdown)
+                    if (reconnectTimerRef.current) {
+                        clearInterval(reconnectTimerRef.current);
+                        reconnectTimerRef.current = null;
+                    }
                     setReconnectCountdown(RECONNECT_COUNTDOWN_SECONDS);
-                    clearReconnectTimer();
                     reconnectTimerRef.current = setInterval(() => {
                         setReconnectCountdown(prev => {
                             if (prev === null || prev <= 1) {
