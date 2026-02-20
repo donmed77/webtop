@@ -44,6 +44,12 @@ export default function SessionPage() {
     const [clipboardSynced, setClipboardSynced] = useState(false);
     const [clipboardFlash, setClipboardFlash] = useState(false);
 
+    // Mobile keyboard state
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
+    const [kbdPos, setKbdPos] = useState({ right: 16, bottom: 16 });
+    const [kbdDragging, setKbdDragging] = useState(false);
+    const kbdDragStart = useRef<{ x: number; y: number; right: number; bottom: number } | null>(null);
+
     // Feedback state
     const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackType, setFeedbackType] = useState<"bug" | "suggestion" | "other">("bug");
@@ -98,6 +104,57 @@ export default function SessionPage() {
             );
             setClipboardSynced(true);
             setTimeout(() => setClipboardSynced(false), 1500);
+        }
+    }, []);
+
+    // Detect touch device
+    useEffect(() => {
+        const check = () => {
+            const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+            const isMobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            setIsTouchDevice(hasTouch || isMobileUA);
+        };
+        check();
+    }, []);
+
+    // Toggle virtual keyboard (mobile only) — mirrors Selkies behavior
+    const toggleVirtualKeyboard = useCallback(() => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const iframeDoc = (iframeRef.current?.contentWindow as any)?.document;
+            if (!iframeDoc) return;
+
+            const kbdInput = iframeDoc.getElementById("keyboard-input-assist") as HTMLInputElement | null;
+            const overlayInput = iframeDoc.getElementById("overlayInput") as HTMLElement | null;
+
+            if (!kbdInput) return;
+
+            // If already focused, blur to dismiss keyboard
+            if (iframeDoc.activeElement === kbdInput) {
+                kbdInput.blur();
+                kbdInput.setAttribute("aria-hidden", "true");
+                return;
+            }
+
+            // Focus to pop keyboard
+            kbdInput.removeAttribute("aria-hidden");
+            kbdInput.value = "";
+            kbdInput.focus();
+
+            // Dismiss on overlay touch (like Selkies does)
+            // Delay listener attachment so the current touch cycle doesn't immediately trigger it
+            if (overlayInput) {
+                setTimeout(() => {
+                    overlayInput.addEventListener("touchstart", () => {
+                        if (iframeDoc.activeElement === kbdInput) {
+                            kbdInput.blur();
+                            kbdInput.setAttribute("aria-hidden", "true");
+                        }
+                    }, { once: true, passive: true });
+                }, 300);
+            }
+        } catch (e) {
+            console.warn("Could not toggle virtual keyboard:", e);
         }
     }, []);
 
@@ -779,8 +836,8 @@ export default function SessionPage() {
                     </div>
                 </div>
             ) : streamReady && !isToolbarMinimized ? (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
-                    <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
+                <div className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-16px)]">
+                    <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-4 shadow-lg">
                         {/* Timer */}
                         <span
                             className={`font-mono text-lg font-semibold tabular-nums min-w-[52px] text-center ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
@@ -806,7 +863,7 @@ export default function SessionPage() {
                                 title="Record session"
                             >
                                 <div className="w-3 h-3 rounded-full border-2 border-current" />
-                                <span className="text-xs">Record</span>
+                                <span className="text-xs hidden sm:inline">Record</span>
                             </button>
                         )}
                         {(recordingState === "recording" || recordingState === "paused") && (
@@ -860,7 +917,7 @@ export default function SessionPage() {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
-                                <span className="text-xs">{formatSize(recordingSize)}</span>
+                                <span className="text-xs hidden sm:inline">{formatSize(recordingSize)}</span>
                             </button>
                         )}
 
@@ -876,7 +933,7 @@ export default function SessionPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            <span className="text-xs">Screenshot</span>
+                            <span className="text-xs hidden sm:inline">Screenshot</span>
                         </button>
 
                         <div className="w-px h-5 bg-white/20" />
@@ -892,12 +949,12 @@ export default function SessionPage() {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
-                                <span className="text-xs">Clipboard</span>
+                                <span className="text-xs hidden sm:inline">Clipboard</span>
                             </button>
 
                             {/* Clipboard panel — centered dropdown below button */}
                             {clipboardOpen && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[260px] sm:w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
                                     <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between">
                                         <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-500 ${clipboardFlash ? "text-green-400" : "text-white/30"
                                             }`}>
@@ -942,11 +999,11 @@ export default function SessionPage() {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
-                                <span className="text-xs">Feedback</span>
+                                <span className="text-xs hidden sm:inline">Feedback</span>
                             </button>
 
                             {feedbackOpen && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[300px] overflow-hidden z-50">
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[260px] sm:w-[300px] overflow-hidden z-50">
                                     <div className="px-3 py-1.5 border-b border-white/5">
                                         <span className="text-[10px] font-medium uppercase tracking-wider text-white/30">Send Feedback</span>
                                     </div>
@@ -1028,7 +1085,7 @@ export default function SessionPage() {
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                             </svg>
-                            <span className="text-xs">Share</span>
+                            <span className="text-xs hidden sm:inline">Share</span>
                             {viewerCount > 0 && (
                                 <span className="absolute -top-1.5 -right-2 bg-blue-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                                     {viewerCount}
@@ -1042,7 +1099,7 @@ export default function SessionPage() {
                         <Button
                             variant="destructive"
                             size="sm"
-                            className="h-7 px-3 text-sm rounded-full cursor-pointer"
+                            className="h-7 px-2 sm:px-3 text-xs sm:text-sm rounded-full cursor-pointer"
                             onClick={handleEndSession}
                         >
                             End Session
@@ -1082,6 +1139,65 @@ export default function SessionPage() {
                     allow="clipboard-read; clipboard-write; autoplay"
                     onLoad={handleIframeLoad}
                 />
+            )}
+
+            {/* Floating Keyboard FAB (mobile/tablet only) */}
+            {isTouchDevice && streamReady && (
+                <button
+                    className="fixed z-50 w-11 h-11 rounded-full bg-black/50 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/70 active:text-white active:bg-black/70 shadow-lg transition-colors"
+                    style={{
+                        right: `${kbdPos.right}px`,
+                        bottom: `${kbdPos.bottom}px`,
+                        touchAction: "none",
+                    }}
+                    title="Toggle keyboard"
+                    onClick={(e) => {
+                        // Only toggle if we didn't just drag
+                        if (kbdDragging) {
+                            e.preventDefault();
+                            return;
+                        }
+                        toggleVirtualKeyboard();
+                    }}
+                    onPointerDown={(e) => {
+                        kbdDragStart.current = {
+                            x: e.clientX,
+                            y: e.clientY,
+                            right: kbdPos.right,
+                            bottom: kbdPos.bottom,
+                        };
+                        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                        if (!kbdDragStart.current) return;
+                        const dx = kbdDragStart.current.x - e.clientX;
+                        const dy = kbdDragStart.current.y - e.clientY;
+                        if (!kbdDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+                            setKbdDragging(true);
+                        }
+                        if (kbdDragging || Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                            const newRight = Math.max(4, Math.min(window.innerWidth - 48, kbdDragStart.current.right + dx));
+                            const newBottom = Math.max(4, Math.min(window.innerHeight - 48, kbdDragStart.current.bottom + dy));
+                            setKbdPos({ right: newRight, bottom: newBottom });
+                        }
+                    }}
+                    onPointerUp={() => {
+                        kbdDragStart.current = null;
+                        // Reset dragging flag after a tick so onClick can read it
+                        if (kbdDragging) {
+                            setTimeout(() => setKbdDragging(false), 0);
+                        }
+                    }}
+                    onPointerCancel={() => {
+                        kbdDragStart.current = null;
+                        setKbdDragging(false);
+                    }}
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={1.5} />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+                    </svg>
+                </button>
             )}
 
             {/* Screenshot selection overlay */}
