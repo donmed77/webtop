@@ -58,7 +58,27 @@ interface RateLimitStat {
     remaining: number;
 }
 
-type Tab = "overview" | "history" | "ratelimits" | "controls";
+interface FeedbackItem {
+    id: number;
+    sessionId: string | null;
+    clientIp: string;
+    email: string | null;
+    type: string;
+    message: string;
+    status: string;
+    adminNote: string | null;
+    createdAt: string;
+    resolvedAt: string | null;
+}
+
+interface FeedbackStats {
+    open: number;
+    resolved: number;
+    dismissed: number;
+    total: number;
+}
+
+type Tab = "overview" | "history" | "ratelimits" | "controls" | "feedback";
 
 export default function AdminPage() {
     const [authenticated, setAuthenticated] = useState(false);
@@ -80,6 +100,12 @@ export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [searchQuery, setSearchQuery] = useState("");
     const [actionMsg, setActionMsg] = useState("");
+
+    // Feedback state
+    const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
+    const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
+    const [feedbackFilter, setFeedbackFilter] = useState<string>("all");
+    const [expandedFeedback, setExpandedFeedback] = useState<number | null>(null);
 
     // Config form state
     const [newPoolSize, setNewPoolSize] = useState("");
@@ -130,6 +156,12 @@ export default function AdminPage() {
         } catch (err) {
             console.error("Failed to fetch data:", err);
         }
+
+        // Always fetch feedback stats for the badge
+        try {
+            const fbStatsRes = await fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: getAuthHeaders() });
+            if (fbStatsRes.ok) setFeedbackStats(await fbStatsRes.json());
+        } catch { /* ignore */ }
     };
 
     const fetchHistory = async (search?: string) => {
@@ -160,6 +192,47 @@ export default function AdminPage() {
             }
         } catch (err) {
             console.error("Failed to fetch rate limits:", err);
+        }
+    };
+
+    const fetchFeedback = async (filterOverride?: string) => {
+        const filter = filterOverride ?? feedbackFilter;
+        try {
+            const statusParam = filter !== "all" ? `?status=${filter}` : "";
+            const [listRes, statsRes] = await Promise.all([
+                fetch(`${apiUrl}/api/admin/feedback${statusParam}`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: getAuthHeaders() }),
+            ]);
+            if (listRes.ok) {
+                const data = await listRes.json();
+                setFeedbackList(data.feedback);
+            }
+            if (statsRes.ok) {
+                setFeedbackStats(await statsRes.json());
+            }
+        } catch (err) {
+            console.error("Failed to fetch feedback:", err);
+        }
+    };
+
+    const feedbackAction = async (id: number, action: "resolve" | "dismiss" | "reopen" | "delete") => {
+        try {
+            if (action === "delete") {
+                await fetch(`${apiUrl}/api/admin/feedback/${id}`, {
+                    method: "DELETE",
+                    headers: getAuthHeaders(),
+                });
+            } else {
+                const statusMap = { resolve: "resolved", dismiss: "dismissed", reopen: "open" };
+                await fetch(`${apiUrl}/api/admin/feedback/${id}`, {
+                    method: "PATCH",
+                    headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: statusMap[action] }),
+                });
+            }
+            fetchFeedback();
+        } catch (err) {
+            console.error(`Failed to ${action} feedback:`, err);
         }
     };
 
@@ -227,8 +300,10 @@ export default function AdminPage() {
             fetchHistory(searchQuery);
         } else if (activeTab === "ratelimits") {
             fetchRateLimits();
+        } else if (activeTab === "feedback") {
+            fetchFeedback();
         }
-    }, [activeTab, authenticated]);
+    }, [activeTab, authenticated, feedbackFilter]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -323,14 +398,19 @@ export default function AdminPage() {
 
                 {/* Tabs */}
                 <div className="flex gap-2 border-b pb-2">
-                    {(["overview", "history", "ratelimits", "controls"] as Tab[]).map((tab) => (
+                    {(["overview", "history", "ratelimits", "feedback", "controls"] as Tab[]).map((tab) => (
                         <Button
                             key={tab}
                             variant={activeTab === tab ? "default" : "ghost"}
                             onClick={() => setActiveTab(tab)}
-                            className="cursor-pointer capitalize"
+                            className="cursor-pointer capitalize relative"
                         >
                             {tab === "ratelimits" ? "Rate Limits" : tab}
+                            {tab === "feedback" && feedbackStats && feedbackStats.open > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                                    {feedbackStats.open}
+                                </span>
+                            )}
                         </Button>
                     ))}
                 </div>
@@ -785,6 +865,151 @@ export default function AdminPage() {
                                         Apply Changes
                                     </Button>
                                 </form>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+
+                {/* ===== FEEDBACK TAB ===== */}
+                {activeTab === "feedback" && (
+                    <>
+                        {/* Filter bar */}
+                        <div className="flex gap-4 items-center">
+                            <div className="flex gap-2">
+                                {(["all", "open", "resolved", "dismissed"] as const).map((f) => (
+                                    <Button
+                                        key={f}
+                                        size="sm"
+                                        variant={feedbackFilter === f ? "default" : "outline"}
+                                        onClick={() => setFeedbackFilter(f)}
+                                        className="cursor-pointer capitalize text-xs"
+                                    >
+                                        {f}
+                                        {f !== "all" && feedbackStats && (
+                                            <span className="ml-1 opacity-60">
+                                                ({feedbackStats[f as keyof FeedbackStats] || 0})
+                                            </span>
+                                        )}
+                                    </Button>
+                                ))}
+                            </div>
+                            <span className="text-muted-foreground text-sm ml-auto">
+                                {feedbackStats?.total || 0} total tickets
+                            </span>
+                        </div>
+
+                        <Card>
+                            <CardContent className="pt-4">
+                                {feedbackList.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm text-center py-8">No feedback tickets</p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm table-fixed">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="text-left p-2 w-10">#</th>
+                                                    <th className="text-left p-2 w-24">Type</th>
+                                                    <th className="text-left p-2 w-24">Status</th>
+                                                    <th className="text-left p-2">Message</th>
+                                                    <th className="text-left p-2 w-40">Contact</th>
+                                                    <th className="text-left p-2 w-36">Date</th>
+                                                    <th className="text-left p-2 w-44">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {feedbackList.map((fb) => (
+                                                    <>
+                                                        <tr
+                                                            key={fb.id}
+                                                            className={`border-b cursor-pointer hover:bg-muted/30 transition-colors ${fb.status === "open" ? "bg-blue-500/5" : ""}`}
+                                                            onClick={() => setExpandedFeedback(expandedFeedback === fb.id ? null : fb.id)}
+                                                        >
+                                                            <td className="p-2 font-mono text-xs text-muted-foreground">{fb.id}</td>
+                                                            <td className="p-2">
+                                                                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${fb.type === "bug" ? "bg-red-500/20 text-red-400" :
+                                                                    fb.type === "suggestion" ? "bg-amber-500/20 text-amber-400" :
+                                                                        "bg-blue-500/20 text-blue-400"
+                                                                    }`}>
+                                                                    {fb.type === "bug" ? (
+                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z" /></svg>
+                                                                    ) : fb.type === "suggestion" ? (
+                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                                                    ) : (
+                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                                                    )}
+                                                                    {fb.type}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${fb.status === "open" ? "bg-blue-500/20 text-blue-400" :
+                                                                    fb.status === "resolved" ? "bg-green-500/20 text-green-400" :
+                                                                        "bg-gray-500/20 text-gray-400"
+                                                                    }`}>
+                                                                    {fb.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2 max-w-xs">
+                                                                <p className="truncate break-all">{fb.message}</p>
+                                                            </td>
+                                                            <td className="p-2 text-xs text-muted-foreground">
+                                                                {fb.email ? (
+                                                                    <span className="text-blue-400">{fb.email}</span>
+                                                                ) : (
+                                                                    <span className="italic">anonymous</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-2 text-xs text-muted-foreground">{formatFullDate(fb.createdAt)}</td>
+                                                            <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                                                                <div className="flex gap-1">
+                                                                    {fb.status === "open" && (
+                                                                        <>
+                                                                            <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "resolve")} className="cursor-pointer text-xs h-7 text-green-400">
+                                                                                ✓
+                                                                            </Button>
+                                                                            <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "dismiss")} className="cursor-pointer text-xs h-7">
+                                                                                —
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                    {fb.status !== "open" && (
+                                                                        <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "reopen")} className="cursor-pointer text-xs h-7 text-blue-400">
+                                                                            ↩
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button size="sm" variant="destructive" onClick={() => feedbackAction(fb.id, "delete")} className="cursor-pointer text-xs h-7">
+                                                                        ✕
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        {expandedFeedback === fb.id && (
+                                                            <tr key={`${fb.id}-detail`} className="border-b bg-muted/20">
+                                                                <td colSpan={7} className="p-4">
+                                                                    <div className="space-y-3">
+                                                                        <div>
+                                                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Full Message</span>
+                                                                            <p className="text-sm whitespace-pre-wrap break-all mt-1">{fb.message}</p>
+                                                                        </div>
+                                                                        <div className="flex gap-6 text-xs text-muted-foreground">
+                                                                            <span>IP: <span className="font-mono">{fb.clientIp}</span></span>
+                                                                            {fb.sessionId && <span>Session: <span className="font-mono">{fb.sessionId.slice(0, 8)}...</span></span>}
+                                                                            {fb.resolvedAt && <span>Resolved: {formatFullDate(fb.resolvedAt)}</span>}
+                                                                        </div>
+                                                                        {fb.adminNote && (
+                                                                            <div className="text-xs bg-muted/50 p-2 rounded">
+                                                                                <span className="font-medium">Admin note:</span> {fb.adminNote}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </>

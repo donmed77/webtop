@@ -44,6 +44,14 @@ export default function SessionPage() {
     const [clipboardSynced, setClipboardSynced] = useState(false);
     const [clipboardFlash, setClipboardFlash] = useState(false);
 
+    // Feedback state
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [feedbackType, setFeedbackType] = useState<"bug" | "suggestion" | "other">("bug");
+    const [feedbackMessage, setFeedbackMessage] = useState("");
+    const [feedbackEmail, setFeedbackEmail] = useState("");
+    const [feedbackSending, setFeedbackSending] = useState(false);
+    const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
     const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -91,6 +99,32 @@ export default function SessionPage() {
             setTimeout(() => setClipboardSynced(false), 1500);
         }
     }, []);
+
+    // Submit feedback
+    const submitFeedback = useCallback(async () => {
+        if (!feedbackMessage.trim() || feedbackSending) return;
+        setFeedbackSending(true);
+        try {
+            const res = await fetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sessionId,
+                    type: feedbackType,
+                    message: feedbackMessage.trim(),
+                    email: feedbackEmail.trim() || undefined,
+                }),
+            });
+            if (res.ok) {
+                setFeedbackMessage("");
+                setFeedbackEmail("");
+                setFeedbackOpen(false);
+                setShowFeedbackToast(true);
+                setTimeout(() => setShowFeedbackToast(false), 3000);
+            }
+        } catch { /* ignore */ }
+        setFeedbackSending(false);
+    }, [feedbackMessage, feedbackEmail, feedbackSending, feedbackType, sessionId]);
 
     // Preload + decode shutter sound into AudioBuffer for instant playback
     useEffect(() => {
@@ -839,7 +873,7 @@ export default function SessionPage() {
                         {/* Clipboard Toggle + Dropdown */}
                         <div className="relative">
                             <button
-                                onClick={() => setClipboardOpen(!clipboardOpen)}
+                                onClick={() => { setClipboardOpen(!clipboardOpen); setFeedbackOpen(false); }}
                                 className={`flex items-center gap-1.5 transition-colors cursor-pointer ${clipboardSynced ? "text-green-400" : clipboardOpen ? "text-white" : "text-white/70 hover:text-white"
                                     }`}
                                 title="Toggle clipboard"
@@ -852,7 +886,7 @@ export default function SessionPage() {
 
                             {/* Clipboard panel — centered dropdown below button */}
                             {clipboardOpen && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-xl shadow-lg w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
                                     <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between">
                                         <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-500 ${clipboardFlash ? "text-green-400" : "text-white/30"
                                             }`}>
@@ -886,7 +920,92 @@ export default function SessionPage() {
 
                         <div className="w-px h-5 bg-white/20" />
 
-                        {/* Share Button */}
+                        {/* Feedback Toggle + Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => { setFeedbackOpen(!feedbackOpen); setClipboardOpen(false); }}
+                                className={`flex items-center gap-1.5 transition-colors cursor-pointer ${feedbackOpen ? "text-white" : "text-white/70 hover:text-white"
+                                    }`}
+                                title="Send feedback"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                <span className="text-xs">Feedback</span>
+                            </button>
+
+                            {feedbackOpen && (
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[300px] overflow-hidden z-50">
+                                    <div className="px-3 py-1.5 border-b border-white/5">
+                                        <span className="text-[10px] font-medium uppercase tracking-wider text-white/30">Send Feedback</span>
+                                    </div>
+                                    <div className="p-3 space-y-3">
+                                        {/* Email */}
+                                        <div>
+                                            <input
+                                                type="email"
+                                                value={feedbackEmail}
+                                                onChange={(e) => setFeedbackEmail(e.target.value)}
+                                                placeholder="E-Mail (leave empty to comment anonymously)"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20"
+                                            />
+                                        </div>
+                                        {/* Type pills */}
+                                        <div className="flex gap-1.5">
+                                            {(["bug", "suggestion", "other"] as const).map((t) => (
+                                                <button
+                                                    key={t}
+                                                    onClick={() => setFeedbackType(t)}
+                                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer border ${feedbackType === t
+                                                        ? t === "bug" ? "bg-red-500/20 text-red-400 border-red-500/30"
+                                                            : t === "suggestion" ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                                                                : "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                                        : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                                                        }`}
+                                                >
+                                                    {t === "bug" ? (
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z" /></svg>
+                                                    ) : t === "suggestion" ? (
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                                    ) : (
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                                    )}
+                                                    {t === "bug" ? "Bug" : t === "suggestion" ? "Suggestion" : "Other"}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {/* Message */}
+                                        <div>
+                                            <textarea
+                                                value={feedbackMessage}
+                                                onChange={(e) => setFeedbackMessage(e.target.value.slice(0, 500))}
+                                                placeholder="Describe your feedback..."
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none"
+                                                rows={4}
+                                            />
+                                            <div className="flex justify-end mt-1">
+                                                <span className={`text-[10px] ${feedbackMessage.length >= 450 ? feedbackMessage.length >= 500 ? "text-red-400" : "text-amber-400" : "text-white/20"}`}>
+                                                    {feedbackMessage.length}/500
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* Send */}
+                                        <button
+                                            onClick={submitFeedback}
+                                            disabled={!feedbackMessage.trim() || feedbackSending}
+                                            className={`w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${feedbackMessage.trim()
+                                                ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
+                                                : "bg-white/5 text-white/20 border border-white/5"
+                                                }`}
+                                        >
+                                            {feedbackSending ? "Sending..." : "Send Feedback"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="w-px h-5 bg-white/20" />
                         <button
                             onClick={copyShareLink}
                             className="relative flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
@@ -1040,6 +1159,16 @@ export default function SessionPage() {
                     <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
                         <span className="text-sm">🔗</span>
                         <p className="text-white/90 text-sm">Viewer link copied to clipboard!</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Feedback sent toast */}
+            {showFeedbackToast && (
+                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
+                        <span className="text-sm">✅</span>
+                        <p className="text-white/90 text-sm">Thanks for your feedback!</p>
                     </div>
                 </div>
             )}
