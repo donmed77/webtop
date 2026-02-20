@@ -305,6 +305,13 @@ export default function AdminPage() {
         }
     }, [activeTab, authenticated, feedbackFilter]);
 
+    // Auto-refresh feedback list when tab is active
+    useEffect(() => {
+        if (!authenticated || activeTab !== "feedback") return;
+        const interval = setInterval(() => fetchFeedback(), 5000);
+        return () => clearInterval(interval);
+    }, [authenticated, activeTab, feedbackFilter]);
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         fetchHistory(searchQuery);
@@ -953,7 +960,16 @@ export default function AdminPage() {
                                                             </td>
                                                             <td className="p-2 text-xs text-muted-foreground">
                                                                 {fb.email ? (
-                                                                    <span className="text-blue-400">{fb.email}</span>
+                                                                    <span className="inline-flex items-center gap-1">
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(fb.email!); showAction("Email copied to clipboard"); }}
+                                                                            className="cursor-pointer text-muted-foreground hover:text-white transition-colors"
+                                                                            title="Copy email"
+                                                                        >
+                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+                                                                        </button>
+                                                                        <span className="text-blue-400 truncate">{fb.email}</span>
+                                                                    </span>
                                                                 ) : (
                                                                     <span className="italic">anonymous</span>
                                                                 )}
@@ -963,21 +979,21 @@ export default function AdminPage() {
                                                                 <div className="flex gap-1">
                                                                     {fb.status === "open" && (
                                                                         <>
-                                                                            <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "resolve")} className="cursor-pointer text-xs h-7 text-green-400">
-                                                                                ✓
+                                                                            <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "resolve")} className="cursor-pointer text-xs h-7 text-green-400" title="Resolve">
+                                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                                                             </Button>
-                                                                            <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "dismiss")} className="cursor-pointer text-xs h-7">
-                                                                                —
+                                                                            <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "dismiss")} className="cursor-pointer text-xs h-7" title="Dismiss">
+                                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" /></svg>
                                                                             </Button>
                                                                         </>
                                                                     )}
                                                                     {fb.status !== "open" && (
-                                                                        <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "reopen")} className="cursor-pointer text-xs h-7 text-blue-400">
-                                                                            ↩
+                                                                        <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "reopen")} className="cursor-pointer text-xs h-7 text-blue-400" title="Reopen">
+                                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
                                                                         </Button>
                                                                     )}
-                                                                    <Button size="sm" variant="destructive" onClick={() => feedbackAction(fb.id, "delete")} className="cursor-pointer text-xs h-7">
-                                                                        ✕
+                                                                    <Button size="sm" variant="destructive" onClick={() => feedbackAction(fb.id, "delete")} className="cursor-pointer text-xs h-7" title="Delete">
+                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                                     </Button>
                                                                 </div>
                                                             </td>

@@ -27,8 +27,26 @@ export class FeedbackController {
         if (!body.message || body.message.trim().length < 3) {
             throw new BadRequestException('Message must be at least 3 characters');
         }
-        if (body.message.length > 2000) {
-            throw new BadRequestException('Message must be at most 2000 characters');
+        if (body.message.length > 500) {
+            throw new BadRequestException('Message must be at most 500 characters');
+        }
+
+        // Sanitize message: strip HTML tags and control characters
+        const sanitizedMessage = body.message
+            .replace(/<[^>]*>/g, '')        // strip HTML tags
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // strip control chars
+            .trim();
+
+        if (sanitizedMessage.length < 3) {
+            throw new BadRequestException('Message must contain valid text');
+        }
+
+        // Validate email format if provided
+        if (body.email && body.email.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(body.email.trim())) {
+                throw new BadRequestException('Invalid email format');
+            }
         }
 
         // Rate limit check
@@ -41,7 +59,7 @@ export class FeedbackController {
             body.sessionId || null,
             clientIp,
             body.type,
-            body.message.trim(),
+            sanitizedMessage,
             body.email?.trim(),
         );
 

@@ -49,6 +49,7 @@ export default function SessionPage() {
     const [feedbackType, setFeedbackType] = useState<"bug" | "suggestion" | "other">("bug");
     const [feedbackMessage, setFeedbackMessage] = useState("");
     const [feedbackEmail, setFeedbackEmail] = useState("");
+    const [feedbackEmailError, setFeedbackEmailError] = useState("");
     const [feedbackSending, setFeedbackSending] = useState(false);
     const [showFeedbackToast, setShowFeedbackToast] = useState(false);
 
@@ -103,6 +104,16 @@ export default function SessionPage() {
     // Submit feedback
     const submitFeedback = useCallback(async () => {
         if (!feedbackMessage.trim() || feedbackSending) return;
+
+        // Validate email if provided
+        if (feedbackEmail.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(feedbackEmail.trim())) {
+                setFeedbackEmailError("Please enter a valid email address");
+                return;
+            }
+        }
+        setFeedbackEmailError("");
         setFeedbackSending(true);
         try {
             const res = await fetch("/api/feedback", {
@@ -945,10 +956,13 @@ export default function SessionPage() {
                                             <input
                                                 type="email"
                                                 value={feedbackEmail}
-                                                onChange={(e) => setFeedbackEmail(e.target.value)}
+                                                onChange={(e) => { setFeedbackEmail(e.target.value); setFeedbackEmailError(""); }}
                                                 placeholder="E-Mail (leave empty to comment anonymously)"
-                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20"
+                                                className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none ${feedbackEmailError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-white/20"}`}
                                             />
+                                            {feedbackEmailError && (
+                                                <p className="text-red-400 text-[10px] mt-1">{feedbackEmailError}</p>
+                                            )}
                                         </div>
                                         {/* Type pills */}
                                         <div className="flex gap-1.5">

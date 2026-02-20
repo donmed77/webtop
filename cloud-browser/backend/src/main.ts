@@ -34,6 +34,10 @@ async function bootstrap() {
     logger: isProduction ? new JsonLogger() : logLevels,
   });
 
+  // Trust nginx proxy so @Ip() reads X-Forwarded-For instead of Docker bridge IP
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', true);
+
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3002',
     credentials: true,
