@@ -38,6 +38,12 @@ export default function SessionPage() {
     const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
     const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
 
+    // Clipboard sync state
+    const [clipboardText, setClipboardText] = useState("");
+    const [clipboardOpen, setClipboardOpen] = useState(false);
+    const [clipboardSynced, setClipboardSynced] = useState(false);
+    const [clipboardFlash, setClipboardFlash] = useState(false);
+
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
     const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -56,6 +62,35 @@ export default function SessionPage() {
     const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
     const shutterCtxRef = useRef<AudioContext | null>(null);
     const shutterBufferRef = useRef<AudioBuffer | null>(null);
+
+    // Listen for clipboard updates from the iframe (Cloud → Local)
+    useEffect(() => {
+        const handleMessage = (e: MessageEvent) => {
+            if (e.data?.type === "clipboardContentUpdate" && typeof e.data.text === "string") {
+                setClipboardText(e.data.text);
+                setClipboardOpen(true);
+                // Green flash animation for incoming remote clipboard
+                setClipboardFlash(true);
+                setClipboardSynced(true);
+                setTimeout(() => setClipboardSynced(false), 1500);
+                setTimeout(() => setClipboardFlash(false), 2000);
+            }
+        };
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, []);
+
+    // Send clipboard text to remote desktop (Local → Cloud)
+    const syncClipboardToRemote = useCallback((text: string) => {
+        if (text && iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage(
+                { type: "clipboardUpdateFromUI", text },
+                "*"
+            );
+            setClipboardSynced(true);
+            setTimeout(() => setClipboardSynced(false), 1500);
+        }
+    }, []);
 
     // Preload + decode shutter sound into AudioBuffer for instant playback
     useEffect(() => {
@@ -703,14 +738,14 @@ export default function SessionPage() {
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
                         {/* Timer */}
                         <span
-                            className={`font-mono text-lg font-semibold ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                            className={`font-mono text-lg font-semibold tabular-nums min-w-[52px] text-center ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
                         >
                             {formatTime(timeRemaining)}
                         </span>
 
                         {/* Latency */}
                         <div className="w-px h-5 bg-white/20" />
-                        <span className={`text-xs font-mono ${latency === null ? "text-white/40" : latency < 50 ? "text-green-400" : latency < 100 ? "text-yellow-400" : "text-red-400"
+                        <span className={`text-xs font-mono tabular-nums min-w-[42px] text-right ${latency === null ? "text-white/40" : latency < 50 ? "text-green-400" : latency < 100 ? "text-yellow-400" : "text-red-400"
                             }`}>
                             {latency !== null ? `${latency}ms` : "—ms"}
                         </span>
@@ -751,11 +786,11 @@ export default function SessionPage() {
                                 {/* Recording indicator + time + size */}
                                 <div className="flex items-center gap-1.5">
                                     <div className={`w-2.5 h-2.5 rounded-full ${recordingState === "recording" ? "bg-red-500 animate-pulse" : "bg-yellow-500"}`} />
-                                    <span className="text-xs font-mono text-red-400">
+                                    <span className="text-xs font-mono text-red-400 tabular-nums min-w-[40px]">
                                         {formatTime(recordingElapsed)}
                                     </span>
                                     <span className="text-xs text-white/40">·</span>
-                                    <span className="text-xs text-white/50 font-mono">
+                                    <span className="text-xs text-white/50 font-mono tabular-nums min-w-[48px]">
                                         {formatSize(recordingSize)}
                                     </span>
                                 </div>
@@ -798,6 +833,56 @@ export default function SessionPage() {
                             </svg>
                             <span className="text-xs">Screenshot</span>
                         </button>
+
+                        <div className="w-px h-5 bg-white/20" />
+
+                        {/* Clipboard Toggle + Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setClipboardOpen(!clipboardOpen)}
+                                className={`flex items-center gap-1.5 transition-colors cursor-pointer ${clipboardSynced ? "text-green-400" : clipboardOpen ? "text-white" : "text-white/70 hover:text-white"
+                                    }`}
+                                title="Toggle clipboard"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                <span className="text-xs">Clipboard</span>
+                            </button>
+
+                            {/* Clipboard panel — centered dropdown below button */}
+                            {clipboardOpen && (
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-xl shadow-lg w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
+                                    <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between">
+                                        <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-500 ${clipboardFlash ? "text-green-400" : "text-white/30"
+                                            }`}>
+                                            {clipboardFlash ? "✓ Clipboard updated" : "Remote Clipboard"}
+                                        </span>
+                                    </div>
+                                    <div className="p-2">
+                                        <textarea
+                                            value={clipboardText}
+                                            onChange={(e) => setClipboardText(e.target.value)}
+                                            onBlur={() => syncClipboardToRemote(clipboardText)}
+                                            onPaste={(e) => {
+                                                const pasted = e.clipboardData.getData("text/plain");
+                                                if (pasted) {
+                                                    e.preventDefault();
+                                                    setClipboardText(pasted);
+                                                    syncClipboardToRemote(pasted);
+                                                }
+                                            }}
+                                            placeholder="Paste here to send to remote desktop..."
+                                            className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none resize-none transition-all duration-500 ${clipboardFlash
+                                                ? "border-green-400/50 text-green-300"
+                                                : "border-white/10 focus:border-white/20"
+                                                }`}
+                                            rows={4}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="w-px h-5 bg-white/20" />
 
@@ -951,7 +1036,7 @@ export default function SessionPage() {
 
             {/* Share link copied toast */}
             {showShareToast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_0.3s_ease-out]">
+                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
                     <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
                         <span className="text-sm">🔗</span>
                         <p className="text-white/90 text-sm">Viewer link copied to clipboard!</p>
@@ -961,7 +1046,7 @@ export default function SessionPage() {
 
             {/* Privacy toast notification */}
             {showPrivacyToast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_0.3s_ease-out]">
+                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
                     <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
                         <span className="text-sm">🔒</span>
                         <p className="text-white/90 text-sm">Recording is saved locally on your device only. We do not store any recordings.</p>
