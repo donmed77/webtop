@@ -2,12 +2,13 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import Docker from 'dockerode';
 import { v4 as uuidv4 } from 'uuid';
+import http from 'http';
 
 interface PooledContainer {
     id: string;
     containerId: string;
     port: number;
-    status: 'warm' | 'active' | 'destroying';
+    status: 'booting' | 'warm' | 'active' | 'destroying';
     sessionId?: string;
     createdAt: Date;
 }
@@ -207,12 +208,58 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             id,
             containerId: container.id,
             port,
-            status: 'warm',
+            status: 'booting',
             createdAt: new Date(),
         };
 
         this.pool.set(id, pooledContainer);
+
+        // Wait for the container to be fully ready before marking as warm
+        this.waitForReady(port).then(() => {
+            if (pooledContainer.status === 'booting') {
+                pooledContainer.status = 'warm';
+                this.logger.log(`Container ${containerName} is ready (warm) on port ${port}`);
+            }
+        }).catch(err => {
+            this.logger.error(`Container ${containerName} failed readiness check: ${err.message}`);
+        });
+
         return pooledContainer;
+    }
+
+    /**
+     * Poll the container's HTTP endpoint until it responds.
+     * Selkies serves on the container's mapped port — once it responds,
+     * the streaming server is fully initialized and ready for connections.
+     */
+    private waitForReady(port: number, timeoutMs = 120000, intervalMs = 2000): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const start = Date.now();
+
+            const check = () => {
+                if (Date.now() - start > timeoutMs) {
+                    return reject(new Error(`Container on port ${port} did not become ready within ${timeoutMs / 1000}s`));
+                }
+
+                const req = http.get(`http://172.17.0.1:${port}/`, (res) => {
+                    // Any HTTP response means the server is up
+                    res.resume();
+                    resolve();
+                });
+
+                req.on('error', () => {
+                    // Connection refused — container not ready yet, retry
+                    setTimeout(check, intervalMs);
+                });
+
+                req.setTimeout(3000, () => {
+                    req.destroy();
+                    setTimeout(check, intervalMs);
+                });
+            };
+
+            check();
+        });
     }
 
     async acquireContainer(sessionId: string): Promise<PooledContainer | null> {
