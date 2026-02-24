@@ -15,7 +15,7 @@ export default function RateLimitedPage() {
     const router = useRouter();
     const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
+    const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     useEffect(() => {
         fetch(`${apiUrl}/api/session/rate-limit/status`)

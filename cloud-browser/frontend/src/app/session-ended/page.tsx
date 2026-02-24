@@ -17,7 +17,7 @@ function SessionEndedContent() {
     const reason = searchParams.get("reason"); // "not_found" | "expired" | null
     const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
+    const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     useEffect(() => {
         fetch(`${apiUrl}/api/session/rate-limit/status`)

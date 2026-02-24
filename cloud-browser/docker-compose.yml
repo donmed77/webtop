@@ -26,10 +26,10 @@ services:
       - SESSION_DURATION=300
       - POOL_SIZE=3
       - PORT_RANGE_START=4000
-      - PORT_RANGE_END=4100
-      - RATE_LIMIT_PER_DAY=10
+      - RATE_LIMIT_PER_DAY=${RATE_LIMIT_PER_DAY:-1000}
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - PORT_RANGE_END=4100
       - CONTAINER_IMAGE=webtop-browser:latest
       - FRONTEND_URL=https://test.unshortlink.com
     volumes:

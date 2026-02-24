@@ -19,7 +19,8 @@ export default function QueuePage() {
     const [estimatedWait, setEstimatedWait] = useState(0);
 
     useEffect(() => {
-        const socket: Socket = io(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005");
+        const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const socket: Socket = io(apiUrl);
 
         socket.on("connect", () => {
             socket.emit("queue:join", { queueId });
@@ -63,7 +64,8 @@ export default function QueuePage() {
 
     const handleLeaveQueue = async () => {
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/queue/${queueId}`, {
+            const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            await fetch(`${apiUrl}/api/queue/${queueId}`, {
                 method: "DELETE",
             });
             router.push("/");

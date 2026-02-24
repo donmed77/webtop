@@ -178,7 +178,6 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 'SELKIES_GAMEPAD_ENABLED=false',
                 'SELKIES_USE_BROWSER_CURSORS=true',
                 'SELKIES_USE_CPU=true',
-                'SELKIES_H264_STREAMING_MODE=true',
                 'SELKIES_ENABLE_RESIZE=true',
                 'SELKIES_AUDIO_BITRATE=128000',
                 // Hide file transfers and apps

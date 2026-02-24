@@ -26,7 +26,8 @@ export default function Home() {
         finalUrl = `https://${finalUrl}`;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/session`, {
+      const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const response = await fetch(`${apiUrl}/api/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: finalUrl }),

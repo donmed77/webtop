@@ -111,7 +111,7 @@ export default function AdminPage() {
     const [newPoolSize, setNewPoolSize] = useState("");
     const [newDuration, setNewDuration] = useState("");
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
+    const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     const getAuthHeaders = () => ({
         Authorization: `Basic ${btoa(`${username}:${password}`)}`,

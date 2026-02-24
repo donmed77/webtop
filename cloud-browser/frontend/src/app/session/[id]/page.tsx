@@ -206,7 +206,7 @@ export default function SessionPage() {
         return () => { ctx.close().catch(() => { }); };
     }, []);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
+    const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     // Check if session is still valid
     const checkSession = useCallback(async () => {
@@ -235,6 +235,7 @@ export default function SessionPage() {
         const connectSocket = async () => {
             // First check if session exists
             const sessionData = await checkSession();
+
             if (!sessionData) {
                 router.replace("/session-ended?reason=not_found");
                 return;
@@ -311,6 +312,7 @@ export default function SessionPage() {
                 } else {
                     // Connectivity issue — start countdown
                     setStatus("reconnecting");
+
                     // Clear any stale interval (but don't null the countdown)
                     if (reconnectTimerRef.current) {
                         clearInterval(reconnectTimerRef.current);
@@ -369,6 +371,7 @@ export default function SessionPage() {
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const iframeWindow = iframeRef.current?.contentWindow as any;
+
             if (iframeWindow?.console) {
                 const originalLog = iframeWindow.console.log;
                 iframeWindow.console.log = function (...args: unknown[]) {
