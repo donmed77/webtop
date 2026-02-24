@@ -169,7 +169,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 'LANG=en_US.UTF-8',
                 'LC_ALL=en_US.UTF-8',
                 // Selkies UI Configuration from @browser spec
-                'SELKIES_UI_SHOW_SIDEBAR=false',
+                'SELKIES_UI_SHOW_SIDEBAR=true',
                 'SELKIES_UI_TITLE=Unshort_Link',
                 'SELKIES_UI_SHOW_LOGO=false',
                 'SELKIES_UI_SIDEBAR_SHOW_GAMEPADS=false',
