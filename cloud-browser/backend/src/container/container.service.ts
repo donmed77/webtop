@@ -180,6 +180,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 'SELKIES_USE_CPU=true',
                 'SELKIES_ENABLE_RESIZE=true',
                 'SELKIES_AUDIO_BITRATE=128000',
+                'SELKIES_ENCODER=x264enc-striped',
+                'SELKIES_FRAMERATE=60',
+                'SELKIES_H264_CRF=25',
+                'SELKIES_H264_PAINTOVER_CRF=20',
                 // Hide file transfers and apps
                 'SELKIES_UI_SIDEBAR_SHOW_FILES=false',
                 'SELKIES_UI_SIDEBAR_SHOW_APPS=false',
