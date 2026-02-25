@@ -26,6 +26,9 @@ export default function SessionPage() {
     const hasNavigated = useRef(false);
     const [streamReady, setStreamReady] = useState(false);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
+    const [toolbarMinPos, setToolbarMinPos] = useState({ right: 16, top: 16 });
+    const [toolbarMinDragging, setToolbarMinDragging] = useState(false);
+    const toolbarMinDragStart = useRef<{ x: number; y: number; right: number; top: number } | null>(null);
     const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
     const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [latency, setLatency] = useState<number | null>(null);
@@ -46,7 +49,7 @@ export default function SessionPage() {
 
     // Mobile keyboard state
     const [isTouchDevice, setIsTouchDevice] = useState(false);
-    const [kbdPos, setKbdPos] = useState({ right: 16, bottom: 16 });
+    const [kbdPos, setKbdPos] = useState({ right: 40, bottom: 16 });
     const [kbdDragging, setKbdDragging] = useState(false);
     const kbdDragStart = useRef<{ x: number; y: number; right: number; bottom: number } | null>(null);
 
@@ -77,6 +80,8 @@ export default function SessionPage() {
 
     const shutterCtxRef = useRef<AudioContext | null>(null);
     const shutterBufferRef = useRef<AudioBuffer | null>(null);
+    const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const scrollCountRef = useRef(0);
 
     // Listen for clipboard updates from the iframe (Cloud → Local)
     useEffect(() => {
@@ -1073,11 +1078,54 @@ export default function SessionPage() {
                     </div>
                 </div>
             ) : streamReady && isToolbarMinimized ? (
-                /* Minimized: small icon in top-right corner */
+                /* Minimized: small draggable icon */
                 <button
-                    onClick={() => setIsToolbarMinimized(false)}
-                    className={`fixed top-4 right-4 z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg cursor-pointer ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                    className={`fixed z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg cursor-pointer select-none ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                    style={{
+                        right: `${toolbarMinPos.right}px`,
+                        top: `${toolbarMinPos.top}px`,
+                        touchAction: 'none',
+                        WebkitTouchCallout: 'none',
+                        WebkitUserSelect: 'none',
+                    }}
                     title="Show toolbar"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onClick={() => {
+                        if (toolbarMinDragging) return;
+                        setIsToolbarMinimized(false);
+                    }}
+                    onPointerDown={(e) => {
+                        toolbarMinDragStart.current = {
+                            x: e.clientX,
+                            y: e.clientY,
+                            right: toolbarMinPos.right,
+                            top: toolbarMinPos.top,
+                        };
+                        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                        if (!toolbarMinDragStart.current) return;
+                        const dx = toolbarMinDragStart.current.x - e.clientX;
+                        const dy = e.clientY - toolbarMinDragStart.current.y;
+                        if (!toolbarMinDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+                            setToolbarMinDragging(true);
+                        }
+                        if (toolbarMinDragging || Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                            const newRight = Math.max(4, Math.min(window.innerWidth - 56, toolbarMinDragStart.current.right + dx));
+                            const newTop = Math.max(4, Math.min(window.innerHeight - 56, toolbarMinDragStart.current.top + dy));
+                            setToolbarMinPos({ right: newRight, top: newTop });
+                        }
+                    }}
+                    onPointerUp={() => {
+                        toolbarMinDragStart.current = null;
+                        if (toolbarMinDragging) {
+                            setTimeout(() => setToolbarMinDragging(false), 0);
+                        }
+                    }}
+                    onPointerCancel={() => {
+                        toolbarMinDragStart.current = null;
+                        setToolbarMinDragging(false);
+                    }}
                 >
                     <span className="font-mono text-sm font-semibold">{formatTime(timeRemaining)}</span>
                     {(recordingState === "recording" || recordingState === "paused") && (
@@ -1098,24 +1146,18 @@ export default function SessionPage() {
                 />
             )}
 
-            {/* Floating Keyboard FAB (mobile/tablet only) */}
+            {/* Floating Mobile Controls — draggable group (scroll ▲ / keyboard / scroll ▼) */}
             {isTouchDevice && streamReady && (
-                <button
-                    className="fixed z-50 w-11 h-11 rounded-full bg-black/50 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/70 active:text-white active:bg-black/70 shadow-lg transition-colors"
+                <div
+                    className="fixed z-50 flex flex-col items-center gap-1 select-none"
                     style={{
                         right: `${kbdPos.right}px`,
                         bottom: `${kbdPos.bottom}px`,
-                        touchAction: "none",
+                        touchAction: 'none',
+                        WebkitTouchCallout: 'none',
+                        WebkitUserSelect: 'none',
                     }}
-                    title="Toggle keyboard"
-                    onClick={(e) => {
-                        // Only toggle if we didn't just drag
-                        if (kbdDragging) {
-                            e.preventDefault();
-                            return;
-                        }
-                        toggleVirtualKeyboard();
-                    }}
+                    onContextMenu={(e) => e.preventDefault()}
                     onPointerDown={(e) => {
                         kbdDragStart.current = {
                             x: e.clientX,
@@ -1123,7 +1165,7 @@ export default function SessionPage() {
                             right: kbdPos.right,
                             bottom: kbdPos.bottom,
                         };
-                        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
                     }}
                     onPointerMove={(e) => {
                         if (!kbdDragStart.current) return;
@@ -1133,14 +1175,13 @@ export default function SessionPage() {
                             setKbdDragging(true);
                         }
                         if (kbdDragging || Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-                            const newRight = Math.max(4, Math.min(window.innerWidth - 48, kbdDragStart.current.right + dx));
-                            const newBottom = Math.max(4, Math.min(window.innerHeight - 48, kbdDragStart.current.bottom + dy));
+                            const newRight = Math.max(4, Math.min(window.innerWidth - 56, kbdDragStart.current.right + dx));
+                            const newBottom = Math.max(4, Math.min(window.innerHeight - 140, kbdDragStart.current.bottom + dy));
                             setKbdPos({ right: newRight, bottom: newBottom });
                         }
                     }}
                     onPointerUp={() => {
                         kbdDragStart.current = null;
-                        // Reset dragging flag after a tick so onClick can read it
                         if (kbdDragging) {
                             setTimeout(() => setKbdDragging(false), 0);
                         }
@@ -1150,13 +1191,71 @@ export default function SessionPage() {
                         setKbdDragging(false);
                     }}
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={1.5} />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
-                    </svg>
-                </button>
-            )}
+                    {/* Scroll Up */}
+                    <button
+                        className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/60 active:text-white active:bg-black/60 shadow-lg transition-colors"
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            scrollCountRef.current = 0;
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const wi = (iframeRef.current?.contentWindow as any)?.webrtcInput;
+                            if (!wi?._triggerMouseWheel) return;
+                            wi._triggerMouseWheel("up", 1);
+                            scrollIntervalRef.current = setInterval(() => {
+                                scrollCountRef.current++;
+                                const mag = scrollCountRef.current > 10 ? 3 : scrollCountRef.current > 5 ? 2 : 1;
+                                wi._triggerMouseWheel("up", mag);
+                            }, 60);
+                        }}
+                        onPointerUp={() => { if (scrollIntervalRef.current) { clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; } }}
+                        onPointerCancel={() => { if (scrollIntervalRef.current) { clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; } }}
+                        onPointerLeave={() => { if (scrollIntervalRef.current) { clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; } }}
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="18 15 12 9 6 15" />
+                        </svg>
+                    </button>
 
+                    {/* Keyboard Toggle */}
+                    <button
+                        className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/60 active:text-white active:bg-black/60 shadow-lg transition-colors"
+                        onClick={(e) => {
+                            if (kbdDragging) { e.preventDefault(); return; }
+                            toggleVirtualKeyboard();
+                        }}
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={1.5} />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+                        </svg>
+                    </button>
+
+                    {/* Scroll Down */}
+                    <button
+                        className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/60 active:text-white active:bg-black/60 shadow-lg transition-colors"
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            scrollCountRef.current = 0;
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const wi = (iframeRef.current?.contentWindow as any)?.webrtcInput;
+                            if (!wi?._triggerMouseWheel) return;
+                            wi._triggerMouseWheel("down", 1);
+                            scrollIntervalRef.current = setInterval(() => {
+                                scrollCountRef.current++;
+                                const mag = scrollCountRef.current > 10 ? 3 : scrollCountRef.current > 5 ? 2 : 1;
+                                wi._triggerMouseWheel("down", mag);
+                            }, 60);
+                        }}
+                        onPointerUp={() => { if (scrollIntervalRef.current) { clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; } }}
+                        onPointerCancel={() => { if (scrollIntervalRef.current) { clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; } }}
+                        onPointerLeave={() => { if (scrollIntervalRef.current) { clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; } }}
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                </div>
+            )}
             {/* Screenshot selection overlay */}
             {screenshotMode && (
                 <div
