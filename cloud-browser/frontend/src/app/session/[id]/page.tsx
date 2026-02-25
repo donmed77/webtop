@@ -74,7 +74,7 @@ export default function SessionPage() {
     const recordingStartTimeRef = useRef(0);
     const recordingPausedMsRef = useRef(0);
     const pauseStartRef = useRef(0);
-    const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+
     const shutterCtxRef = useRef<AudioContext | null>(null);
     const shutterBufferRef = useRef<AudioBuffer | null>(null);
 
@@ -384,29 +384,6 @@ export default function SessionPage() {
                 };
             }
 
-            // Monkey-patch AudioContext so Selkies' private instance is accessible
-            // Selkies creates AudioContext inside a closure — this intercepts construction
-            if (iframeWindow && !iframeWindow.__audioCtxPatched) {
-                const OrigAudioContext = iframeWindow.AudioContext || iframeWindow.webkitAudioContext;
-                if (OrigAudioContext) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    iframeWindow.AudioContext = function (...args: any[]) {
-                        const ctx = new OrigAudioContext(...args);
-                        iframeWindow.__audioCtx = ctx;
-                        // Also intercept createGain to capture the gain node
-                        const origCreateGain = ctx.createGain.bind(ctx);
-                        ctx.createGain = function () {
-                            const gain = origCreateGain();
-                            iframeWindow.__audioGain = gain;
-                            return gain;
-                        };
-                        return ctx;
-                    };
-                    iframeWindow.AudioContext.prototype = OrigAudioContext.prototype;
-                    iframeWindow.__audioCtxPatched = true;
-                }
-            }
-
             // Poll Selkies' network_stats for latency
             if (latencyIntervalRef.current) clearInterval(latencyIntervalRef.current);
             latencyIntervalRef.current = setInterval(() => {
@@ -554,25 +531,6 @@ export default function SessionPage() {
         try {
             const stream = canvas.captureStream(60);
 
-            // Try to capture audio from Selkies' AudioContext (exposed via monkey-patch)
-            try {
-                const audioCtx = iframeWindow?.__audioCtx;
-                const gainNode = iframeWindow?.__audioGain;
-                if (audioCtx && gainNode && audioCtx.state === "running") {
-                    const dest = audioCtx.createMediaStreamDestination();
-                    audioDestRef.current = dest;
-                    gainNode.connect(dest);
-                    dest.stream.getAudioTracks().forEach((track: MediaStreamTrack) => {
-                        stream.addTrack(track);
-                    });
-                    console.log("[Recording] Audio capture attached");
-                } else {
-                    console.log("[Recording] No audio context available, recording video only");
-                }
-            } catch (audioErr) {
-                console.log("[Recording] Audio capture failed, recording video only", audioErr);
-            }
-
             recordingStreamRef.current = stream;
             const recorder = new MediaRecorder(stream, {
                 mimeType,
@@ -592,11 +550,6 @@ export default function SessionPage() {
                 }
             };
             recorder.onstop = async () => {
-                // Clean up audio destination node
-                if (audioDestRef.current) {
-                    try { audioDestRef.current.disconnect(); } catch { /* already disconnected */ }
-                    audioDestRef.current = null;
-                }
                 // Stop all stream tracks
                 recordingStreamRef.current?.getTracks().forEach(t => t.stop());
                 recordingStreamRef.current = null;
@@ -1139,6 +1092,7 @@ export default function SessionPage() {
                     ref={iframeRef}
                     src={`/browser/${port}/${isViewer ? "#shared" : ""}`}
                     className="flex-1 w-full border-0"
+                    style={{ touchAction: "none" }}
                     allow="clipboard-read; clipboard-write; autoplay"
                     onLoad={handleIframeLoad}
                 />
