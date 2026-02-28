@@ -512,9 +512,16 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 this.pool.delete(id);
             }
         }
-        // Recreate to target pool size
-        await this.initializePool();
-        this.logger.log('Container pool restarted');
+        // Recreate only the needed warm containers (pool target minus active containers still alive)
+        const activeCount = this.pool.size; // remaining entries are all active/booting
+        const needed = Math.max(0, this.poolSize - activeCount);
+        this.logger.log(`Recreating ${needed} warm containers (${activeCount} active still in pool)`);
+        const promises = [];
+        for (let i = 0; i < needed; i++) {
+            promises.push(this.createWarmContainer());
+        }
+        await Promise.all(promises);
+        this.logger.log(`Container pool restarted (total: ${this.pool.size})`);
     }
 
     /**
