@@ -565,7 +565,18 @@ export default function SessionPage() {
                 const rawBlob = new Blob(recordingChunksRef.current, { type: "video/webm" });
                 // Calculate actual duration accounting for pauses
                 const durationMs = Date.now() - recordingStartTimeRef.current - recordingPausedMsRef.current;
-                const blob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
+
+                // Try to fix duration, with timeout and fallback to raw blob
+                let blob = rawBlob;
+                try {
+                    const fixed = await Promise.race([
+                        fixWebmDuration(rawBlob, durationMs, { logger: false }),
+                        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+                    ]);
+                    blob = fixed;
+                } catch {
+                    // fixWebmDuration failed or timed out — use raw blob
+                }
                 setRecordingBlob(blob);
                 setRecordingSize(blob.size);
                 setRecordingState("ready");
