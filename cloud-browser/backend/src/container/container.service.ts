@@ -22,7 +22,8 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private usedPorts: Set<number> = new Set();
     private readonly acquireMutex = new Mutex();
 
-    private poolSize: number;
+    private readonly initialWarm: number;
+    private maxContainers: number;
     private readonly portRangeStart: number;
     private readonly portRangeEnd: number;
     private readonly containerImage: string;
@@ -39,7 +40,8 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     constructor(private configService: ConfigService) {
         this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
-        this.poolSize = this.configService.get<number>('POOL_SIZE', 3);
+        this.initialWarm = this.configService.get<number>('INITIAL_WARM', 3);
+        this.maxContainers = this.configService.get<number>('MAX_CONTAINERS', 30);
         this.portRangeStart = this.configService.get<number>('PORT_RANGE_START', 4000);
         this.portRangeEnd = this.configService.get<number>('PORT_RANGE_END', 4100);
         this.containerImage = this.configService.get<string>('CONTAINER_IMAGE', 'webtop-browser:latest');
@@ -119,11 +121,68 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     private async initializePool() {
         const promises = [];
-        for (let i = 0; i < this.poolSize; i++) {
+        for (let i = 0; i < this.initialWarm; i++) {
             promises.push(this.createWarmContainer());
         }
         await Promise.all(promises);
-        this.logger.log(`Container pool initialized with ${this.pool.size} containers`);
+        this.logger.log(`Container pool initialized with ${this.pool.size} warm containers (initialWarm=${this.initialWarm}, maxContainers=${this.maxContainers})`);
+    }
+
+    // ---- 1:1 Mirror Pool Logic ----
+
+    /**
+     * Dynamic warm target: always match active count, with initialWarm as floor.
+     * warm_target = max(initialWarm, activeCount)
+     */
+    private getWarmTarget(): number {
+        const activeCount = Array.from(this.pool.values()).filter(c => c.status === 'active').length;
+        return Math.max(this.initialWarm, activeCount);
+    }
+
+    /**
+     * Ensure warm container count matches the dynamic target.
+     * Creates new warm containers if below target, respecting MAX_CONTAINERS cap.
+     * Destroys surplus warm containers if above target.
+     */
+    private async replenishPool(): Promise<void> {
+        const warmTarget = this.getWarmTarget();
+        const warmCount = this.getWarmCount();
+        const bootingCount = Array.from(this.pool.values()).filter(c => c.status === 'booting').length;
+        const effectiveWarm = warmCount + bootingCount; // count booting as upcoming warm
+
+        if (effectiveWarm < warmTarget && this.pool.size < this.maxContainers) {
+            const canCreate = this.maxContainers - this.pool.size;
+            const needed = Math.min(warmTarget - effectiveWarm, canCreate);
+            if (needed > 0) {
+                this.logger.log(`Replenishing pool: warm=${warmCount}+${bootingCount}booting, target=${warmTarget}, creating ${needed} (total ${this.pool.size}→${this.pool.size + needed}, max=${this.maxContainers})`);
+                const promises = [];
+                for (let i = 0; i < needed; i++) {
+                    promises.push(
+                        this.createWarmContainer().catch(err => {
+                            this.logger.error(`Failed to create container: ${err.message}`);
+                        })
+                    );
+                }
+                await Promise.all(promises);
+            }
+        } else if (warmCount > warmTarget) {
+            // Shrink surplus warm containers
+            let toRemove = warmCount - warmTarget;
+            this.logger.log(`Shrinking pool: warm=${warmCount}, target=${warmTarget}, removing ${toRemove}`);
+            for (const [id, container] of this.pool) {
+                if (toRemove <= 0) break;
+                if (container.status !== 'warm') continue;
+                container.status = 'destroying';
+                try {
+                    const dc = this.docker.getContainer(container.containerId);
+                    await dc.stop().catch(() => { });
+                    await dc.remove({ force: true });
+                } catch { /* ignore */ }
+                this.releasePort(container.port);
+                this.pool.delete(id);
+                toRemove--;
+            }
+        }
     }
 
     private getAvailablePort(): number {
@@ -312,6 +371,12 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     container.status = 'active';
                     container.sessionId = sessionId;
                     this.logger.log(`Assigned container ${id} to session ${sessionId}`);
+
+                    // 1:1 mirror: replenish pool to match new active count
+                    this.replenishPool().catch(err => {
+                        this.logger.error(`Failed to replenish pool: ${err.message}`);
+                    });
+
                     return container;
                 }
             }
@@ -358,7 +423,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Releasing container ${poolId}`);
         container.status = 'destroying';
 
-        // Fix #6: Destroy old container and release port BEFORE creating replacement
+        // Destroy old container and release port
         try {
             const dockerContainer = this.docker.getContainer(container.containerId);
             await dockerContainer.stop({ t: 5 });
@@ -370,9 +435,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.releasePort(container.port);
         this.pool.delete(poolId);
 
-        // Now create replacement with the freed port available
-        this.createWarmContainer().catch(err => {
-            this.logger.error(`Failed to create replacement container: ${err.message}`);
+        // 1:1 mirror: replenish (warm target shrinks since active count decreased)
+        // This also handles creating a base replacement if still needed
+        this.replenishPool().catch(err => {
+            this.logger.error(`Failed to replenish pool: ${err.message}`);
         });
     }
 
@@ -399,6 +465,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         }));
         const warm = containers.filter(c => c.status === 'warm').length;
         const active = containers.filter(c => c.status === 'active').length;
+        const booting = containers.filter(c => c.status === 'booting').length;
         const avgBootTimeMs = this.metrics.bootTimes.length > 0
             ? Math.round(this.metrics.bootTimes.reduce((a, b) => a + b, 0) / this.metrics.bootTimes.length)
             : 0;
@@ -406,7 +473,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             ? Math.round(((this.metrics.totalAcquires - this.metrics.acquireFailures) / this.metrics.totalAcquires) * 100)
             : 100;
         return {
-            total: this.pool.size, warm, active, containers,
+            total: this.pool.size, warm, active, booting, containers,
+            warmTarget: this.getWarmTarget(),
+            initialWarm: this.initialWarm,
+            maxContainers: this.maxContainers,
             metrics: {
                 totalAcquires: this.metrics.totalAcquires,
                 acquireFailures: this.metrics.acquireFailures,
@@ -431,13 +501,13 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
      * P5: Kill and recreate unhealthy containers immediately
      */
     private async healthCheck() {
-        // Fix #3: Prevent overlapping health check runs
         if (this.healthCheckRunning) return;
         this.healthCheckRunning = true;
 
         try {
-            const statuses = Array.from(this.pool.entries()).map(([id, c]) => `${id}:${c.status}`).join(', ');
-            this.logger.debug(`Health check: pool.size=${this.pool.size}, target=${this.poolSize}, [${statuses}]`);
+            const warm = this.getWarmCount();
+            const active = this.getActiveContainers().length;
+            this.logger.debug(`Health check: total=${this.pool.size}, active=${active}, warm=${warm}, warmTarget=${this.getWarmTarget()}, max=${this.maxContainers}`);
 
             for (const [id, container] of this.pool) {
                 if (container.status === 'destroying') continue;
@@ -455,7 +525,6 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                         } catch { /* ignore */ }
                         this.releasePort(container.port);
                         this.pool.delete(id);
-                        // Fix #1: Don't create inline replacement — replenishment block handles it
                         continue;
                     }
                 }
@@ -472,32 +541,16 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                         } catch { /* ignore */ }
                         this.releasePort(container.port);
                         this.pool.delete(id);
-                        // Fix #1: No inline replacement — replenishment below handles it
                     }
                 } catch (err) {
                     this.logger.warn(`Container ${id} health check failed: ${err.message}, removing...`);
                     this.releasePort(container.port);
                     this.pool.delete(id);
-                    // Fix #1: No inline replacement — replenishment below handles it
                 }
             }
 
-            // Single replenishment point: create all needed containers at once
-            const currentSize = this.pool.size;
-            if (currentSize < this.poolSize) {
-                const needed = this.poolSize - currentSize;
-                this.logger.log(`Pool below target (current=${currentSize}, target=${this.poolSize}), creating ${needed}`);
-                const promises = [];
-                for (let i = 0; i < needed; i++) {
-                    promises.push(
-                        this.createWarmContainer().catch(err => {
-                            this.logger.error(`Failed to create container: ${err.message}`);
-                        })
-                    );
-                }
-                // Wait for all replacements to complete before ending health check
-                await Promise.all(promises);
-            }
+            // Replenish pool using 1:1 mirror logic
+            await this.replenishPool();
         } finally {
             this.healthCheckRunning = false;
         }
@@ -525,57 +578,32 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 this.pool.delete(id);
             }
         }
-        // Recreate only the needed warm containers (pool target minus active containers still alive)
-        const activeCount = this.pool.size; // remaining entries are all active/booting
-        const needed = Math.max(0, this.poolSize - activeCount);
-        this.logger.log(`Recreating ${needed} warm containers (${activeCount} active still in pool)`);
-        const promises = [];
-        for (let i = 0; i < needed; i++) {
-            promises.push(this.createWarmContainer());
-        }
-        await Promise.all(promises);
+        // Replenish using 1:1 mirror logic
+        await this.replenishPool();
         this.logger.log(`Container pool restarted (total: ${this.pool.size})`);
     }
 
     /**
-     * Change pool size at runtime
+     * Change max containers at runtime
      */
-    async setPoolSize(newSize: number): Promise<void> {
-        const oldSize = this.poolSize;
-        this.poolSize = newSize;
-        this.logger.log(`Pool size changed: ${oldSize} → ${newSize}`);
-
-        if (this.pool.size < newSize) {
-            // Scale up: create missing containers
-            const needed = newSize - this.pool.size;
-            this.logger.log(`Scaling up: creating ${needed} containers`);
-            for (let i = 0; i < needed; i++) {
-                this.createWarmContainer().catch(err => {
-                    this.logger.error(`Failed to create container: ${err.message}`);
-                });
-            }
-        } else if (this.pool.size > newSize) {
-            // Fix #4: Scale down — destroy surplus warm containers
-            let toRemove = this.pool.size - newSize;
-            this.logger.log(`Scaling down: removing ${toRemove} warm containers`);
-            for (const [id, container] of this.pool) {
-                if (toRemove <= 0) break;
-                if (container.status !== 'warm') continue;
-                container.status = 'destroying';
-                try {
-                    const dc = this.docker.getContainer(container.containerId);
-                    await dc.stop().catch(() => { });
-                    await dc.remove({ force: true });
-                } catch { /* ignore */ }
-                this.releasePort(container.port);
-                this.pool.delete(id);
-                toRemove--;
-            }
-        }
+    async setMaxContainers(newMax: number): Promise<void> {
+        const oldMax = this.maxContainers;
+        this.maxContainers = newMax;
+        this.logger.log(`Max containers changed: ${oldMax} → ${newMax}`);
+        await this.replenishPool();
     }
 
     getPoolSize(): number {
-        return this.poolSize;
+        // For queue wait time estimation: return maxContainers as the effective pool capacity
+        return this.maxContainers;
+    }
+
+    getMaxContainers(): number {
+        return this.maxContainers;
+    }
+
+    getInitialWarm(): number {
+        return this.initialWarm;
     }
 
     /** Average container boot time in seconds, defaults to 15s if no data */

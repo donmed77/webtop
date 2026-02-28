@@ -84,6 +84,8 @@ export class AdminController {
             avgDurationWeek: weekAvgDuration,
             sessionDuration: this.sessionService.getSessionDuration(),
             poolSize: this.containerService.getPoolSize(),
+            maxContainers: this.containerService.getMaxContainers(),
+            initialWarm: this.containerService.getInitialWarm(),
             paused: this.sessionService.isPaused(),
         };
     }
@@ -192,12 +194,12 @@ export class AdminController {
     }
 
     @Post('config')
-    async updateConfig(@Body() config: { poolSize?: number; sessionDuration?: number }) {
+    async updateConfig(@Body() config: { maxContainers?: number; sessionDuration?: number }) {
         const changes: string[] = [];
 
-        if (config.poolSize && config.poolSize >= 1 && config.poolSize <= 20) {
-            await this.containerService.setPoolSize(config.poolSize);
-            changes.push(`Pool size → ${config.poolSize}`);
+        if (config.maxContainers && config.maxContainers >= 1 && config.maxContainers <= 100) {
+            await this.containerService.setMaxContainers(config.maxContainers);
+            changes.push(`Max containers → ${config.maxContainers}`);
         }
 
         if (config.sessionDuration && config.sessionDuration >= 60 && config.sessionDuration <= 1800) {
