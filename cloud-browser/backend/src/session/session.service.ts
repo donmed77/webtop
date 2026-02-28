@@ -45,8 +45,8 @@ export class SessionService {
         this.sessionDuration = this.configService.get<number>('SESSION_DURATION', 300);
         this.rateLimitPerDay = this.configService.get<number>('RATE_LIMIT_PER_DAY', 10);
 
-        // Check for expired sessions every 5 seconds
-        this.checkInterval = setInterval(() => this.checkExpiredSessions(), 5000);
+        // Check for expired sessions every second (matches timer broadcast frequency)
+        this.checkInterval = setInterval(() => this.checkExpiredSessions(), 1000);
     }
 
     private getAnonymizedIp(ip: string): string {

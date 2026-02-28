@@ -8,7 +8,7 @@ import {
     MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { SessionService } from './session.service';
 
 @WebSocketGateway({
@@ -16,7 +16,7 @@ import { SessionService } from './session.service';
         origin: process.env.FRONTEND_URL || 'http://localhost:3002',
     },
 })
-export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
     @WebSocketServer()
     server: Server;
 
@@ -28,10 +28,15 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     private sessionViewers: Map<string, Set<string>> = new Map(); // sessionId -> Set<viewer socketId>
     private clientIsViewer: Map<string, boolean> = new Map(); // socketId -> isViewer
     private reconnectingSessions: Map<string, { disconnectedAt: number; timer: NodeJS.Timeout }> = new Map();
+    private timerInterval: NodeJS.Timeout;
 
     constructor(private sessionService: SessionService) {
         // Send timer updates every second
-        setInterval(() => this.broadcastTimerUpdates(), 1000);
+        this.timerInterval = setInterval(() => this.broadcastTimerUpdates(), 1000);
+    }
+
+    onModuleDestroy() {
+        clearInterval(this.timerInterval);
     }
 
     handleConnection(client: Socket) {
