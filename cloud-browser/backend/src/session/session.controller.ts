@@ -26,6 +26,11 @@ export class SessionController {
             throw new HttpException('URL is required', HttpStatus.BAD_REQUEST);
         }
 
+        // URL length validation — reject before wasting a queue slot
+        if (dto.url.length > 2048) {
+            throw new HttpException('URL is too long (max 2048 characters)', HttpStatus.BAD_REQUEST);
+        }
+
         // DT3: Check if service is paused by admin
         if (this.sessionService.isPaused()) {
             throw new HttpException(

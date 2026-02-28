@@ -96,6 +96,11 @@ export class SessionService {
     async createSession(url: string, clientIp: string): Promise<{ session?: Session; queued?: boolean; error?: string }> {
         this.resetDailyStats();
 
+        // URL length validation
+        if (url.length > 2048) {
+            return { error: 'URL is too long (max 2048 characters)' };
+        }
+
         // U4: Block dangerous protocols
         const blockedProtocols = ['file:', 'javascript:', 'data:', 'chrome:', 'about:'];
         const lowerUrl = url.toLowerCase().trim();

@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import Docker from 'dockerode';
 import { v4 as uuidv4 } from 'uuid';
+import { Mutex } from 'async-mutex';
 import http from 'http';
 
 interface PooledContainer {
@@ -19,12 +20,20 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private docker: Docker;
     private pool: Map<string, PooledContainer> = new Map();
     private usedPorts: Set<number> = new Set();
+    private readonly acquireMutex = new Mutex();
 
     private readonly poolSize: number;
     private readonly portRangeStart: number;
     private readonly portRangeEnd: number;
     private readonly containerImage: string;
     private readonly networkName = 'cloud-browser-isolated';
+
+    // Metrics
+    private metrics = {
+        totalAcquires: 0,
+        acquireFailures: 0,
+        bootTimes: [] as number[],
+    };
 
     constructor(private configService: ConfigService) {
         this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -84,9 +93,29 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     private async cleanupOrphanedContainers() {
         const containers = await this.docker.listContainers({ all: true });
+        let recovered = 0;
         for (const containerInfo of containers) {
             const name = containerInfo.Names[0]?.replace('/', '');
             if (name?.startsWith('session-')) {
+                // Try to recover running containers instead of destroying them
+                if (containerInfo.State === 'running') {
+                    const port = containerInfo.Ports?.find(p => p.PrivatePort === 3000)?.PublicPort;
+                    if (port) {
+                        const id = name.replace('session-', '');
+                        this.pool.set(id, {
+                            id,
+                            containerId: containerInfo.Id,
+                            port,
+                            status: 'warm',
+                            createdAt: new Date(),
+                        });
+                        this.usedPorts.add(port);
+                        recovered++;
+                        this.logger.log(`Recovered running container: ${name} on port ${port}`);
+                        continue;
+                    }
+                }
+                // Non-running or no port — clean up
                 this.logger.log(`Cleaning up orphaned container: ${name}`);
                 try {
                     const container = this.docker.getContainer(containerInfo.Id);
@@ -97,11 +126,21 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 }
             }
         }
+        if (recovered > 0) {
+            this.logger.log(`Recovered ${recovered} containers from previous run`);
+        }
     }
 
     private async initializePool() {
+        // Only create containers for remaining empty slots (some may have been recovered)
+        const needed = this.poolSize - this.pool.size;
+        if (needed <= 0) {
+            this.logger.log(`Container pool already at target size (${this.pool.size} recovered)`);
+            return;
+        }
+        this.logger.log(`Creating ${needed} new containers (${this.pool.size} already recovered)`);
         const promises = [];
-        for (let i = 0; i < this.poolSize; i++) {
+        for (let i = 0; i < needed; i++) {
             promises.push(this.createWarmContainer());
         }
         await Promise.all(promises);
@@ -109,6 +148,11 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     private getAvailablePort(): number {
+        const totalPorts = this.portRangeEnd - this.portRangeStart + 1;
+        const usedPercent = (this.usedPorts.size / totalPorts) * 100;
+        if (usedPercent > 80) {
+            this.logger.warn(`Port exhaustion warning: ${this.usedPorts.size}/${totalPorts} ports in use (${usedPercent.toFixed(0)}%)`);
+        }
         for (let port = this.portRangeStart; port <= this.portRangeEnd; port++) {
             if (!this.usedPorts.has(port)) {
                 this.usedPorts.add(port);
@@ -225,7 +269,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.waitForReady(port).then(() => {
             if (pooledContainer.status === 'booting') {
                 pooledContainer.status = 'warm';
-                this.logger.log(`Container ${containerName} is ready (warm) on port ${port}`);
+                const bootMs = Date.now() - pooledContainer.createdAt.getTime();
+                this.metrics.bootTimes.push(bootMs);
+                if (this.metrics.bootTimes.length > 20) this.metrics.bootTimes.shift(); // rolling window
+                this.logger.log(`Container ${containerName} is ready (warm) on port ${port} — boot time: ${(bootMs / 1000).toFixed(1)}s`);
             }
         }).catch(err => {
             this.logger.error(`Container ${containerName} failed readiness check: ${err.message}`);
@@ -270,16 +317,23 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     async acquireContainer(sessionId: string): Promise<PooledContainer | null> {
-        // Find a warm container
-        for (const [id, container] of this.pool) {
-            if (container.status === 'warm') {
-                container.status = 'active';
-                container.sessionId = sessionId;
-                this.logger.log(`Assigned container ${id} to session ${sessionId}`);
-                return container;
+        const release = await this.acquireMutex.acquire();
+        try {
+            this.metrics.totalAcquires++;
+            // Find a warm container
+            for (const [id, container] of this.pool) {
+                if (container.status === 'warm') {
+                    container.status = 'active';
+                    container.sessionId = sessionId;
+                    this.logger.log(`Assigned container ${id} to session ${sessionId}`);
+                    return container;
+                }
             }
+            this.metrics.acquireFailures++;
+            return null;
+        } finally {
+            release();
         }
-        return null;
     }
 
     /**
@@ -359,7 +413,23 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         }));
         const warm = containers.filter(c => c.status === 'warm').length;
         const active = containers.filter(c => c.status === 'active').length;
-        return { total: this.pool.size, warm, active, containers };
+        const avgBootTimeMs = this.metrics.bootTimes.length > 0
+            ? Math.round(this.metrics.bootTimes.reduce((a, b) => a + b, 0) / this.metrics.bootTimes.length)
+            : 0;
+        const hitRate = this.metrics.totalAcquires > 0
+            ? Math.round(((this.metrics.totalAcquires - this.metrics.acquireFailures) / this.metrics.totalAcquires) * 100)
+            : 100;
+        return {
+            total: this.pool.size, warm, active, containers,
+            metrics: {
+                totalAcquires: this.metrics.totalAcquires,
+                acquireFailures: this.metrics.acquireFailures,
+                poolHitRate: `${hitRate}%`,
+                avgBootTimeMs,
+                portsUsed: this.usedPorts.size,
+                portsTotal: this.portRangeEnd - this.portRangeStart + 1,
+            },
+        };
     }
 
     getActiveContainers(): PooledContainer[] {
@@ -377,6 +447,26 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private async healthCheck() {
         for (const [id, container] of this.pool) {
             if (container.status === 'destroying') continue;
+
+            // Timeout booting containers after 2 minutes
+            if (container.status === 'booting') {
+                const bootingMs = Date.now() - container.createdAt.getTime();
+                if (bootingMs > 120_000) {
+                    this.logger.warn(`Container ${id} stuck in booting for ${Math.round(bootingMs / 1000)}s, replacing...`);
+                    container.status = 'destroying';
+                    this.releasePort(container.port);
+                    this.pool.delete(id);
+                    try {
+                        const dc = this.docker.getContainer(container.containerId);
+                        await dc.stop({ t: 5 }).catch(() => { });
+                        await dc.remove({ force: true }).catch(() => { });
+                    } catch { /* ignore */ }
+                    this.createWarmContainer().catch(err => {
+                        this.logger.error(`Failed to create replacement: ${err.message}`);
+                    });
+                    continue;
+                }
+            }
 
             try {
                 const dockerContainer = this.docker.getContainer(container.containerId);
