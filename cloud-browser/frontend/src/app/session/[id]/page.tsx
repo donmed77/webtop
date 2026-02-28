@@ -37,6 +37,7 @@ export default function SessionPage() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [viewerCount, setViewerCount] = useState(0);
     const [showShareToast, setShowShareToast] = useState(false);
+    const [showTakeoverToast, setShowTakeoverToast] = useState(false);
     const [screenshotMode, setScreenshotMode] = useState(false);
     const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
     const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
@@ -307,6 +308,11 @@ export default function SessionPage() {
 
             // EC1: Another tab took over this session
             socket.on("session:takeover", () => {
+                // Stop recording gracefully — user can download before leaving
+                stopRecorderGracefully();
+                // Clean up: disconnect socket and clear localStorage
+                if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
+                socket.disconnect();
                 setStatus("taken_over");
             });
 
@@ -655,11 +661,49 @@ export default function SessionPage() {
     const handleResume = () => {
         setStreamReady(false);
         setStatus("connecting");
-        if (socketRef.current?.connected) {
-            socketRef.current.emit("session:join", { sessionId, viewer: isViewer });
-        } else {
-            socketRef.current?.connect();
-        }
+        // Reconnect and reclaim primary
+        const socket = io(apiUrl, {
+            reconnection: true,
+            reconnectionAttempts: 30,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 2000,
+        });
+        socketRef.current = socket;
+        socket.on("connect", () => {
+            socket.emit("session:join", { sessionId, viewer: isViewer });
+        });
+        socket.on("session:joined", (data) => {
+            setPort(data.port);
+            setTimeRemaining(data.timeRemaining);
+            setStatus("active");
+            // Show toast indicating session was resumed
+            setShowTakeoverToast(true);
+            setTimeout(() => setShowTakeoverToast(false), 3000);
+            if (!isViewer) {
+                localStorage.setItem(`session_${sessionId}`, JSON.stringify({
+                    port: data.port,
+                    connectedAt: Date.now(),
+                }));
+            }
+        });
+        socket.on("session:timer", (data) => {
+            setTimeRemaining(data.timeRemaining);
+        });
+        socket.on("session:ended", () => {
+            if (hasNavigated.current) return;
+            hasNavigated.current = true;
+            if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
+            router.replace("/session-ended?reason=expired");
+        });
+        socket.on("session:error", () => {
+            router.replace("/session-ended?reason=not_found");
+        });
+        socket.on("session:takeover", () => {
+            stopRecorderGracefully();
+            if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
+            socket.disconnect();
+            setStatus("taken_over");
+        });
     };
 
     const formatTime = (seconds: number) => {
@@ -703,6 +747,15 @@ export default function SessionPage() {
                     <div className="text-4xl mb-4">🔄</div>
                     <h2 className="text-xl font-semibold mb-2">Session Opened in Another Tab</h2>
                     <p className="text-muted-foreground mb-6">This session is active in another tab.</p>
+                    {/* If recording was in progress, offer download */}
+                    {recordingBlob && (
+                        <div className="mb-4">
+                            <p className="text-sm text-muted-foreground mb-2">Your recording is ready to download.</p>
+                            <Button onClick={downloadRecording} variant="outline" className="cursor-pointer mb-3">
+                                📥 Download Recording
+                            </Button>
+                        </div>
+                    )}
                     <Button onClick={handleResume} className="cursor-pointer">Resume Session Here</Button>
                 </div>
             </main>
@@ -1354,6 +1407,16 @@ export default function SessionPage() {
                     <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
                         <span className="text-sm">✅</span>
                         <p className="text-white/90 text-sm">Thanks for your feedback!</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Session resumed from another tab toast */}
+            {showTakeoverToast && (
+                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
+                        <span className="text-sm">🔄</span>
+                        <p className="text-white/90 text-sm">Session resumed from another tab</p>
                     </div>
                 </div>
             )}
