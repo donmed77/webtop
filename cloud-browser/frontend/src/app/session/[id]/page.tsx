@@ -752,10 +752,10 @@ export default function SessionPage() {
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 // Tab went to background — pause recording if active
-                // Use refs directly to avoid stale closure issues
+                // Only pause the MediaRecorder, do NOT disable stream tracks.
+                // Disabling captureStream tracks kills the canvas→stream connection permanently.
                 if (mediaRecorderRef.current?.state === "recording") {
                     mediaRecorderRef.current.pause();
-                    recordingStreamRef.current?.getTracks().forEach(t => t.enabled = false);
                     pauseStartRef.current = Date.now();
                     setRecordingState("paused");
                     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
