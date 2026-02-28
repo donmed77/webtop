@@ -73,17 +73,10 @@ export class SessionController {
         // Read from nginx X-headers (auth_request) or query params (direct call)
         const port = req.headers['x-browser-port'] || queryPort;
         const token = req.headers['x-session-token'] || queryToken;
-
-        // DEBUG: Log what we receive
-        const activeSessions = this.sessionService.getActiveSessionPorts();
-        console.log(`[AUTH DEBUG] port=${port} token=${token ? token.substring(0, 8) + '...' : 'NONE'} activePorts=${JSON.stringify(activeSessions)}`);
-
         if (!port || !token) {
-            console.log(`[AUTH DEBUG] REJECTED: missing port or token`);
             return res.status(403).send('Forbidden');
         }
         const valid = this.sessionService.validateBrowserAccess(parseInt(port, 10), token);
-        console.log(`[AUTH DEBUG] port=${port} valid=${valid}`);
         return res.status(valid ? 200 : 403).send(valid ? 'OK' : 'Forbidden');
     }
 

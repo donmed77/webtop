@@ -256,6 +256,9 @@ export class SessionService implements OnModuleInit {
         // Release container back to pool (will destroy and recreate)
         await this.containerService.releaseContainer(session.poolId);
 
+        // Fix #8: Remove from in-memory Map to prevent memory leak
+        this.sessions.delete(sessionId);
+
         return true;
     }
 
@@ -422,12 +425,5 @@ export class SessionService implements OnModuleInit {
 
     getSessionToken(sessionId: string): string | undefined {
         return this.sessions.get(sessionId)?.sessionToken;
-    }
-
-    // DEBUG: Get active session ports for auth debugging
-    getActiveSessionPorts(): { port: number; token: string }[] {
-        return Array.from(this.sessions.values())
-            .filter(s => s.status === 'active')
-            .map(s => ({ port: s.port, token: s.sessionToken.substring(0, 8) + '...' }));
     }
 }
