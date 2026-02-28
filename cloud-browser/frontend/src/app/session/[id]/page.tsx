@@ -312,28 +312,27 @@ export default function SessionPage() {
 
             socket.on("disconnect", (reason) => {
                 if (reason === "io server disconnect") {
-                    // Server disconnected us, session might have ended
-                    setStatus("ended");
-                } else {
-                    // Connectivity issue — start countdown
-                    setStatus("reconnecting");
-
-                    // Clear any stale interval (but don't null the countdown)
-                    if (reconnectTimerRef.current) {
-                        clearInterval(reconnectTimerRef.current);
-                        reconnectTimerRef.current = null;
-                    }
-                    setReconnectCountdown(RECONNECT_COUNTDOWN_SECONDS);
-                    reconnectTimerRef.current = setInterval(() => {
-                        setReconnectCountdown(prev => {
-                            if (prev === null || prev <= 1) {
-                                clearReconnectTimer();
-                                return 0;
-                            }
-                            return prev - 1;
-                        });
-                    }, 1000);
+                    // Server disconnected us — could be restart, try reconnecting
+                    socket.connect();
                 }
+                // Start countdown for all disconnect types
+                setStatus("reconnecting");
+
+                // Clear any stale interval (but don't null the countdown)
+                if (reconnectTimerRef.current) {
+                    clearInterval(reconnectTimerRef.current);
+                    reconnectTimerRef.current = null;
+                }
+                setReconnectCountdown(RECONNECT_COUNTDOWN_SECONDS);
+                reconnectTimerRef.current = setInterval(() => {
+                    setReconnectCountdown(prev => {
+                        if (prev === null || prev <= 1) {
+                            clearReconnectTimer();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
             });
 
             socket.on("reconnect", () => {
@@ -688,7 +687,7 @@ export default function SessionPage() {
             socketRef.current?.disconnect();
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
             setPort(null); // unmount iframe so last frame doesn't show through
-            router.replace(isViewer ? "/session-ended?reason=expired&viewer=true" : "/session-ended?reason=expired");
+            router.replace(isViewer ? "/session-ended?reason=abandoned&viewer=true" : "/session-ended?reason=abandoned");
         }
     }, [reconnectCountdown, status]);
 

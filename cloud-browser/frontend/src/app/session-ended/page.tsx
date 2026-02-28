@@ -36,14 +36,17 @@ function SessionEndedContent() {
     // Contextual title and subtitle based on reason
     const isNotFound = reason === "not_found";
     const isExpired = reason === "expired";
+    const isAbandoned = reason === "abandoned";
     const title = isNotFound ? "Session Not Available" : "Session Ended";
     const subtitle = isNotFound
         ? "This session has expired or doesn't exist."
-        : isExpired
-            ? isViewerParam
-                ? "The session you were viewing has ended."
-                : "Your session time has expired."
-            : null;
+        : isAbandoned
+            ? "Connection was lost and could not be restored."
+            : isExpired
+                ? isViewerParam
+                    ? "The session you were viewing has ended."
+                    : "Your session time has expired."
+                : null;
 
     return (
         <Card className="w-full max-w-md">

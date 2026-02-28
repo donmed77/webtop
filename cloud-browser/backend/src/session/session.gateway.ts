@@ -64,12 +64,15 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             const clients = this.sessionClients.get(sessionId);
             if (clients) {
                 clients.delete(client.id);
-                // EC1: If the primary disconnected, clear primary
-                if (this.sessionPrimary.get(sessionId) === client.id) {
-                    this.sessionPrimary.delete(sessionId);
-                }
                 if (clients.size === 0) {
                     this.sessionClients.delete(sessionId);
+                }
+
+                // Start grace period when the PRIMARY (controller) disconnects,
+                // not when all clients disconnect. Viewers shouldn't keep a session alive.
+                const wasPrimary = this.sessionPrimary.get(sessionId) === client.id;
+                if (wasPrimary) {
+                    this.sessionPrimary.delete(sessionId);
                     // Cancel any stale timer from a previous disconnect
                     const existing = this.reconnectingSessions.get(sessionId);
                     if (existing) clearTimeout(existing.timer);
