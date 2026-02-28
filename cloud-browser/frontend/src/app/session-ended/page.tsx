@@ -106,12 +106,12 @@ function SessionEndedContent() {
                 </Button>
 
                 {/* Feedback link */}
-                <button
-                    onClick={() => router.push("/")}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                <a
+                    href="mailto:feedback@unshortlink.com?subject=Session Feedback"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                     Share feedback
-                </button>
+                </a>
             </CardContent>
         </Card>
     );
