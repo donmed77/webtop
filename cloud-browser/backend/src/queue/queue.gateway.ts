@@ -75,6 +75,11 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
                     port: updatedEntry.port,
                 });
             }
+
+            // Fix #3: Notify client about processing errors
+            if (updatedEntry.status === 'error') {
+                client.emit('queue:error', { error: 'Failed to create session. Please try again.' });
+            }
         });
 
         // Send initial status

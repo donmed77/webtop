@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { ContainerService } from '../container/container.service';
 import { SessionService } from '../session/session.service';
 
-export type QueueStatus = 'waiting' | 'preparing' | 'connecting' | 'ready' | 'rate_limited';
+export type QueueStatus = 'waiting' | 'preparing' | 'connecting' | 'ready' | 'rate_limited' | 'error';
 
 export interface QueueEntry {
     id: string;
@@ -17,13 +17,14 @@ export interface QueueEntry {
 }
 
 @Injectable()
-export class QueueService {
+export class QueueService implements OnModuleDestroy {
     private readonly logger = new Logger(QueueService.name);
     private queue: QueueEntry[] = [];
     private entries: Map<string, QueueEntry> = new Map(); // All entries by ID
     private ipQueueMap: Map<string, string> = new Map(); // QE3: clientIp -> queueId
     private onUpdateCallbacks: Map<string, (entry: QueueEntry) => void> = new Map();
     private checkInterval: NodeJS.Timeout;
+    private processing = false; // Fix #4: prevent concurrent processQueue runs
 
     constructor(
         private containerService: ContainerService,
@@ -31,6 +32,13 @@ export class QueueService {
     ) {
         // Process queue every 500ms for faster response
         this.checkInterval = setInterval(() => this.processQueue(), 500);
+    }
+
+    // Fix #6: Clear interval on module destroy to prevent memory leaks
+    onModuleDestroy() {
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+        }
     }
 
     addToQueue(url: string, clientIp: string): QueueEntry {
@@ -75,17 +83,18 @@ export class QueueService {
         return entry;
     }
 
+    // Fix #2: Return false if entry doesn't exist (guard for double-tab disconnect)
     removeFromQueue(queueId: string): boolean {
         const entry = this.entries.get(queueId);
+        if (!entry) return false;
+
         const queueIndex = this.queue.findIndex(e => e.id === queueId);
         if (queueIndex !== -1) {
             this.queue.splice(queueIndex, 1);
             this.updatePositions();
         }
         // QE3: Clean up IP mapping
-        if (entry) {
-            this.ipQueueMap.delete(entry.clientIp);
-        }
+        this.ipQueueMap.delete(entry.clientIp);
         this.entries.delete(queueId);
         this.onUpdateCallbacks.delete(queueId);
         return true;
@@ -136,8 +145,6 @@ export class QueueService {
         this.onUpdateCallbacks.set(queueId, callback);
     }
 
-
-
     private notifyUpdate(entry: QueueEntry) {
         const callback = this.onUpdateCallbacks.get(entry.id);
         if (callback) {
@@ -145,8 +152,27 @@ export class QueueService {
         }
     }
 
+    /**
+     * Fix #1: Clean up terminal entries (ready/error/rate_limited) after 60s
+     */
+    private scheduleCleanup(entry: QueueEntry) {
+        setTimeout(() => {
+            if (this.entries.has(entry.id)) {
+                this.entries.delete(entry.id);
+                this.onUpdateCallbacks.delete(entry.id);
+                this.ipQueueMap.delete(entry.clientIp);
+                this.logger.debug(`Cleaned up stale entry ${entry.id} (status: ${entry.status})`);
+            }
+        }, 60_000);
+    }
+
     private async processQueue() {
+        // Fix #4: Prevent concurrent runs
+        if (this.processing) return;
         if (this.queue.length === 0) return;
+
+        // Fix #5: Skip processing when service is paused
+        if (this.sessionService.isPaused()) return;
 
         const warmCount = this.containerService.getWarmCount();
         if (warmCount === 0) return;
@@ -155,58 +181,65 @@ export class QueueService {
         const entry = this.queue.find(e => e.status === 'waiting');
         if (!entry) return;
 
-        // Remove from waiting queue
-        const queueIndex = this.queue.indexOf(entry);
-        if (queueIndex !== -1) {
-            this.queue.splice(queueIndex, 1);
-            this.updatePositions();
-        }
+        this.processing = true;
 
-        this.logger.log(`Processing queue entry ${entry.id}`);
+        try {
+            // Remove from waiting queue
+            const queueIndex = this.queue.indexOf(entry);
+            if (queueIndex !== -1) {
+                this.queue.splice(queueIndex, 1);
+                this.updatePositions();
+            }
 
-        // E4: Check rate limit during processing (user has already seen queue page)
-        const rateLimit = this.sessionService.checkRateLimit(entry.clientIp);
-        if (!rateLimit.allowed) {
-            entry.status = 'rate_limited';
-            this.notifyUpdate(entry);
-            this.logger.log(`Queue entry ${entry.id} rate-limited (IP: ${entry.clientIp})`);
-            // Clean up
-            if (entry.clientIp) this.ipQueueMap.delete(entry.clientIp);
-            this.entries.delete(entry.id);
-            this.onUpdateCallbacks.delete(entry.id);
-            return;
-        }
+            this.logger.log(`Processing queue entry ${entry.id}`);
 
-        // Step 1: Preparing
-        entry.status = 'preparing';
-        this.notifyUpdate(entry);
+            // E4: Check rate limit during processing (user has already seen queue page)
+            const rateLimit = this.sessionService.checkRateLimit(entry.clientIp);
+            if (!rateLimit.allowed) {
+                entry.status = 'rate_limited';
+                this.notifyUpdate(entry);
+                this.logger.log(`Queue entry ${entry.id} rate-limited (IP: ${entry.clientIp})`);
+                this.scheduleCleanup(entry);
+                return;
+            }
 
-        // Small delay for UX (shows preparing step)
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Step 2: Connecting
-        entry.status = 'connecting';
-        this.notifyUpdate(entry);
-
-        const result = await this.sessionService.createSession(entry.url, entry.clientIp);
-
-        if (result.session) {
-            // Step 3: Ready
-            entry.status = 'ready';
-            entry.sessionId = result.session.id;
-            entry.port = result.session.port;
+            // Step 1: Preparing
+            entry.status = 'preparing';
             this.notifyUpdate(entry);
 
-            this.logger.log(`Queue entry ${entry.id} ready with session ${entry.sessionId}`);
-        } else if (result.error) {
-            this.logger.error(`Queue processing failed for ${entry.id}: ${result.error}`);
-            this.entries.delete(entry.id);
-        } else {
-            // Put back in queue if no containers
-            entry.status = 'waiting';
-            this.queue.unshift(entry);
-            this.updatePositions();
+            // Small delay for UX (shows preparing step)
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 2: Connecting
+            entry.status = 'connecting';
             this.notifyUpdate(entry);
+
+            const result = await this.sessionService.createSession(entry.url, entry.clientIp);
+
+            if (result.session) {
+                // Step 3: Ready
+                entry.status = 'ready';
+                entry.sessionId = result.session.id;
+                entry.port = result.session.port;
+                this.notifyUpdate(entry);
+                this.logger.log(`Queue entry ${entry.id} ready with session ${entry.sessionId}`);
+                // Fix #1: Schedule cleanup of this completed entry
+                this.scheduleCleanup(entry);
+            } else if (result.error) {
+                // Fix #3: Notify the client about the error instead of silently dropping
+                this.logger.error(`Queue processing failed for ${entry.id}: ${result.error}`);
+                entry.status = 'error';
+                this.notifyUpdate(entry);
+                this.scheduleCleanup(entry);
+            } else {
+                // Put back in queue if no containers
+                entry.status = 'waiting';
+                this.queue.unshift(entry);
+                this.updatePositions();
+                this.notifyUpdate(entry);
+            }
+        } finally {
+            this.processing = false;
         }
     }
 

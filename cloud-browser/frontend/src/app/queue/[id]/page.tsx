@@ -68,10 +68,10 @@ export default function QueuePage() {
             await fetch(`${apiUrl}/api/queue/${queueId}`, {
                 method: "DELETE",
             });
-            router.push("/");
+            router.replace("/");
         } catch (err) {
             console.error(err);
-            router.push("/");
+            router.replace("/");
         }
     };
 
