@@ -605,7 +605,7 @@ export default function AdminPage() {
                                                     : container.status === "reconnecting"
                                                         ? "border-orange-500 bg-orange-500/10 animate-pulse"
                                                         : container.status === "active"
-                                                            ? "border-yellow-500 bg-yellow-500/10"
+                                                            ? "border-blue-500 bg-blue-500/10"
                                                             : "border-gray-500 bg-gray-500/10"
                                                     }`}
                                             >
@@ -617,7 +617,9 @@ export default function AdminPage() {
                                                             ? "bg-green-500/20 text-green-400"
                                                             : container.status === "reconnecting"
                                                                 ? "bg-orange-500/20 text-orange-400"
-                                                                : "bg-yellow-500/20 text-yellow-400"
+                                                                : container.status === "active"
+                                                                    ? "bg-blue-500/20 text-blue-400"
+                                                                    : "bg-gray-500/20 text-gray-400"
                                                             }`}
                                                     >
                                                         {container.status}
