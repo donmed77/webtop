@@ -34,9 +34,9 @@ async function bootstrap() {
     logger: isProduction ? new JsonLogger() : logLevels,
   });
 
-  // Trust nginx proxy so @Ip() reads X-Forwarded-For instead of Docker bridge IP
+  // Fix #4: Trust only the first proxy (nginx), not arbitrary X-Forwarded-For headers
   const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.set('trust proxy', true);
+  expressApp.set('trust proxy', 1);
 
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3002',

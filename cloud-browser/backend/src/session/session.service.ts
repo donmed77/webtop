@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { ContainerService } from '../container/container.service';
 import { LoggingService } from '../logging/logging.service';
 
@@ -10,13 +11,14 @@ export interface Session {
     port: number;
     url: string;
     clientIp: string;
+    sessionToken: string;
     startedAt: Date;
     expiresAt: Date;
     status: 'active' | 'ended' | 'expired';
 }
 
 @Injectable()
-export class SessionService {
+export class SessionService implements OnModuleInit {
     private readonly logger = new Logger(SessionService.name);
     private sessions: Map<string, Session> = new Map();
     private ipSessionCount: Map<string, number> = new Map();
@@ -47,6 +49,68 @@ export class SessionService {
 
         // Check for expired sessions every second (matches timer broadcast frequency)
         this.checkInterval = setInterval(() => this.checkExpiredSessions(), 1000);
+    }
+
+    // Fix #1: Load persistent state from SQLite on startup
+    async onModuleInit() {
+        this.blockedIps = new Set(this.loggingService.getIpList('blocked'));
+        this.whitelistedIps = new Set(this.loggingService.getIpList('whitelisted'));
+        this.ipSessionCount = this.loggingService.getTodaySessionCountsByIp();
+
+        // Reload active sessions that haven't expired yet
+        this.loggingService.clearExpiredActiveSessions();
+        const savedSessions = this.loggingService.getActiveSessionsFromDb();
+
+        // Build skip set of container names (session-${poolId}) so orphan cleanup doesn't destroy them
+        const skipContainerNames = new Set<string>(savedSessions.map(s => `session-${s.poolId}`));
+
+        // Clean up orphaned containers, but skip those belonging to restored sessions
+        await this.containerService.cleanupOrphanedContainers(skipContainerNames);
+
+        // Restore sessions and verify their containers still exist
+        let restoredCount = 0;
+        for (const s of savedSessions) {
+            const session: Session = {
+                id: s.sessionId,
+                poolId: s.poolId,
+                port: Number(s.port),  // Fix: SQLite may return string, ensure number
+                url: s.url,
+                clientIp: s.clientIp,
+                sessionToken: s.sessionToken,
+                startedAt: new Date(s.startedAt),
+                expiresAt: new Date(s.expiresAt),
+                status: 'active',
+            };
+
+            // Verify the Docker container is still running (container name = session-${poolId})
+            const containerName = `session-${s.poolId}`;
+            try {
+                const Docker = require('dockerode');
+                const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+                const container = docker.getContainer(containerName);
+                const info = await container.inspect();
+                if (info.State.Running) {
+                    this.sessions.set(s.sessionId, session);
+                    this.containerService.registerRestoredContainer(s.poolId, info.Id, s.port, s.sessionId);
+                    restoredCount++;
+                } else {
+                    this.loggingService.removeActiveSession(s.sessionId);
+                    this.logger.log(`Session ${s.sessionId} container ${containerName} is not running, removing`);
+                }
+            } catch {
+                // Container doesn't exist anymore
+                this.loggingService.removeActiveSession(s.sessionId);
+                this.logger.log(`Session ${s.sessionId} container ${containerName} not found, removing`);
+            }
+        }
+
+        this.sessionsToday = savedSessions.length;
+        this.updatePeakConcurrent();
+
+        this.logger.log(`Loaded ${this.blockedIps.size} blocked, ${this.whitelistedIps.size} whitelisted, ${this.ipSessionCount.size} rate limits, ${restoredCount}/${savedSessions.length} active sessions from DB`);
+
+        // Initialize warm pool AFTER restored containers are registered (ports are reserved)
+        await this.containerService.initializePoolAndHealthCheck();
     }
 
     private getAnonymizedIp(ip: string): string {
@@ -122,8 +186,9 @@ export class SessionService {
             }
         }
 
-        // Generate session ID first, then assign to container
+        // Generate session ID and auth token
         const sessionId = uuidv4();
+        const sessionToken = crypto.randomBytes(16).toString('hex');
 
         // Acquire a warm container (fast - container already running without Chrome)
         const container = await this.containerService.acquireContainer(sessionId);
@@ -139,6 +204,7 @@ export class SessionService {
             port: container.port,
             url: finalUrl,
             clientIp: this.getAnonymizedIp(clientIp),
+            sessionToken,
             startedAt: now,
             expiresAt,
             status: 'active',
@@ -153,6 +219,9 @@ export class SessionService {
 
         // Log to SQLite database
         this.loggingService.logSessionStart(sessionId, finalUrl, session.clientIp);
+
+        // Persist active session for restart recovery
+        this.loggingService.saveActiveSession(session);
 
         // Launch Chrome with URL via docker exec (non-blocking)
         this.containerService.launchChrome(container.containerId, finalUrl).catch(err => {
@@ -180,6 +249,9 @@ export class SessionService {
 
         // Log to SQLite database
         this.loggingService.logSessionEnd(sessionId, reason);
+
+        // Remove from persistent active sessions
+        this.loggingService.removeActiveSession(sessionId);
 
         // Release container back to pool (will destroy and recreate)
         await this.containerService.releaseContainer(session.poolId);
@@ -299,22 +371,28 @@ export class SessionService {
     blockIp(ip: string): void {
         this.blockedIps.add(ip);
         this.whitelistedIps.delete(ip);
+        this.loggingService.addIpToList(ip, 'blocked');
+        this.loggingService.removeIpFromList(ip, 'whitelisted');
         this.logger.log(`IP blocked: ${ip}`);
     }
 
     unblockIp(ip: string): void {
         this.blockedIps.delete(ip);
+        this.loggingService.removeIpFromList(ip, 'blocked');
         this.logger.log(`IP unblocked: ${ip}`);
     }
 
     whitelistIp(ip: string): void {
         this.whitelistedIps.add(ip);
         this.blockedIps.delete(ip);
+        this.loggingService.addIpToList(ip, 'whitelisted');
+        this.loggingService.removeIpFromList(ip, 'blocked');
         this.logger.log(`IP whitelisted: ${ip}`);
     }
 
     unwhitelistIp(ip: string): void {
         this.whitelistedIps.delete(ip);
+        this.loggingService.removeIpFromList(ip, 'whitelisted');
         this.logger.log(`IP removed from whitelist: ${ip}`);
     }
 
@@ -329,5 +407,27 @@ export class SessionService {
 
     getWhitelistedIps(): string[] {
         return Array.from(this.whitelistedIps);
+    }
+
+    // ---- Fix #6: Browser Port Auth ----
+
+    validateBrowserAccess(port: number, token: string): boolean {
+        for (const session of this.sessions.values()) {
+            if (session.status === 'active' && Number(session.port) === port && session.sessionToken === token) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getSessionToken(sessionId: string): string | undefined {
+        return this.sessions.get(sessionId)?.sessionToken;
+    }
+
+    // DEBUG: Get active session ports for auth debugging
+    getActiveSessionPorts(): { port: number; token: string }[] {
+        return Array.from(this.sessions.values())
+            .filter(s => s.status === 'active')
+            .map(s => ({ port: s.port, token: s.sessionToken.substring(0, 8) + '...' }));
     }
 }

@@ -51,13 +51,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private healthCheckInterval: NodeJS.Timeout;
 
     async onModuleInit() {
-        this.logger.log('Initializing container pool...');
+        this.logger.log('Initializing container network...');
         await this.ensureNetwork();
-        await this.cleanupOrphanedContainers();
-        await this.initializePool();
-
-        // P4: Health check every 5 seconds
-        this.healthCheckInterval = setInterval(() => this.healthCheck(), 5000);
+        // Pool initialization and orphan cleanup are triggered by SessionService.onModuleInit
+        // AFTER restored sessions have been registered, to avoid port conflicts
     }
 
     /**
@@ -102,11 +99,16 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         await this.destroyAllContainers();
     }
 
-    private async cleanupOrphanedContainers() {
+    // Fix #1: Made public so SessionService can call it after loading restored sessions
+    async cleanupOrphanedContainers(skipContainerNames: Set<string> = new Set()) {
         const containers = await this.docker.listContainers({ all: true });
         for (const containerInfo of containers) {
             const name = containerInfo.Names[0]?.replace('/', '');
             if (name?.startsWith('session-')) {
+                if (skipContainerNames.has(name)) {
+                    this.logger.log(`Keeping restored session container: ${name}`);
+                    continue;
+                }
                 this.logger.log(`Cleaning up orphaned container: ${name}`);
                 try {
                     const container = this.docker.getContainer(containerInfo.Id);
@@ -117,6 +119,26 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 }
             }
         }
+    }
+
+    // Fix #1: Register a restored session's container back into the pool
+    registerRestoredContainer(poolId: string, containerId: string, port: number, sessionId: string): void {
+        this.usedPorts.add(port);
+        this.pool.set(poolId, {
+            id: poolId,
+            containerId,
+            port,
+            status: 'active',
+            sessionId,
+            createdAt: new Date(),
+        });
+        this.logger.log(`Registered restored container ${poolId} (port ${port}) for session ${sessionId}`);
+    }
+
+    // Fix #1: Made public so SessionService can call after session restoration
+    async initializePoolAndHealthCheck() {
+        await this.initializePool();
+        this.healthCheckInterval = setInterval(() => this.healthCheck(), 5000);
     }
 
     private async initializePool() {

@@ -72,6 +72,26 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
             
             CREATE INDEX IF NOT EXISTS idx_session_logs_started_at ON session_logs(started_at);
             CREATE INDEX IF NOT EXISTS idx_session_logs_client_ip ON session_logs(client_ip);
+
+            -- Fix #1: Persistent IP lists (blocked/whitelisted survive restarts)
+            CREATE TABLE IF NOT EXISTS ip_lists (
+                ip TEXT NOT NULL,
+                list_type TEXT NOT NULL CHECK(list_type IN ('blocked', 'whitelisted')),
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (ip, list_type)
+            );
+
+            -- Fix #1: Persist active sessions across restarts (for Fix #6 token auth)
+            CREATE TABLE IF NOT EXISTS active_sessions (
+                session_id TEXT PRIMARY KEY,
+                pool_id TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                client_ip TEXT NOT NULL,
+                session_token TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            );
         `);
 
         this.logger.log('Database schema initialized');
@@ -222,5 +242,81 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
 
         // Also run once on startup
         this.cleanupOldLogs();
+    }
+
+    // ---- Fix #1: Persistent IP Lists ----
+
+    getIpList(listType: 'blocked' | 'whitelisted'): string[] {
+        const stmt = this.db.prepare('SELECT ip FROM ip_lists WHERE list_type = ?');
+        return (stmt.all(listType) as { ip: string }[]).map(r => r.ip);
+    }
+
+    addIpToList(ip: string, listType: 'blocked' | 'whitelisted'): void {
+        try {
+            this.db.prepare('INSERT OR REPLACE INTO ip_lists (ip, list_type) VALUES (?, ?)').run(ip, listType);
+        } catch (err) {
+            this.logger.error(`Failed to add ${ip} to ${listType}: ${err.message}`);
+        }
+    }
+
+    removeIpFromList(ip: string, listType: 'blocked' | 'whitelisted'): void {
+        try {
+            this.db.prepare('DELETE FROM ip_lists WHERE ip = ? AND list_type = ?').run(ip, listType);
+        } catch (err) {
+            this.logger.error(`Failed to remove ${ip} from ${listType}: ${err.message}`);
+        }
+    }
+
+    getTodaySessionCountsByIp(): Map<string, number> {
+        const stmt = this.db.prepare(`
+            SELECT client_ip, COUNT(*) as count
+            FROM session_logs
+            WHERE DATE(started_at) = DATE('now')
+            GROUP BY client_ip
+        `);
+        const rows = stmt.all() as { client_ip: string; count: number }[];
+        const map = new Map<string, number>();
+        for (const row of rows) {
+            map.set(row.client_ip, row.count);
+        }
+        return map;
+    }
+
+    // ---- Fix #1: Persistent Active Sessions ----
+
+    saveActiveSession(session: { id: string; poolId: string; port: number; url: string; clientIp: string; sessionToken: string; startedAt: Date; expiresAt: Date }): void {
+        try {
+            this.db.prepare(`
+                INSERT OR REPLACE INTO active_sessions (session_id, pool_id, port, url, client_ip, session_token, started_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(session.id, session.poolId, session.port, session.url, session.clientIp, session.sessionToken, session.startedAt.toISOString(), session.expiresAt.toISOString());
+        } catch (err) {
+            this.logger.error(`Failed to save active session: ${err.message}`);
+        }
+    }
+
+    removeActiveSession(sessionId: string): void {
+        try {
+            this.db.prepare('DELETE FROM active_sessions WHERE session_id = ?').run(sessionId);
+        } catch (err) {
+            this.logger.error(`Failed to remove active session: ${err.message}`);
+        }
+    }
+
+    getActiveSessionsFromDb(): { sessionId: string; poolId: string; port: number; url: string; clientIp: string; sessionToken: string; startedAt: string; expiresAt: string }[] {
+        // Only return sessions that haven't expired yet
+        return this.db.prepare(`
+            SELECT session_id as sessionId, pool_id as poolId, port, url, client_ip as clientIp, session_token as sessionToken, started_at as startedAt, expires_at as expiresAt
+            FROM active_sessions
+            WHERE expires_at > datetime('now')
+        `).all() as any[];
+    }
+
+    clearExpiredActiveSessions(): void {
+        try {
+            this.db.prepare("DELETE FROM active_sessions WHERE expires_at <= datetime('now')").run();
+        } catch (err) {
+            this.logger.error(`Failed to clear expired sessions: ${err.message}`);
+        }
     }
 }

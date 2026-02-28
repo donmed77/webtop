@@ -20,6 +20,7 @@ export default function SessionPage() {
     const isViewer = searchParams.get("viewer") === "true";
 
     const [port, setPort] = useState<number | null>(null);
+    const [sessionToken, setSessionToken] = useState<string | null>(null);
     const [timeRemaining, setTimeRemaining] = useState(300);
     const [status, setStatus] = useState<SessionStatus>("connecting");
     const [error, setError] = useState("");
@@ -264,6 +265,7 @@ export default function SessionPage() {
 
             socket.on("session:joined", (data) => {
                 setPort(data.port);
+                setSessionToken(data.sessionToken);
                 setTimeRemaining(data.timeRemaining);
                 setStatus("active");
 
@@ -271,6 +273,7 @@ export default function SessionPage() {
                 if (!isViewer) {
                     localStorage.setItem(`session_${sessionId}`, JSON.stringify({
                         port: data.port,
+                        sessionToken: data.sessionToken,
                         connectedAt: Date.now(),
                     }));
                 }
@@ -689,6 +692,7 @@ export default function SessionPage() {
         });
         socket.on("session:joined", (data) => {
             setPort(data.port);
+            setSessionToken(data.sessionToken);
             setTimeRemaining(data.timeRemaining);
             setStatus("active");
             // Show toast indicating session was resumed
@@ -697,6 +701,7 @@ export default function SessionPage() {
             if (!isViewer) {
                 localStorage.setItem(`session_${sessionId}`, JSON.stringify({
                     port: data.port,
+                    sessionToken: data.sessionToken,
                     connectedAt: Date.now(),
                 }));
             }
@@ -1197,11 +1202,11 @@ export default function SessionPage() {
                 </button>
             ) : null}
 
-            {/* Browser iframe — loads behind overlay when port is available */}
-            {port && (
+            {/* Browser iframe — loads when port and auth token are available */}
+            {port && sessionToken && (
                 <iframe
                     ref={iframeRef}
-                    src={`/browser/${port}/${isViewer ? "#shared" : ""}`}
+                    src={`/browser/${port}/?token=${sessionToken}${isViewer ? "#shared" : ""}`}
                     className="flex-1 w-full border-0"
                     style={{ touchAction: "none" }}
                     allow="clipboard-read; clipboard-write; autoplay"

@@ -142,6 +142,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             client.emit('session:joined', {
                 sessionId: session.id,
                 port: session.port,
+                sessionToken: session.sessionToken,
                 timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
                 isViewer: true,
             });
@@ -164,6 +165,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
         client.emit('session:joined', {
             sessionId: session.id,
             port: session.port,
+            sessionToken: session.sessionToken,
             timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
             isPrimary: true,
         });
