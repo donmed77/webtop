@@ -308,6 +308,12 @@ export default function SessionPage() {
 
             // EC1: Another tab took over this session
             socket.on("session:takeover", () => {
+                // Stop recording — iframe will be unmounted, stream source dies
+                stopRecorderGracefully();
+                setRecordingState("idle");
+                setRecordingBlob(null);
+                setRecordingElapsed(0);
+                setRecordingSize(0);
                 // Clean up: disconnect socket and clear localStorage
                 if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
                 socket.disconnect();
@@ -708,6 +714,11 @@ export default function SessionPage() {
             router.replace("/session-ended?reason=not_found");
         });
         socket.on("session:takeover", () => {
+            stopRecorderGracefully();
+            setRecordingState("idle");
+            setRecordingBlob(null);
+            setRecordingElapsed(0);
+            setRecordingSize(0);
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
             socket.disconnect();
             setStatus("taken_over");
@@ -747,24 +758,6 @@ export default function SessionPage() {
 
     // Error state — handled by redirect in session:error handler
 
-    // Auto-pause recording when tab goes hidden (e.g. user switches tabs)
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                // Tab went to background — pause recording if active
-                // Only pause the MediaRecorder, do NOT disable stream tracks.
-                // Disabling captureStream tracks kills the canvas→stream connection permanently.
-                if (mediaRecorderRef.current?.state === "recording") {
-                    mediaRecorderRef.current.pause();
-                    pauseStartRef.current = Date.now();
-                    setRecordingState("paused");
-                    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-                }
-            }
-        };
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, []);
 
     // EC1: Taken over by another tab
     if (status === "taken_over") {
