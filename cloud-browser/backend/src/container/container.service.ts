@@ -93,29 +93,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     private async cleanupOrphanedContainers() {
         const containers = await this.docker.listContainers({ all: true });
-        let recovered = 0;
         for (const containerInfo of containers) {
             const name = containerInfo.Names[0]?.replace('/', '');
             if (name?.startsWith('session-')) {
-                // Try to recover running containers instead of destroying them
-                if (containerInfo.State === 'running') {
-                    const port = containerInfo.Ports?.find(p => p.PrivatePort === 3000)?.PublicPort;
-                    if (port) {
-                        const id = name.replace('session-', '');
-                        this.pool.set(id, {
-                            id,
-                            containerId: containerInfo.Id,
-                            port,
-                            status: 'warm',
-                            createdAt: new Date(),
-                        });
-                        this.usedPorts.add(port);
-                        recovered++;
-                        this.logger.log(`Recovered running container: ${name} on port ${port}`);
-                        continue;
-                    }
-                }
-                // Non-running or no port — clean up
                 this.logger.log(`Cleaning up orphaned container: ${name}`);
                 try {
                     const container = this.docker.getContainer(containerInfo.Id);
@@ -126,21 +106,11 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 }
             }
         }
-        if (recovered > 0) {
-            this.logger.log(`Recovered ${recovered} containers from previous run`);
-        }
     }
 
     private async initializePool() {
-        // Only create containers for remaining empty slots (some may have been recovered)
-        const needed = this.poolSize - this.pool.size;
-        if (needed <= 0) {
-            this.logger.log(`Container pool already at target size (${this.pool.size} recovered)`);
-            return;
-        }
-        this.logger.log(`Creating ${needed} new containers (${this.pool.size} already recovered)`);
         const promises = [];
-        for (let i = 0; i < needed; i++) {
+        for (let i = 0; i < this.poolSize; i++) {
             promises.push(this.createWarmContainer());
         }
         await Promise.all(promises);

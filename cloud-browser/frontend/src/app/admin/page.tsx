@@ -26,6 +26,14 @@ interface PoolStatus {
     warm: number;
     active: number;
     containers: Array<{ id: string; port: number; status: string; disconnectedAt: number | null }>;
+    metrics?: {
+        totalAcquires: number;
+        acquireFailures: number;
+        poolHitRate: string;
+        avgBootTimeMs: number;
+        portsUsed: number;
+        portsTotal: number;
+    };
 }
 
 interface Stats {
@@ -625,6 +633,28 @@ export default function AdminPage() {
                                     </div>
                                 ) : (
                                     <p className="text-muted-foreground text-sm">No containers</p>
+                                )}
+
+                                {/* Pool Metrics */}
+                                {pool?.metrics && (
+                                    <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="text-center p-2 rounded bg-muted/30">
+                                            <div className="text-lg font-semibold text-primary">{pool.metrics.poolHitRate}</div>
+                                            <div className="text-xs text-muted-foreground">Hit Rate</div>
+                                        </div>
+                                        <div className="text-center p-2 rounded bg-muted/30">
+                                            <div className="text-lg font-semibold">{pool.metrics.avgBootTimeMs > 0 ? `${(pool.metrics.avgBootTimeMs / 1000).toFixed(1)}s` : "—"}</div>
+                                            <div className="text-xs text-muted-foreground">Avg Boot Time</div>
+                                        </div>
+                                        <div className="text-center p-2 rounded bg-muted/30">
+                                            <div className="text-lg font-semibold">{pool.metrics.totalAcquires}</div>
+                                            <div className="text-xs text-muted-foreground">Total Acquires</div>
+                                        </div>
+                                        <div className="text-center p-2 rounded bg-muted/30">
+                                            <div className="text-lg font-semibold">{pool.metrics.portsUsed}/{pool.metrics.portsTotal}</div>
+                                            <div className="text-xs text-muted-foreground">Ports Used</div>
+                                        </div>
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
