@@ -308,8 +308,6 @@ export default function SessionPage() {
 
             // EC1: Another tab took over this session
             socket.on("session:takeover", () => {
-                // Stop recording gracefully — user can download before leaving
-                stopRecorderGracefully();
                 // Clean up: disconnect socket and clear localStorage
                 if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
                 socket.disconnect();
@@ -699,7 +697,6 @@ export default function SessionPage() {
             router.replace("/session-ended?reason=not_found");
         });
         socket.on("session:takeover", () => {
-            stopRecorderGracefully();
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
             socket.disconnect();
             setStatus("taken_over");
@@ -739,6 +736,25 @@ export default function SessionPage() {
 
     // Error state — handled by redirect in session:error handler
 
+    // Auto-pause recording when tab goes hidden (e.g. user switches tabs)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // Tab went to background — pause recording if active
+                // Use refs directly to avoid stale closure issues
+                if (mediaRecorderRef.current?.state === "recording") {
+                    mediaRecorderRef.current.pause();
+                    recordingStreamRef.current?.getTracks().forEach(t => t.enabled = false);
+                    pauseStartRef.current = Date.now();
+                    setRecordingState("paused");
+                    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+                }
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, []);
+
     // EC1: Taken over by another tab
     if (status === "taken_over") {
         return (
@@ -747,15 +763,6 @@ export default function SessionPage() {
                     <div className="text-4xl mb-4">🔄</div>
                     <h2 className="text-xl font-semibold mb-2">Session Opened in Another Tab</h2>
                     <p className="text-muted-foreground mb-6">This session is active in another tab.</p>
-                    {/* If recording was in progress, offer download */}
-                    {recordingBlob && (
-                        <div className="mb-4">
-                            <p className="text-sm text-muted-foreground mb-2">Your recording is ready to download.</p>
-                            <Button onClick={downloadRecording} variant="outline" className="cursor-pointer mb-3">
-                                📥 Download Recording
-                            </Button>
-                        </div>
-                    )}
                     <Button onClick={handleResume} className="cursor-pointer">Resume Session Here</Button>
                 </div>
             </main>
