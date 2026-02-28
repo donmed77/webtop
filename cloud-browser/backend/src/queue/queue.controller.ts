@@ -16,7 +16,7 @@ export class QueueController {
             id: entry.id,
             position: entry.position,
             totalInQueue: this.queueService.getQueueLength(),
-            estimatedWaitSeconds: this.queueService.getEstimatedWaitTime(),
+            estimatedWaitSeconds: this.queueService.getEstimatedWaitTime(entry.position),
             createdAt: entry.createdAt,
         };
     }

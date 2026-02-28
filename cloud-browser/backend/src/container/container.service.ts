@@ -537,4 +537,11 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     getPoolSize(): number {
         return this.poolSize;
     }
+
+    /** Average container boot time in seconds, defaults to 15s if no data */
+    getAvgBootTimeSec(): number {
+        if (this.metrics.bootTimes.length === 0) return 15;
+        const avgMs = this.metrics.bootTimes.reduce((a, b) => a + b, 0) / this.metrics.bootTimes.length;
+        return Math.ceil(avgMs / 1000);
+    }
 }

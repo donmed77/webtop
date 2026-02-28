@@ -110,14 +110,43 @@ export class QueueService implements OnModuleDestroy {
         return this.queue.length;
     }
 
-    getEstimatedWaitTime(): number {
-        // Q5: Use dynamic avg from actual session durations
-        const avgDuration = this.sessionService.getAvgSessionDuration();
-        const queueLength = this.queue.length;
-        const warmContainers = this.containerService.getWarmCount();
+    /**
+     * Calculate realistic estimated wait time for a specific queue position.
+     * Maps each position to the Nth soonest-ending active session + boot time.
+     * For positions beyond active session count, uses max session duration.
+     */
+    getEstimatedWaitTime(position: number): number {
+        const warmCount = this.containerService.getWarmCount();
+        const bootTime = this.containerService.getAvgBootTimeSec();
+        const poolSize = this.containerService.getPoolSize();
 
-        if (warmContainers > 0) return 0;
-        return Math.ceil((queueLength / 3) * avgDuration);
+        // Users covered by warm containers wait 0 seconds
+        if (position <= warmCount) return 0;
+
+        // Position after warm containers are consumed
+        const posAfterWarm = position - warmCount;
+
+        // Get sorted remaining times of all active sessions (soonest first)
+        const sortedRemaining = this.sessionService.getSortedRemainingTimes();
+        const maxDuration = this.sessionService.getMaxSessionDuration();
+
+        // Which "wave" am I in? Wave 0 = waiting for current sessions to end
+        const wave = Math.floor((posAfterWarm - 1) / poolSize);
+        const slotIndex = (posAfterWarm - 1) % poolSize;
+
+        if (wave === 0) {
+            // First wave: wait for the Nth soonest session to end + boot
+            const remaining = sortedRemaining[slotIndex];
+            if (remaining !== undefined) {
+                return remaining + bootTime;
+            }
+            // No active sessions — just boot time (containers are starting)
+            return bootTime;
+        }
+
+        // Later waves: first wave wait + (wave × maxSessionDuration) + boot
+        const firstWaveRemaining = sortedRemaining[slotIndex] ?? maxDuration;
+        return firstWaveRemaining + (wave * maxDuration) + bootTime;
     }
 
     /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,20 @@ export default function QueuePage() {
     const [position, setPosition] = useState(0);
     const [totalInQueue, setTotalInQueue] = useState(0);
     const [estimatedWait, setEstimatedWait] = useState(0);
+    const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Local countdown: decrement estimatedWait every second between server pushes
+    useEffect(() => {
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        if (status === "waiting" && estimatedWait > 0) {
+            countdownRef.current = setInterval(() => {
+                setEstimatedWait(prev => Math.max(0, prev - 1));
+            }, 1000);
+        }
+        return () => {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+        };
+    }, [status, estimatedWait > 0]); // Only restart when status changes or countdown starts/stops
 
     useEffect(() => {
         const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -77,9 +91,10 @@ export default function QueuePage() {
 
     const formatWaitTime = (seconds: number): string => {
         if (seconds <= 0) return "Starting soon";
-        if (seconds < 60) return `~${seconds} seconds`;
-        const mins = Math.ceil(seconds / 60);
-        return `~${mins} minute${mins > 1 ? 's' : ''}`;
+        if (seconds < 60) return `~${seconds}s`;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `~${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     // Error state — queue:error redirects to home

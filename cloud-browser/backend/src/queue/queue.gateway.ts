@@ -65,7 +65,7 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 status: updatedEntry.status,
                 position: updatedEntry.position,
                 totalInQueue: this.queueService.getQueueLength(),
-                estimatedWaitSeconds: this.queueService.getEstimatedWaitTime(),
+                estimatedWaitSeconds: this.queueService.getEstimatedWaitTime(updatedEntry.position),
             });
 
             // If ready, send session info
@@ -88,7 +88,7 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
             status: entry.status,
             position: entry.position,
             totalInQueue: this.queueService.getQueueLength(),
-            estimatedWaitSeconds: this.queueService.getEstimatedWaitTime(),
+            estimatedWaitSeconds: this.queueService.getEstimatedWaitTime(entry.position),
         });
 
         // If already ready (processed before client connected), send ready event immediately

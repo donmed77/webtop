@@ -211,6 +211,17 @@ export class SessionService {
         return this.getActiveSessions().length;
     }
 
+    /** Remaining seconds for all active sessions, sorted ascending (soonest-ending first) */
+    getSortedRemainingTimes(): number[] {
+        return this.getActiveSessions()
+            .map(s => Math.max(0, Math.floor((s.expiresAt.getTime() - Date.now()) / 1000)))
+            .sort((a, b) => a - b);
+    }
+
+    getMaxSessionDuration(): number {
+        return this.sessionDuration;
+    }
+
     getSessionsToday(): number {
         this.resetDailyStats();
         return this.sessionsToday;
