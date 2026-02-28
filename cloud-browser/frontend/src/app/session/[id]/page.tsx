@@ -287,7 +287,7 @@ export default function SessionPage() {
                 if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
                 // Viewers just navigate away on session end
                 if (isViewer) {
-                    router.push("/session-ended");
+                    router.replace("/session-ended?reason=expired&viewer=true");
                     return;
                 }
                 // If recording is active, stop it and let onstop handler finalize the blob
@@ -411,7 +411,7 @@ export default function SessionPage() {
         if (wasRecording) {
             setStatus("ended");
         } else {
-            router.push("/session-ended");
+            router.replace("/session-ended");
         }
     };
 
@@ -688,7 +688,7 @@ export default function SessionPage() {
             socketRef.current?.disconnect();
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
             setPort(null); // unmount iframe so last frame doesn't show through
-            router.push("/session-ended");
+            router.replace(isViewer ? "/session-ended?reason=expired&viewer=true" : "/session-ended?reason=expired");
         }
     }, [reconnectCountdown, status]);
 
@@ -714,7 +714,7 @@ export default function SessionPage() {
     if (status === "ended") {
         // No recording was active — go straight to the real session-ended page
         if (recordingState === "idle") {
-            router.push("/session-ended");
+            router.replace("/session-ended?reason=expired");
             return null;
         }
 
@@ -741,7 +741,7 @@ export default function SessionPage() {
                         <p className="text-sm text-muted-foreground mb-4">Finalizing your recording...</p>
                     )}
                     <button
-                        onClick={() => router.push("/session-ended")}
+                        onClick={() => router.replace("/session-ended?reason=expired")}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     >
                         {recordingBlob ? "Skip & continue →" : ""}

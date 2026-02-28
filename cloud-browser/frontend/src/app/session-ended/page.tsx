@@ -15,27 +15,35 @@ function SessionEndedContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const reason = searchParams.get("reason"); // "not_found" | "expired" | null
+    const isViewerParam = searchParams.get("viewer") === "true";
     const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
 
     const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     useEffect(() => {
+        // Don't fetch rate limit for viewers — they didn't consume a session
+        if (isViewerParam) return;
         fetch(`${apiUrl}/api/session/rate-limit/status`)
             .then((res) => res.json())
             .then((data) => setRateLimit(data))
             .catch(() => {
                 setRateLimit(null);
             });
-    }, [apiUrl]);
+    }, [apiUrl, isViewerParam]);
 
     const isLimited = rateLimit !== null && rateLimit.remaining <= 0;
 
     // Contextual title and subtitle based on reason
     const isNotFound = reason === "not_found";
+    const isExpired = reason === "expired";
     const title = isNotFound ? "Session Not Available" : "Session Ended";
     const subtitle = isNotFound
         ? "This session has expired or doesn't exist."
-        : null;
+        : isExpired
+            ? isViewerParam
+                ? "The session you were viewing has ended."
+                : "Your session time has expired."
+            : null;
 
     return (
         <Card className="w-full max-w-md">
@@ -59,8 +67,8 @@ function SessionEndedContent() {
                 <h1 className="text-2xl font-bold mb-2">{title}</h1>
                 {subtitle && <p className="text-muted-foreground mb-4">{subtitle}</p>}
 
-                {/* Rate limit info */}
-                {rateLimit !== null ? (
+                {/* Rate limit info — only for non-viewers */}
+                {!isViewerParam && rateLimit !== null ? (
                     <div className="mb-6">
                         <p className="text-muted-foreground mb-3">
                             You&apos;ve used <span className="font-semibold text-foreground">{rateLimit.used}</span> of{" "}
@@ -83,7 +91,9 @@ function SessionEndedContent() {
                         </p>
                     </div>
                 ) : (
-                    <p className="text-muted-foreground mb-6">Thanks for using Cloud Browser!</p>
+                    <p className="text-muted-foreground mb-6">
+                        {isViewerParam ? "The host's session has ended." : "Thanks for using Cloud Browser!"}
+                    </p>
                 )}
 
                 {/* Start New Session button */}
@@ -96,12 +106,12 @@ function SessionEndedContent() {
                 </Button>
 
                 {/* Feedback link */}
-                <a
-                    href="mailto:feedback@unshortlink.com?subject=Session Feedback"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                <button
+                    onClick={() => router.push("/")}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
                     Share feedback
-                </a>
+                </button>
             </CardContent>
         </Card>
     );
