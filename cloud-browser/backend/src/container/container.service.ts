@@ -415,6 +415,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
      * P5: Kill and recreate unhealthy containers immediately
      */
     private async healthCheck() {
+        const statuses = Array.from(this.pool.entries()).map(([id, c]) => `${id}:${c.status}`).join(', ');
+        this.logger.debug(`Health check start: pool.size=${this.pool.size}, poolSize=${this.poolSize}, entries=[${statuses}]`);
+
         for (const [id, container] of this.pool) {
             if (container.status === 'destroying') continue;
 
@@ -443,7 +446,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 const info = await dockerContainer.inspect();
 
                 if (!info.State.Running) {
-                    this.logger.warn(`Container ${id} is not running, recreating...`);
+                    this.logger.warn(`Container ${id} is not running (State=${info.State.Status}), recreating...`);
 
                     // Mark as destroying and recreate
                     container.status = 'destroying';
@@ -478,7 +481,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         const currentSize = this.pool.size;
         if (currentSize < this.poolSize) {
             const needed = this.poolSize - currentSize;
-            this.logger.log(`Pool below target size, creating ${needed} containers`);
+            this.logger.log(`Pool below target size (current=${currentSize}, target=${this.poolSize}), creating ${needed} containers`);
             for (let i = 0; i < needed; i++) {
                 this.createWarmContainer().catch(err => {
                     this.logger.error(`Failed to create container: ${err.message}`);
