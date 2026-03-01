@@ -19,6 +19,7 @@ services:
     ports:
       - "3005:3005"
     environment:
+      - TZ=${TZ:-UTC}
       - NODE_ENV=production
       - PORT=3005
       - REDIS_URL=redis://redis:6379
@@ -49,6 +50,7 @@ services:
     ports:
       - "3002:3000"
     environment:
+      - TZ=${TZ:-UTC}
       - NEXT_PUBLIC_API_URL=https://test.unshortlink.com/api
     depends_on:
       - backend
