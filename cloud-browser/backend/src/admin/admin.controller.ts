@@ -25,7 +25,7 @@ export class AdminController {
             id: session.id,
             port: session.port,
             url: session.url,
-            clientIp: session.clientIp,
+            clientIp: session.clientIp,  // Fix #2: Full IP for admin (behind Basic Auth)
             startedAt: session.startedAt,
             expiresAt: session.expiresAt,
             timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
@@ -115,7 +115,7 @@ export class AdminController {
         const paginated = logs.slice(offsetNum, offsetNum + limitNum);
 
         return {
-            logs: paginated,
+            logs: paginated,  // Fix #2: Full IPs for admin (behind Basic Auth)
             total: logs.length,
             limit: limitNum,
             offset: offsetNum,
@@ -131,7 +131,7 @@ export class AdminController {
             limitedIps: this.sessionService.getRateLimitedIps(),
             blockedIps: this.sessionService.getBlockedIps(),
             whitelistedIps: this.sessionService.getWhitelistedIps(),
-            dailyLimit: 10,
+            dailyLimit: this.sessionService.getRateLimitPerDay(),
         };
     }
 

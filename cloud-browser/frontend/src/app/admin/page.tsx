@@ -101,6 +101,7 @@ export default function AdminPage() {
     const [history, setHistory] = useState<SessionLog[]>([]);
     const [historyTotal, setHistoryTotal] = useState(0);
     const [rateLimits, setRateLimits] = useState<RateLimitStat[]>([]);
+    const [dailyLimit, setDailyLimit] = useState<number>(10);
     const [limitedIps, setLimitedIps] = useState<string[]>([]);
     const [blockedIps, setBlockedIps] = useState<string[]>([]);
     const [whitelistedIps, setWhitelistedIps] = useState<string[]>([]);
@@ -194,6 +195,7 @@ export default function AdminPage() {
             if (res.ok) {
                 const data = await res.json();
                 setRateLimits(data.stats);
+                setDailyLimit(data.dailyLimit || 10);
                 setLimitedIps(data.limitedIps);
                 setBlockedIps(data.blockedIps || []);
                 setWhitelistedIps(data.whitelistedIps || []);
@@ -806,7 +808,7 @@ export default function AdminPage() {
                                                 {rateLimits.map((stat) => (
                                                     <tr key={stat.ip} className="border-b">
                                                         <td className="p-2 font-mono text-xs">{stat.ip}</td>
-                                                        <td className="p-2">{stat.count}/10</td>
+                                                        <td className="p-2">{stat.count}/{dailyLimit}</td>
                                                         <td className="p-2">{stat.remaining}</td>
                                                         <td className="p-2">
                                                             <span className={`text-xs px-2 py-1 rounded ${stat.remaining === 0 ? "bg-red-500/20 text-red-400" :

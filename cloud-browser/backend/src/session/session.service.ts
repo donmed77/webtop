@@ -113,7 +113,8 @@ export class SessionService implements OnModuleInit {
         await this.containerService.initializePoolAndHealthCheck();
     }
 
-    private getAnonymizedIp(ip: string): string {
+    // Fix #2: Made public so admin controller can anonymize at display time
+    getAnonymizedIp(ip: string): string {
         const parts = ip.split('.');
         if (parts.length === 4) {
             return `${parts[0]}.${parts[1]}.${parts[2]}.x`;
@@ -203,7 +204,7 @@ export class SessionService implements OnModuleInit {
             poolId: container.id,
             port: container.port,
             url: finalUrl,
-            clientIp: this.getAnonymizedIp(clientIp),
+            clientIp: clientIp,  // Fix #2: Store full IP for consistent rate limiting/blocking
             sessionToken,
             startedAt: now,
             expiresAt,
@@ -215,7 +216,7 @@ export class SessionService implements OnModuleInit {
         this.sessionsToday++;
         this.updatePeakConcurrent();
 
-        this.logger.log(`Session ${sessionId} started for ${session.clientIp} with URL: ${finalUrl}`);
+        this.logger.log(`Session ${sessionId} started for ${this.getAnonymizedIp(session.clientIp)} with URL: ${finalUrl}`);
 
         // Log to SQLite database
         this.loggingService.logSessionStart(sessionId, finalUrl, session.clientIp);
@@ -323,7 +324,7 @@ export class SessionService implements OnModuleInit {
         const stats: { ip: string; count: number; remaining: number }[] = [];
         for (const [ip, count] of this.ipSessionCount) {
             stats.push({
-                ip: this.getAnonymizedIp(ip),
+                ip: ip,  // Fix #2: Full IP for admin
                 count,
                 remaining: Math.max(0, this.rateLimitPerDay - count),
             });
@@ -339,7 +340,7 @@ export class SessionService implements OnModuleInit {
         const limited: string[] = [];
         for (const [ip, count] of this.ipSessionCount) {
             if (count >= this.rateLimitPerDay) {
-                limited.push(this.getAnonymizedIp(ip));
+                limited.push(ip);  // Fix #2: Full IP for admin
             }
         }
         return limited;
