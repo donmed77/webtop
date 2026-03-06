@@ -119,7 +119,7 @@ export default function SessionPage() {
         const check = () => {
             const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
             const isMobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            setIsTouchDevice(hasTouch || isMobileUA);
+            setIsTouchDevice(hasTouch && isMobileUA);
         };
         check();
     }, []);
