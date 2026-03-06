@@ -73,10 +73,10 @@ export class SessionController {
         // Read from nginx X-headers (auth_request) or query params (direct call)
         const port = req.headers['x-browser-port'] || queryPort;
         const token = req.headers['x-session-token'] || queryToken;
-        if (!port || !token) {
+        if (!port) {
             return res.status(403).send('Forbidden');
         }
-        const valid = this.sessionService.validateBrowserAccess(parseInt(port, 10), token);
+        const valid = this.sessionService.validateBrowserAccess(parseInt(port, 10), token || null);
         return res.status(valid ? 200 : 403).send(valid ? 'OK' : 'Forbidden');
     }
 

@@ -378,7 +378,7 @@ export default function SessionPage() {
         if (status === "active" && !streamReady) {
             const fallbackTimer = setTimeout(() => {
                 setStreamReady(true);
-            }, 15000);
+            }, 5000);
             return () => clearTimeout(fallbackTimer);
         }
     }, [status, streamReady]);
@@ -395,8 +395,7 @@ export default function SessionPage() {
                     originalLog.apply(this, args);
                     const msg = args.join(" ");
                     if (msg.includes("Stream started")) {
-                        // Brief delay to let the browser finish fullscreen layout
-                        setTimeout(() => setStreamReady(true), 1500);
+                        setTimeout(() => setStreamReady(true), 300);
                     }
                 };
             }
@@ -408,9 +407,20 @@ export default function SessionPage() {
                 if (ms !== undefined && ms !== null) setLatency(Math.round(ms));
             }, 1000);
         } catch {
-            // Cross-origin fallback — rely on the 15s timeout
+            // Cross-origin fallback — rely on the postMessage listener or fallback timeout
         }
     };
+
+    // Listen for postMessage from iframe sub_filter (reliable even on refresh)
+    useEffect(() => {
+        const handleStreamMessage = (e: MessageEvent) => {
+            if (e.data?.type === "streamStarted") {
+                setTimeout(() => setStreamReady(true), 300);
+            }
+        };
+        window.addEventListener("message", handleStreamMessage);
+        return () => window.removeEventListener("message", handleStreamMessage);
+    }, []);
 
     const handleEndSession = () => {
         if (isViewer || hasNavigated.current) return;
@@ -1206,7 +1216,7 @@ export default function SessionPage() {
             {port && sessionToken && (
                 <iframe
                     ref={iframeRef}
-                    src={`/browser/${port}/?token=${sessionToken}${isViewer ? "#shared" : ""}`}
+                    src={isViewer ? `/browser/${port}/#shared` : `/browser/${port}/?token=${sessionToken}`}
                     className="flex-1 w-full border-0"
                     style={{ touchAction: "none" }}
                     allow="clipboard-read; clipboard-write; autoplay"

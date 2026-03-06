@@ -415,9 +415,14 @@ export class SessionService implements OnModuleInit {
 
     // ---- Fix #6: Browser Port Auth ----
 
-    validateBrowserAccess(port: number, token: string): boolean {
+    validateBrowserAccess(port: number, token: string | null): boolean {
         for (const session of this.sessions.values()) {
-            if (session.status === 'active' && Number(session.port) === port && session.sessionToken === token) {
+            if (session.status === 'active' && Number(session.port) === port) {
+                // If token provided (owner), validate it matches
+                if (token) {
+                    return session.sessionToken === token;
+                }
+                // No token (viewer) — allow if port has active session
                 return true;
             }
         }
