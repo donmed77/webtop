@@ -866,7 +866,7 @@ export default function SessionPage() {
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
                         <span
-                            className={`font-mono text-lg font-semibold ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                            className={`font-mono text-lg font-semibold ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite] will-change-[color]" : ""}`}
                         >
                             {formatTime(timeRemaining)}
                         </span>
@@ -899,7 +899,7 @@ export default function SessionPage() {
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2.5 lg:px-4 py-1.5 lg:py-2 flex items-center gap-1.5 lg:gap-4 shadow-lg">
                         {/* Timer */}
                         <span
-                            className={`font-mono text-lg font-semibold tabular-nums min-w-[52px] text-center ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                            className={`font-mono text-lg font-semibold tabular-nums min-w-[52px] text-center ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite] will-change-[color]" : ""}`}
                         >
                             {formatTime(timeRemaining)}
                         </span>
@@ -1322,7 +1322,7 @@ export default function SessionPage() {
             {streamReady && isToolbarMinimized && (
                 /* Minimized: small draggable icon */
                 <button
-                    className={`fixed z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg cursor-pointer select-none ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
+                    className={`fixed z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg cursor-pointer select-none ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite] will-change-[color]" : ""}`}
                     style={{
                         right: `${toolbarMinPos.right}px`,
                         top: `${toolbarMinPos.top}px`,
@@ -1638,8 +1638,8 @@ export default function SessionPage() {
             {/* Custom animations */}
             <style jsx>{`
                 @keyframes flash {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.3; }
+                    0%, 100% { color: #ef4444; }
+                    50% { color: #7f1d1d; }
                 }
                 @keyframes slideUp {
                     from { opacity: 0; transform: translate(-50%, 20px); }
