@@ -64,6 +64,9 @@ export default function SessionPage() {
     const [feedbackSending, setFeedbackSending] = useState(false);
     const [showFeedbackToast, setShowFeedbackToast] = useState(false);
 
+    // Mobile toolbar overflow menu
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
     const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -114,12 +117,12 @@ export default function SessionPage() {
         }
     }, []);
 
-    // Detect touch device
+    // Detect touch device (3-layer approach: pointer:coarse, maxTouchPoints, ontouchstart)
     useEffect(() => {
         const check = () => {
-            const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-            const isMobileUA = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            setIsTouchDevice(hasTouch && isMobileUA);
+            const isCoarsePointer = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+            const hasTouchSmallScreen = (navigator.maxTouchPoints > 0 || "ontouchstart" in window) && window.innerWidth < 1400;
+            setIsTouchDevice(isCoarsePointer || hasTouchSmallScreen);
         };
         check();
     }, []);
@@ -529,15 +532,19 @@ export default function SessionPage() {
         cancelScreenshot();
     };
 
-    // ESC to cancel screenshot mode
+    // ESC to cancel screenshot mode or close panels
     useEffect(() => {
-        if (!screenshotMode) return;
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") cancelScreenshot();
+            if (e.key === "Escape") {
+                if (screenshotMode) cancelScreenshot();
+                if (clipboardOpen) setClipboardOpen(false);
+                if (feedbackOpen) setFeedbackOpen(false);
+                if (mobileMenuOpen) setMobileMenuOpen(false);
+            }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [screenshotMode]);
+    }, [screenshotMode, clipboardOpen, feedbackOpen, mobileMenuOpen]);
 
     // --- Recording functions ---
     const formatSize = (bytes: number) => {
@@ -830,7 +837,7 @@ export default function SessionPage() {
     }
 
     return (
-        <main className="min-h-screen bg-background flex flex-col relative">
+        <main className="min-h-[100dvh] bg-background flex flex-col relative">
             {/* Loading overlay — stays until WebRTC stream is ready */}
             {showLoading && (
                 <div className="absolute inset-0 z-40 bg-background flex items-center justify-center">
@@ -842,7 +849,7 @@ export default function SessionPage() {
             )}
 
             {/* Toolbar - only visible when stream is ready */}
-            {streamReady && !isToolbarMinimized && isViewer ? (
+            {streamReady && !isToolbarMinimized && isViewer && (
                 /* Viewer toolbar: minimal — timer + latency + viewing label */
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-lg">
@@ -865,7 +872,7 @@ export default function SessionPage() {
                         </span>
                         <button
                             onClick={() => setIsToolbarMinimized(true)}
-                            className="text-white/60 hover:text-white transition-colors cursor-pointer"
+                            className="text-white/60 hover:text-white transition-colors cursor-pointer focus:outline-none"
                             title="Minimize"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -874,9 +881,10 @@ export default function SessionPage() {
                         </button>
                     </div>
                 </div>
-            ) : streamReady && !isToolbarMinimized ? (
-                <div className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-16px)]">
-                    <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-4 shadow-lg">
+            )}
+            {streamReady && !isToolbarMinimized && !isViewer && (
+                <div className="absolute top-2 lg:top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-16px)]">
+                    <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2.5 lg:px-4 py-1.5 lg:py-2 flex items-center gap-1.5 lg:gap-4 shadow-lg">
                         {/* Timer */}
                         <span
                             className={`font-mono text-lg font-semibold tabular-nums min-w-[52px] text-center ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
@@ -898,11 +906,11 @@ export default function SessionPage() {
                         {recordingState === "idle" && (
                             <button
                                 onClick={startRecording}
-                                className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
+                                className="hidden lg:flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer focus:outline-none"
                                 title="Record session"
                             >
                                 <div className="w-3 h-3 rounded-full border-2 border-current" />
-                                <span className="text-xs hidden sm:inline">Record</span>
+                                <span className="text-xs">Record</span>
                             </button>
                         )}
                         {(recordingState === "recording" || recordingState === "paused") && (
@@ -910,7 +918,7 @@ export default function SessionPage() {
                                 {/* Pause/Resume */}
                                 <button
                                     onClick={recordingState === "recording" ? pauseRecording : resumeRecording}
-                                    className="flex items-center gap-1 text-white/70 hover:text-white transition-colors cursor-pointer"
+                                    className="flex items-center gap-1 text-white/70 hover:text-white transition-colors cursor-pointer focus:outline-none"
                                     title={recordingState === "recording" ? "Pause" : "Resume"}
                                 >
                                     {recordingState === "recording" ? (
@@ -925,20 +933,20 @@ export default function SessionPage() {
                                     )}
                                 </button>
                                 {/* Recording indicator + time + size */}
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1 lg:gap-1.5">
                                     <div className={`w-2.5 h-2.5 rounded-full ${recordingState === "recording" ? "bg-red-500 animate-pulse" : "bg-yellow-500"}`} />
                                     <span className="text-xs font-mono text-red-400 tabular-nums min-w-[40px]">
                                         {formatTime(recordingElapsed)}
                                     </span>
-                                    <span className="text-xs text-white/40">·</span>
-                                    <span className="text-xs text-white/50 font-mono tabular-nums min-w-[48px]">
+                                    <span className="text-xs text-white/40 hidden lg:inline">·</span>
+                                    <span className="text-xs text-white/50 font-mono tabular-nums min-w-[48px] hidden lg:inline">
                                         {formatSize(recordingSize)}
                                     </span>
                                 </div>
                                 {/* Stop */}
                                 <button
                                     onClick={stopRecording}
-                                    className="flex items-center text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                    className="flex items-center text-red-400 hover:text-red-300 transition-colors cursor-pointer focus:outline-none"
                                     title="Stop recording"
                                 >
                                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
@@ -950,187 +958,239 @@ export default function SessionPage() {
                         {recordingState === "ready" && (
                             <button
                                 onClick={downloadRecording}
-                                className="flex items-center gap-1.5 text-green-400 hover:text-green-300 transition-colors cursor-pointer"
+                                className="hidden lg:flex items-center gap-1.5 text-green-400 hover:text-green-300 transition-colors cursor-pointer focus:outline-none whitespace-nowrap"
                                 title="Download recording"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
-                                <span className="text-xs hidden sm:inline">{formatSize(recordingSize)}</span>
+                                <span className="text-xs">Download ({formatSize(recordingSize)})</span>
                             </button>
                         )}
 
-                        <div className="w-px h-5 bg-white/20" />
+                        {/* === DESKTOP ONLY: secondary items === */}
+                        <div className="hidden lg:contents">
+                            <div className="w-px h-5 bg-white/20" />
 
-                        {/* Screenshot Button */}
-                        <button
-                            onClick={startScreenshotMode}
-                            className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
-                            title="Take area screenshot"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span className="text-xs hidden sm:inline">Screenshot</span>
-                        </button>
-
-                        <div className="w-px h-5 bg-white/20" />
-
-                        {/* Clipboard Toggle + Dropdown */}
-                        <div className="relative">
+                            {/* Screenshot Button */}
                             <button
-                                onClick={() => { setClipboardOpen(!clipboardOpen); setFeedbackOpen(false); }}
-                                className={`flex items-center gap-1.5 transition-colors cursor-pointer ${clipboardSynced ? "text-green-400" : clipboardOpen ? "text-white" : "text-white/70 hover:text-white"
-                                    }`}
-                                title="Toggle clipboard"
+                                onClick={startScreenshotMode}
+                                className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer focus:outline-none"
+                                title="Take area screenshot"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                <span className="text-xs hidden sm:inline">Clipboard</span>
+                                <span className="text-xs hidden lg:inline">Screenshot</span>
                             </button>
 
-                            {/* Clipboard panel — centered dropdown below button */}
-                            {clipboardOpen && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[260px] sm:w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
-                                    <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between">
-                                        <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-500 ${clipboardFlash ? "text-green-400" : "text-white/30"
-                                            }`}>
-                                            {clipboardFlash ? "✓ Clipboard updated" : "Remote Clipboard"}
-                                        </span>
-                                    </div>
-                                    <div className="p-2">
-                                        <textarea
-                                            value={clipboardText}
-                                            onChange={(e) => setClipboardText(e.target.value)}
-                                            onBlur={() => syncClipboardToRemote(clipboardText)}
-                                            onPaste={(e) => {
-                                                const pasted = e.clipboardData.getData("text/plain");
-                                                if (pasted) {
-                                                    e.preventDefault();
-                                                    setClipboardText(pasted);
-                                                    syncClipboardToRemote(pasted);
-                                                }
-                                            }}
-                                            placeholder="Paste here to send to remote desktop..."
-                                            className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none resize-none transition-all duration-500 ${clipboardFlash
-                                                ? "border-green-400/50 text-green-300"
-                                                : "border-white/10 focus:border-white/20"
-                                                }`}
-                                            rows={4}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                            <div className="w-px h-5 bg-white/20" />
 
-                        <div className="w-px h-5 bg-white/20" />
+                            {/* Clipboard Toggle + Dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => { setClipboardOpen(!clipboardOpen); setFeedbackOpen(false); }}
+                                    className={`flex items-center gap-1.5 transition-colors cursor-pointer focus:outline-none ${clipboardSynced ? "text-green-400" : clipboardOpen ? "text-white" : "text-white/70 hover:text-white"
+                                        }`}
+                                    title="Toggle clipboard"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <span className="text-xs hidden lg:inline">Clipboard</span>
+                                </button>
 
-                        {/* Feedback Toggle + Dropdown */}
-                        <div className="relative">
-                            <button
-                                onClick={() => { setFeedbackOpen(!feedbackOpen); setClipboardOpen(false); }}
-                                className={`flex items-center gap-1.5 transition-colors cursor-pointer ${feedbackOpen ? "text-white" : "text-white/70 hover:text-white"
-                                    }`}
-                                title="Send feedback"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                                <span className="text-xs hidden sm:inline">Feedback</span>
-                            </button>
-
-                            {feedbackOpen && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[260px] sm:w-[300px] overflow-hidden z-50">
-                                    <div className="px-3 py-1.5 border-b border-white/5">
-                                        <span className="text-[10px] font-medium uppercase tracking-wider text-white/30">Send Feedback</span>
-                                    </div>
-                                    <div className="p-3 space-y-3">
-                                        {/* Email */}
-                                        <div>
-                                            <input
-                                                type="email"
-                                                value={feedbackEmail}
-                                                onChange={(e) => { setFeedbackEmail(e.target.value); setFeedbackEmailError(""); }}
-                                                placeholder="E-Mail (leave empty to comment anonymously)"
-                                                className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none ${feedbackEmailError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-white/20"}`}
-                                            />
-                                            {feedbackEmailError && (
-                                                <p className="text-red-400 text-[10px] mt-1">{feedbackEmailError}</p>
-                                            )}
+                                {/* Clipboard panel — centered dropdown below button */}
+                                {clipboardOpen && (
+                                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-5 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[260px] sm:w-[300px] overflow-hidden z-50" style={{ transition: 'border-color 0.5s ease' }}>
+                                        <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between">
+                                            <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-500 ${clipboardFlash ? "text-green-400" : "text-white/30"
+                                                }`}>
+                                                {clipboardFlash ? "✓ Clipboard updated" : "Remote Clipboard"}
+                                            </span>
                                         </div>
-                                        {/* Type pills */}
-                                        <div className="flex gap-1.5">
-                                            {(["bug", "suggestion", "other"] as const).map((t) => (
-                                                <button
-                                                    key={t}
-                                                    onClick={() => setFeedbackType(t)}
-                                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer border ${feedbackType === t
-                                                        ? t === "bug" ? "bg-red-500/20 text-red-400 border-red-500/30"
-                                                            : t === "suggestion" ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                                                                : "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                                        : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                                                        }`}
-                                                >
-                                                    {t === "bug" ? (
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z" /></svg>
-                                                    ) : t === "suggestion" ? (
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                                    ) : (
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                                                    )}
-                                                    {t === "bug" ? "Bug" : t === "suggestion" ? "Suggestion" : "Other"}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {/* Message */}
-                                        <div>
+                                        <div className="p-2">
                                             <textarea
-                                                value={feedbackMessage}
-                                                onChange={(e) => setFeedbackMessage(e.target.value.slice(0, 500))}
-                                                placeholder="Describe your feedback..."
-                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none"
+                                                value={clipboardText}
+                                                onChange={(e) => setClipboardText(e.target.value)}
+                                                onBlur={() => syncClipboardToRemote(clipboardText)}
+                                                onPaste={(e) => {
+                                                    const pasted = e.clipboardData.getData("text/plain");
+                                                    if (pasted) {
+                                                        e.preventDefault();
+                                                        setClipboardText(pasted);
+                                                        syncClipboardToRemote(pasted);
+                                                    }
+                                                }}
+                                                placeholder="Paste here to send to remote desktop..."
+                                                className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none resize-none transition-all duration-500 ${clipboardFlash
+                                                    ? "border-green-400/50 text-green-300"
+                                                    : "border-white/10 focus:border-white/20"
+                                                    }`}
                                                 rows={4}
                                             />
-                                            <div className="flex justify-end mt-1">
-                                                <span className={`text-[10px] ${feedbackMessage.length >= 450 ? feedbackMessage.length >= 500 ? "text-red-400" : "text-amber-400" : "text-white/20"}`}>
-                                                    {feedbackMessage.length}/500
-                                                </span>
-                                            </div>
                                         </div>
-                                        {/* Send */}
-                                        <button
-                                            onClick={submitFeedback}
-                                            disabled={!feedbackMessage.trim() || feedbackSending}
-                                            className={`w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${feedbackMessage.trim()
-                                                ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
-                                                : "bg-white/5 text-white/20 border border-white/5"
-                                                }`}
-                                        >
-                                            {feedbackSending ? "Sending..." : "Send Feedback"}
-                                        </button>
                                     </div>
+                                )}
+                            </div>
+
+                            <div className="w-px h-5 bg-white/20" />
+
+                            {/* Feedback Toggle + Dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => { setFeedbackOpen(!feedbackOpen); setClipboardOpen(false); }}
+                                    className={`flex items-center gap-1.5 transition-colors cursor-pointer focus:outline-none ${feedbackOpen ? "text-white" : "text-white/70 hover:text-white"
+                                        }`}
+                                    title="Send feedback"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    <span className="text-xs hidden lg:inline">Feedback</span>
+                                </button>
+
+                                {feedbackOpen && (
+                                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-5 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg w-[260px] sm:w-[300px] overflow-hidden z-50">
+                                        <div className="px-3 py-1.5 border-b border-white/5">
+                                            <span className="text-[10px] font-medium uppercase tracking-wider text-white/30">Send Feedback</span>
+                                        </div>
+                                        <div className="p-3 space-y-3">
+                                            {/* Email */}
+                                            <div>
+                                                <input
+                                                    type="email"
+                                                    value={feedbackEmail}
+                                                    onChange={(e) => { setFeedbackEmail(e.target.value); setFeedbackEmailError(""); }}
+                                                    placeholder="E-Mail (leave empty to comment anonymously)"
+                                                    className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none ${feedbackEmailError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-white/20"}`}
+                                                />
+                                                {feedbackEmailError && (
+                                                    <p className="text-red-400 text-[10px] mt-1">{feedbackEmailError}</p>
+                                                )}
+                                            </div>
+                                            {/* Type pills */}
+                                            <div className="flex gap-1.5">
+                                                {(["bug", "suggestion", "other"] as const).map((t) => (
+                                                    <button
+                                                        key={t}
+                                                        onClick={() => setFeedbackType(t)}
+                                                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer focus:outline-none border ${feedbackType === t
+                                                            ? t === "bug" ? "bg-red-500/20 text-red-400 border-red-500/30"
+                                                                : t === "suggestion" ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                                                                    : "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                                            : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                                                            }`}
+                                                    >
+                                                        {t === "bug" ? (
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z" /></svg>
+                                                        ) : t === "suggestion" ? (
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                                        ) : (
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                                        )}
+                                                        {t === "bug" ? "Bug" : t === "suggestion" ? "Suggestion" : "Other"}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {/* Message */}
+                                            <div>
+                                                <textarea
+                                                    value={feedbackMessage}
+                                                    onChange={(e) => setFeedbackMessage(e.target.value.slice(0, 500))}
+                                                    placeholder="Describe your feedback..."
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none"
+                                                    rows={4}
+                                                />
+                                                <div className="flex justify-end mt-1">
+                                                    <span className={`text-[10px] ${feedbackMessage.length >= 450 ? feedbackMessage.length >= 500 ? "text-red-400" : "text-amber-400" : "text-white/20"}`}>
+                                                        {feedbackMessage.length}/500
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {/* Send */}
+                                            <button
+                                                onClick={submitFeedback}
+                                                disabled={!feedbackMessage.trim() || feedbackSending}
+                                                className={`w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer focus:outline-none ${feedbackMessage.trim()
+                                                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
+                                                    : "bg-white/5 text-white/20 border border-white/5"
+                                                    }`}
+                                            >
+                                                {feedbackSending ? "Sending..." : "Send Feedback"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="w-px h-5 bg-white/20" />
+                            <button
+                                onClick={copyShareLink}
+                                className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer focus:outline-none"
+                                title="Copy viewer link"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                                <span className="relative text-xs hidden lg:inline">
+                                    Share
+                                    {viewerCount > 0 && (
+                                        <span className="absolute -top-1.5 -right-2.5 bg-blue-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
+                                            {viewerCount}
+                                        </span>
+                                    )}
+                                </span>
+                            </button>
+                        </div>{/* end hidden lg:contents */}
+
+                        {/* === MOBILE: overflow menu === */}
+                        <div className="lg:hidden relative">
+                            <button
+                                onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setClipboardOpen(false); setFeedbackOpen(false); }}
+                                className={`flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer focus:outline-none ${mobileMenuOpen ? "text-white bg-white/10" : "text-white/60 hover:text-white"}`}
+                                title="More options"
+                            >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="5" r="2" />
+                                    <circle cx="12" cy="12" r="2" />
+                                    <circle cx="12" cy="19" r="2" />
+                                </svg>
+                            </button>
+                            {mobileMenuOpen && (
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 bg-[#1a1a1a]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-xl w-[220px] overflow-hidden z-50">
+                                    {recordingState === "idle" && (
+                                        <button onClick={() => { startRecording(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer focus:outline-none">
+                                            <div className="w-3.5 h-3.5 rounded-full border-2 border-current flex-shrink-0" />
+                                            <span className="text-xs">Record Session</span>
+                                        </button>
+                                    )}
+                                    {recordingState === "ready" && (
+                                        <button onClick={() => { downloadRecording(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-green-400 hover:bg-white/5 transition-colors cursor-pointer focus:outline-none">
+                                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                            <span className="text-xs">Download ({formatSize(recordingSize)})</span>
+                                        </button>
+                                    )}
+                                    <button onClick={() => { startScreenshotMode(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer focus:outline-none">
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                        <span className="text-xs">Screenshot</span>
+                                    </button>
+                                    <button onClick={() => { setClipboardOpen(!clipboardOpen); setFeedbackOpen(false); setMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer focus:outline-none ${clipboardSynced ? "text-green-400" : "text-white/70 hover:text-white"}`}>
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                        <span className="text-xs">Clipboard</span>
+                                    </button>
+                                    <button onClick={() => { setFeedbackOpen(!feedbackOpen); setClipboardOpen(false); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer focus:outline-none">
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                        <span className="text-xs">Feedback</span>
+                                    </button>
+                                    <button onClick={() => { copyShareLink(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer focus:outline-none">
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                        <span className="text-xs">Share{viewerCount > 0 ? ` (${viewerCount})` : ""}</span>
+                                    </button>
                                 </div>
                             )}
                         </div>
-
-                        <div className="w-px h-5 bg-white/20" />
-                        <button
-                            onClick={copyShareLink}
-                            className="relative flex items-center gap-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
-                            title="Copy viewer link"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                            </svg>
-                            <span className="text-xs hidden sm:inline">Share</span>
-                            {viewerCount > 0 && (
-                                <span className="absolute -top-1.5 -right-2 bg-blue-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                                    {viewerCount}
-                                </span>
-                            )}
-                        </button>
 
                         <div className="w-px h-5 bg-white/20" />
 
@@ -1138,15 +1198,16 @@ export default function SessionPage() {
                         <Button
                             variant="destructive"
                             size="sm"
-                            className="h-7 px-2 sm:px-3 text-xs sm:text-sm rounded-full cursor-pointer"
+                            className="h-7 px-2 lg:px-3 text-xs lg:text-sm rounded-full cursor-pointer"
                             onClick={handleEndSession}
                         >
-                            End Session
+                            <span className="lg:hidden">End</span>
+                            <span className="hidden lg:inline">End Session</span>
                         </Button>
 
                         <button
                             onClick={() => setIsToolbarMinimized(true)}
-                            className="text-white/60 hover:text-white transition-colors cursor-pointer"
+                            className="text-white/60 hover:text-white transition-colors cursor-pointer focus:outline-none"
                             title="Minimize"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1155,7 +1216,61 @@ export default function SessionPage() {
                         </button>
                     </div>
                 </div>
-            ) : streamReady && isToolbarMinimized ? (
+            )}
+
+            {/* Click-outside backdrop for clipboard/feedback/mobile menu */}
+            {streamReady && !isToolbarMinimized && !isViewer && (clipboardOpen || feedbackOpen || mobileMenuOpen) && (
+                <div className="fixed inset-0 z-40" onClick={() => { setClipboardOpen(false); setFeedbackOpen(false); setMobileMenuOpen(false); }} />
+            )}
+            {/* Mobile clipboard panel */}
+            {streamReady && !isToolbarMinimized && !isViewer && clipboardOpen && (
+                <div className="lg:hidden fixed left-1/2 -translate-x-1/2 top-14 z-[55] w-[calc(100vw-32px)] max-w-[300px]">
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg overflow-hidden" style={{ transition: 'border-color 0.5s ease' }}>
+                        <div className="px-3 py-1.5 border-b border-white/5">
+                            <span className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-500 ${clipboardFlash ? "text-green-400" : "text-white/30"}`}>
+                                {clipboardFlash ? "✓ Clipboard updated" : "Remote Clipboard"}
+                            </span>
+                        </div>
+                        <div className="p-2">
+                            <textarea value={clipboardText} onChange={(e) => setClipboardText(e.target.value)} onBlur={() => syncClipboardToRemote(clipboardText)}
+                                onPaste={(e) => { const p = e.clipboardData.getData("text/plain"); if (p) { e.preventDefault(); setClipboardText(p); syncClipboardToRemote(p); } }}
+                                placeholder="Paste here to send to remote desktop..."
+                                className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none resize-none transition-all duration-500 ${clipboardFlash ? "border-green-400/50 text-green-300" : "border-white/10 focus:border-white/20"}`}
+                                rows={4} />
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Mobile feedback panel */}
+            {streamReady && !isToolbarMinimized && !isViewer && feedbackOpen && (
+                <div className="lg:hidden fixed left-1/2 -translate-x-1/2 top-14 z-[55] w-[calc(100vw-32px)] max-w-[300px]">
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl shadow-lg overflow-hidden">
+                        <div className="px-3 py-1.5 border-b border-white/5">
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-white/30">Send Feedback</span>
+                        </div>
+                        <div className="p-3 space-y-3">
+                            <input type="email" value={feedbackEmail} onChange={(e) => { setFeedbackEmail(e.target.value); setFeedbackEmailError(""); }}
+                                placeholder="E-Mail (optional)" className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none ${feedbackEmailError ? "border-red-500/50" : "border-white/10 focus:border-white/20"}`} />
+                            {feedbackEmailError && <p className="text-red-400 text-[10px] mt-1">{feedbackEmailError}</p>}
+                            <div className="flex gap-1.5">
+                                {(["bug", "suggestion", "other"] as const).map((t) => (
+                                    <button key={t} onClick={() => setFeedbackType(t)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer border ${feedbackType === t ? t === "bug" ? "bg-red-500/20 text-red-400 border-red-500/30" : t === "suggestion" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"}`}>
+                                        {t === "bug" ? "Bug" : t === "suggestion" ? "Suggestion" : "Other"}
+                                    </button>
+                                ))}
+                            </div>
+                            <textarea value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value.slice(0, 500))} placeholder="Describe your feedback..."
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none" rows={3} />
+                            <button onClick={submitFeedback} disabled={!feedbackMessage.trim() || feedbackSending}
+                                className={`w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${feedbackMessage.trim() ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30" : "bg-white/5 text-white/20 border border-white/5"}`}>
+                                {feedbackSending ? "Sending..." : "Send Feedback"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {streamReady && isToolbarMinimized && (
                 /* Minimized: small draggable icon */
                 <button
                     className={`fixed z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg cursor-pointer select-none ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite]" : ""}`}
@@ -1209,8 +1324,13 @@ export default function SessionPage() {
                     {(recordingState === "recording" || recordingState === "paused") && (
                         <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black/40 ${recordingState === "recording" ? "bg-red-500 animate-pulse" : "bg-yellow-500"}`} />
                     )}
+                    {viewerCount > 0 && (
+                        <div className="absolute -bottom-0.5 -right-0.5 bg-blue-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center border-2 border-black/40">
+                            {viewerCount}
+                        </div>
+                    )}
                 </button>
-            ) : null}
+            )}
 
             {/* Browser iframe — loads when port and auth token are available */}
             {port && sessionToken && (
@@ -1338,43 +1458,32 @@ export default function SessionPage() {
             {screenshotMode && (
                 <div
                     className="absolute inset-0 z-[60] cursor-crosshair select-none overflow-hidden"
-                    style={{ top: iframeRef.current?.offsetTop || 0 }}
+                    style={{ top: iframeRef.current?.offsetTop || 0, touchAction: 'none' }}
                     onMouseDown={handleScreenshotMouseDown}
                     onMouseMove={handleScreenshotMouseMove}
                     onMouseUp={handleScreenshotMouseUp}
+                    onTouchStart={(e) => { const t = e.touches[0]; handleScreenshotMouseDown({ clientX: t.clientX, clientY: t.clientY, currentTarget: e.currentTarget } as any); }}
+                    onTouchMove={(e) => { const t = e.touches[0]; handleScreenshotMouseMove({ clientX: t.clientX, clientY: t.clientY, currentTarget: e.currentTarget } as any); }}
+                    onTouchEnd={() => handleScreenshotMouseUp()}
                 >
-                    {/* Dimmed background */}
-                    <div className="absolute inset-0 bg-black/40" />
-                    {/* Instructions */}
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-                        <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-3 shadow-lg">
-                            <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span className="text-white/90 text-sm">Drag to select area</span>
-                            <span className="text-white/40 text-xs">ESC to cancel</span>
-                        </div>
-                    </div>
-                    {/* Selection rectangle */}
-                    {selectionStart && selectionEnd && (() => {
+                    {/* Dim overlay — uses clip-path to cut out the selection area at full opacity */}
+                    {selectionStart && selectionEnd ? (() => {
                         const x = Math.min(selectionStart.x, selectionEnd.x);
                         const y = Math.min(selectionStart.y, selectionEnd.y);
                         const w = Math.abs(selectionEnd.x - selectionStart.x);
                         const h = Math.abs(selectionEnd.y - selectionStart.y);
                         return (
                             <>
-                                {/* Clear window in the dim overlay */}
                                 <div
-                                    className="absolute bg-transparent border-2 border-white/80 border-dashed"
-                                    style={{ left: x, top: y, width: w, height: h }}
-                                />
-                                {/* Re-dim everything except the selection using clip-path */}
-                                <div
-                                    className="absolute inset-0 bg-black/40"
+                                    className="absolute inset-0 bg-black/50"
                                     style={{
                                         clipPath: `polygon(0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y}px, ${x + w}px ${y}px, ${x + w}px ${y + h}px, ${x}px ${y + h}px, ${x}px 100%, 100% 100%, 100% 0%)`,
                                     }}
+                                />
+                                {/* Selection border */}
+                                <div
+                                    className="absolute border-2 border-white/80 border-dashed"
+                                    style={{ left: x, top: y, width: w, height: h }}
                                 />
                                 {/* Dimension label */}
                                 {w > 60 && h > 30 && (
@@ -1387,7 +1496,27 @@ export default function SessionPage() {
                                 )}
                             </>
                         );
-                    })()}
+                    })() : (
+                        /* No selection yet — full dim + instructions */
+                        <div className="absolute inset-0 bg-black/50" />
+                    )}
+                    {/* Instructions — always visible */}
+                    <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 max-w-[calc(100vw-32px)]">
+                        <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shadow-lg">
+                            <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span className="text-white/90 text-xs sm:text-sm whitespace-nowrap">Drag to select area</span>
+                            <span className="text-white/40 text-xs hidden sm:inline">ESC to cancel</span>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setScreenshotMode(false); setSelectionStart(null); setSelectionEnd(null); }}
+                                className="sm:hidden text-white/40 hover:text-white text-xs cursor-pointer whitespace-nowrap"
+                            >
+                                ✕ Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -1419,40 +1548,40 @@ export default function SessionPage() {
 
             {/* Share link copied toast */}
             {showShareToast && (
-                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
-                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
-                        <span className="text-sm">🔗</span>
-                        <p className="text-white/90 text-sm">Viewer link copied to clipboard!</p>
+                <div className="fixed bottom-4 sm:bottom-6 left-1/2 z-50 w-auto max-w-[calc(100vw-32px)] animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-lg">
+                        <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                        <p className="text-white/90 text-xs sm:text-sm whitespace-nowrap">Viewer link copied to clipboard!</p>
                     </div>
                 </div>
             )}
 
             {/* Feedback sent toast */}
             {showFeedbackToast && (
-                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
-                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
-                        <span className="text-sm">✅</span>
-                        <p className="text-white/90 text-sm">Thanks for your feedback!</p>
+                <div className="fixed bottom-4 sm:bottom-6 left-1/2 z-50 w-auto max-w-[calc(100vw-32px)] animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-lg">
+                        <svg className="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <p className="text-white/90 text-xs sm:text-sm whitespace-nowrap">Thanks for your feedback!</p>
                     </div>
                 </div>
             )}
 
             {/* Session resumed from another tab toast */}
             {showTakeoverToast && (
-                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
-                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
-                        <span className="text-sm">🔄</span>
-                        <p className="text-white/90 text-sm">Session resumed from another tab</p>
+                <div className="fixed bottom-4 sm:bottom-6 left-1/2 z-50 w-auto max-w-[calc(100vw-32px)] animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-lg">
+                        <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        <p className="text-white/90 text-xs sm:text-sm whitespace-nowrap">Session resumed from another tab</p>
                     </div>
                 </div>
             )}
 
             {/* Privacy toast notification */}
             {showPrivacyToast && (
-                <div className="fixed bottom-6 left-1/2 z-50 animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
-                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg">
-                        <span className="text-sm">🔒</span>
-                        <p className="text-white/90 text-sm">Recording is saved locally on your device only. We do not store any recordings.</p>
+                <div className="fixed bottom-4 sm:bottom-6 left-1/2 z-50 w-auto max-w-[calc(100vw-32px)] animate-[slideUp_0.3s_ease-out_forwards]" style={{ transform: 'translate(-50%, 0)' }}>
+                    <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-lg">
+                        <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        <p className="text-white/90 text-xs sm:text-sm whitespace-nowrap"><span className="sm:hidden">Saved locally only</span><span className="hidden sm:inline">Recording is saved locally on your device only. We do not store any recordings.</span></p>
                     </div>
                 </div>
             )}
