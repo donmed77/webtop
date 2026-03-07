@@ -67,6 +67,9 @@ export default function SessionPage() {
     // Mobile toolbar overflow menu
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+    // Audio state
+    const [audioMuted, setAudioMuted] = useState(true);
+
     // Recording state
     type RecordingState = "idle" | "recording" | "paused" | "ready";
     const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -420,10 +423,19 @@ export default function SessionPage() {
             if (e.data?.type === "streamStarted") {
                 setTimeout(() => setStreamReady(true), 1500);
             }
+            if (e.data?.type === "audioState") {
+                setAudioMuted(e.data.muted);
+            }
         };
         window.addEventListener("message", handleStreamMessage);
         return () => window.removeEventListener("message", handleStreamMessage);
     }, []);
+
+    // Toggle audio in the iframe via postMessage
+    const toggleAudio = () => {
+        iframeRef.current?.contentWindow?.postMessage({ type: "toggleAudio" }, "*");
+        setAudioMuted(!audioMuted);
+    };
 
     const handleEndSession = () => {
         if (isViewer || hasNavigated.current) return;
@@ -899,6 +911,23 @@ export default function SessionPage() {
                             {latency !== null ? `${latency}ms` : "—ms"}
                         </span>
 
+                        {/* Mobile Audio Toggle */}
+                        <div className="lg:hidden w-px h-5 bg-white/20" />
+                        <button
+                            onClick={toggleAudio}
+                            className={`lg:hidden flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer focus:outline-none ${audioMuted ? "text-white/40 hover:text-white" : "text-white/70 hover:text-white"}`}
+                            title={audioMuted ? "Unmute audio" : "Mute audio"}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                {audioMuted ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                ) : (
+                                    <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728" /></>
+                                )}
+                            </svg>
+                        </button>
+
                         {/* Divider */}
                         <div className="w-px h-5 bg-white/20" />
 
@@ -983,6 +1012,25 @@ export default function SessionPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                                 <span className="text-xs hidden lg:inline">Screenshot</span>
+                            </button>
+
+                            <div className="w-px h-5 bg-white/20" />
+
+                            {/* Audio Toggle */}
+                            <button
+                                onClick={toggleAudio}
+                                className={`flex items-center gap-1.5 transition-colors cursor-pointer focus:outline-none ${audioMuted ? "text-white/40 hover:text-white" : "text-white/70 hover:text-white"}`}
+                                title={audioMuted ? "Unmute audio" : "Mute audio"}
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                    {audioMuted ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                    ) : (
+                                        <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728" /></>
+                                    )}
+                                </svg>
+                                <span className="text-xs hidden lg:inline">{audioMuted ? "Unmute" : "Mute"}</span>
                             </button>
 
                             <div className="w-px h-5 bg-white/20" />
@@ -1188,6 +1236,7 @@ export default function SessionPage() {
                                         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
                                         <span className="text-xs">Share{viewerCount > 0 ? ` (${viewerCount})` : ""}</span>
                                     </button>
+
                                 </div>
                             )}
                         </div>
