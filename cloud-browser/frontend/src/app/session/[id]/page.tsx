@@ -395,7 +395,7 @@ export default function SessionPage() {
                     originalLog.apply(this, args);
                     const msg = args.join(" ");
                     if (msg.includes("Stream started")) {
-                        setTimeout(() => setStreamReady(true), 300);
+                        setTimeout(() => setStreamReady(true), 1500);
                     }
                 };
             }
@@ -415,7 +415,7 @@ export default function SessionPage() {
     useEffect(() => {
         const handleStreamMessage = (e: MessageEvent) => {
             if (e.data?.type === "streamStarted") {
-                setTimeout(() => setStreamReady(true), 300);
+                setTimeout(() => setStreamReady(true), 1500);
             }
         };
         window.addEventListener("message", handleStreamMessage);
