@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { LoggingModule } from './logging/logging.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { SurveyModule } from './survey/survey.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { FeedbackModule } from './feedback/feedback.module';
     HealthModule,
     MetricsModule,
     FeedbackModule,
+    SurveyModule,
   ],
 })
 export class AppModule { }

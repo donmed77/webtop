@@ -509,7 +509,7 @@ export default function SessionPage() {
         if (wasRecording) {
             setStatus("ended");
         } else {
-            router.replace("/session-ended");
+            router.replace(`/survey?sessionId=${sessionId}`);
         }
     };
 
@@ -803,7 +803,7 @@ export default function SessionPage() {
             if (hasNavigated.current) return;
             hasNavigated.current = true;
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
-            router.replace("/session-ended?reason=expired");
+            router.replace(`/survey?sessionId=${sessionId}&reason=expired`);
         });
         socket.on("session:error", (data) => {
             if (data?.viewerLimitReached) {
@@ -849,7 +849,7 @@ export default function SessionPage() {
             socketRef.current?.disconnect();
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
             setPort(null); // unmount iframe so last frame doesn't show through
-            router.replace(isViewer ? "/session-ended?reason=abandoned&viewer=true" : "/session-ended?reason=abandoned");
+            router.replace(isViewer ? "/session-ended?reason=abandoned&viewer=true" : `/survey?sessionId=${sessionId}&reason=abandoned`);
         }
     }, [reconnectCountdown, status]);
 
@@ -876,7 +876,7 @@ export default function SessionPage() {
     if (status === "ended") {
         // No recording was active — go straight to the real session-ended page
         if (recordingState === "idle") {
-            router.replace("/session-ended?reason=expired");
+            router.replace(`/survey?sessionId=${sessionId}&reason=expired`);
             return null;
         }
 
@@ -903,7 +903,7 @@ export default function SessionPage() {
                         <p className="text-sm text-muted-foreground mb-4">Finalizing your recording...</p>
                     )}
                     <button
-                        onClick={() => router.replace("/session-ended?reason=expired")}
+                        onClick={() => router.replace(`/survey?sessionId=${sessionId}&reason=expired`)}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     >
                         {recordingBlob ? "Skip & continue →" : ""}

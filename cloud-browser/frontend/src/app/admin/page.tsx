@@ -172,7 +172,25 @@ interface FeedbackStats {
     total: number;
 }
 
-type Tab = "overview" | "history" | "ratelimits" | "controls" | "feedback";
+interface SurveyItem {
+    id: number;
+    sessionId: string;
+    rating: number;
+    tags: string[];
+    comment: string | null;
+    clientIp: string;
+    createdAt: string;
+}
+
+interface SurveyStats {
+    totalResponses: number;
+    averageRating: number;
+    ratingDistribution: { [key: number]: number };
+    tagFrequency: { [key: string]: number };
+    dailyAverages: { date: string; average: number; count: number }[];
+}
+
+type Tab = "overview" | "history" | "ratelimits" | "controls" | "feedback" | "surveys";
 
 export default function AdminPage() {
     const [authenticated, setAuthenticated] = useState(false);
@@ -201,6 +219,11 @@ export default function AdminPage() {
     const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
     const [feedbackFilter, setFeedbackFilter] = useState<string>("all");
     const [expandedFeedback, setExpandedFeedback] = useState<number | null>(null);
+
+    // Survey state
+    const [surveyList, setSurveyList] = useState<SurveyItem[]>([]);
+    const [expandedSurveyId, setExpandedSurveyId] = useState<number | null>(null);
+    const [surveyStats, setSurveyStats] = useState<SurveyStats | null>(null);
 
     // Config form state
     const [newPoolSize, setNewPoolSize] = useState("");
@@ -398,6 +421,8 @@ export default function AdminPage() {
             fetchRateLimits();
         } else if (activeTab === "feedback") {
             fetchFeedback();
+        } else if (activeTab === "surveys") {
+            fetchSurveys();
         }
     }, [activeTab, authenticated, feedbackFilter]);
 
@@ -407,6 +432,22 @@ export default function AdminPage() {
         const interval = setInterval(() => fetchFeedback(), 5000);
         return () => clearInterval(interval);
     }, [authenticated, activeTab, feedbackFilter]);
+
+    const fetchSurveys = async () => {
+        try {
+            const [listRes, statsRes] = await Promise.all([
+                fetch(`${apiUrl}/api/admin/surveys`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/surveys/stats`, { headers: getAuthHeaders() }),
+            ]);
+            if (listRes.ok) {
+                const data = await listRes.json();
+                setSurveyList(data.surveys);
+            }
+            if (statsRes.ok) setSurveyStats(await statsRes.json());
+        } catch (err) {
+            console.error("Failed to fetch surveys:", err);
+        }
+    };
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -501,7 +542,7 @@ export default function AdminPage() {
 
                 {/* Tabs */}
                 <div className="flex gap-2 border-b pb-2">
-                    {(["overview", "history", "ratelimits", "feedback", "controls"] as Tab[]).map((tab) => (
+                    {(["overview", "history", "ratelimits", "feedback", "surveys", "controls"] as Tab[]).map((tab) => (
                         <Button
                             key={tab}
                             variant={activeTab === tab ? "default" : "ghost"}
@@ -1159,6 +1200,313 @@ export default function AdminPage() {
                                                                                 </div>
                                                                             </div>
                                                                         )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+
+                {/* ===== SURVEYS TAB ===== */}
+                {activeTab === "surveys" && (
+                    <>
+                        {/* Stats Cards */}
+                        {surveyStats && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <Card>
+                                    <CardContent className="pt-4 pb-3 text-center">
+                                        <p className="text-3xl font-bold">{surveyStats.averageRating}</p>
+                                        <div className="flex justify-center gap-0.5 my-1">
+                                            {[1, 2, 3, 4, 5].map(s => (
+                                                <svg key={s} className={`w-4 h-4 ${s <= Math.round(surveyStats.averageRating) ? "text-amber-400" : "text-muted-foreground/20"}`} fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                </svg>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">Avg Rating</p>
+                                        {surveyStats.dailyAverages.length > 1 && (() => {
+                                            const data = surveyStats.dailyAverages;
+                                            const w = 100, h = 24, pad = 2;
+                                            const min = Math.min(...data.map(d => d.average)) - 0.3;
+                                            const max = Math.max(...data.map(d => d.average)) + 0.3;
+                                            const range = max - min || 1;
+                                            const points = data.map((d, i) => {
+                                                const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+                                                const y = h - pad - ((d.average - min) / range) * (h - pad * 2);
+                                                return `${x},${y}`;
+                                            }).join(' ');
+                                            const areaPoints = `${pad},${h} ${points} ${w - pad},${h}`;
+                                            return (
+                                                <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-6 mt-2" preserveAspectRatio="none">
+                                                    <defs>
+                                                        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="0%" stopColor="rgb(251,191,36)" stopOpacity="0.3" />
+                                                            <stop offset="100%" stopColor="rgb(251,191,36)" stopOpacity="0" />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <polygon points={areaPoints} fill="url(#sparkFill)" />
+                                                    <polyline points={points} fill="none" stroke="rgb(251,191,36)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            );
+                                        })()}
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 pb-4 text-center">
+                                        <p className="text-3xl font-bold">{surveyStats.totalResponses}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Total Responses</p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 pb-4 text-center">
+                                        <p className="text-3xl font-bold text-green-500">
+                                            {surveyStats.ratingDistribution[5] + surveyStats.ratingDistribution[4] + surveyStats.ratingDistribution[3]}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">Positive (3-5★)</p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 pb-4 text-center">
+                                        <p className="text-3xl font-bold text-red-500">
+                                            {surveyStats.ratingDistribution[2] + surveyStats.ratingDistribution[1]}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">Negative (1-2★)</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+
+                        {/* Rating Distribution & Tag Frequency */}
+                        {surveyStats && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Rating Distribution */}
+                                <Card>
+                                    <CardContent className="pt-4 pb-4">
+                                        <h3 className="text-sm font-semibold mb-3">Rating Distribution</h3>
+                                        <div className="space-y-2">
+                                            {[5, 4, 3, 2, 1].map(star => {
+                                                const count = surveyStats.ratingDistribution[star] || 0;
+                                                const pct = surveyStats.totalResponses > 0 ? (count / surveyStats.totalResponses) * 100 : 0;
+                                                return (
+                                                    <div key={star} className="flex items-center gap-2 text-xs">
+                                                        <span className="w-4 text-right text-muted-foreground">{star}★</span>
+                                                        <div className="flex-1 bg-muted rounded-full h-2.5">
+                                                            <div
+                                                                className={`h-2.5 rounded-full transition-all ${star >= 4 ? "bg-green-500" : star === 3 ? "bg-amber-500" : "bg-red-500"}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="w-6 text-right text-muted-foreground">{count}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Tag Frequency */}
+                                <Card>
+                                    <CardContent className="pt-4 pb-4">
+                                        <h3 className="text-sm font-semibold mb-3">Tag Frequency</h3>
+                                        {Object.keys(surveyStats.tagFrequency).length === 0 ? (
+                                            <p className="text-xs text-muted-foreground text-center py-4">No tag data yet</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {Object.entries(surveyStats.tagFrequency)
+                                                    .sort(([, a], [, b]) => b - a)
+                                                    .map(([tag, count]) => {
+                                                        const maxCount = Math.max(...Object.values(surveyStats.tagFrequency));
+                                                        const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                                                        const labels: Record<string, string> = {
+                                                            fast: "Fast & smooth", great_quality: "Great quality", stable: "Stable & reliable",
+                                                            easy: "Easy to use", everything_great: "Everything great!",
+                                                            slow: "Slow performance", poor_quality: "Poor quality", unstable: "Unstable / crashes",
+                                                            hard_to_use: "Hard to use", other_issue: "Other issue",
+                                                            speed: "Speed", quality: "Quality", stability: "Stability",
+                                                            ease_of_use: "Easy to use", great: "Great!",
+                                                        };
+                                                        const icons: Record<string, string> = {
+                                                            fast: "M13 10V3L4 14h7v7l9-11h-7z",
+                                                            great_quality: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                                                            stable: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                                                            easy: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                            everything_great: "M5 13l4 4L19 7",
+                                                            slow: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                            poor_quality: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
+                                                            unstable: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+                                                            hard_to_use: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01",
+                                                            other_issue: "M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z",
+                                                            speed: "M13 10V3L4 14h7v7l9-11h-7z",
+                                                            quality: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                                                            stability: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                                                            ease_of_use: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                            great: "M5 13l4 4L19 7",
+                                                        };
+                                                        return (
+                                                            <div key={tag} className="flex items-center gap-2 text-xs">
+                                                                <span className="w-28 flex items-center gap-1.5 truncate text-muted-foreground">
+                                                                    {icons[tag] && (
+                                                                        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[tag]} />
+                                                                        </svg>
+                                                                    )}
+                                                                    <span className="truncate">{labels[tag] || tag}</span>
+                                                                </span>
+                                                                <div className="flex-1 bg-muted rounded-full h-2.5">
+                                                                    <div className="h-2.5 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+                                                                </div>
+                                                                <span className="w-6 text-right text-muted-foreground">{count}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+
+
+
+                        {/* Recent Responses */}
+                        <Card>
+                            <CardContent className="pt-4 pb-4">
+                                <h3 className="text-sm font-semibold mb-3">Recent Responses ({surveyList.length})</h3>
+                                {surveyList.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm text-center py-8">No survey responses yet</p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm table-fixed">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="text-left p-2 w-40">Date</th>
+                                                    <th className="text-left p-2 w-24">Rating</th>
+                                                    <th className="text-left p-2 w-28">Tags</th>
+                                                    <th className="text-left p-2">Comment</th>
+                                                    <th className="text-left p-2 w-20">Session</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {surveyList.map((s) => (
+                                                    <>
+                                                        <tr key={s.id} className="border-b cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setExpandedSurveyId(expandedSurveyId === s.id ? null : s.id)}>
+                                                            <td className="p-2 whitespace-nowrap">{new Date(s.createdAt).toLocaleString()}</td>
+                                                            <td className="p-2">
+                                                                <span className="flex gap-0.5">
+                                                                    {[1, 2, 3, 4, 5].map(star => (
+                                                                        <svg key={star} className={`w-3 h-3 ${star <= s.rating ? "text-amber-400" : "text-muted-foreground/20"}`} fill="currentColor" viewBox="0 0 24 24">
+                                                                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                                        </svg>
+                                                                    ))}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {s.tags.map(t => {
+                                                                        const icons: Record<string, string> = {
+                                                                            fast: "M13 10V3L4 14h7v7l9-11h-7z",
+                                                                            great_quality: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                                                                            stable: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                                                                            easy: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                                            everything_great: "M5 13l4 4L19 7",
+                                                                            slow: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                                            poor_quality: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
+                                                                            unstable: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+                                                                            hard_to_use: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01",
+                                                                            other_issue: "M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z",
+                                                                            speed: "M13 10V3L4 14h7v7l9-11h-7z",
+                                                                            quality: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                                                                            stability: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                                                                            ease_of_use: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                                            great: "M5 13l4 4L19 7",
+                                                                        };
+                                                                        const tagLabels: Record<string, string> = {
+                                                                            fast: "Fast & smooth", great_quality: "Great quality", stable: "Stable & reliable",
+                                                                            easy: "Easy to use", everything_great: "Everything great!",
+                                                                            slow: "Slow performance", poor_quality: "Poor quality", unstable: "Unstable / crashes",
+                                                                            hard_to_use: "Hard to use", other_issue: "Other issue",
+                                                                        };
+                                                                        return (
+                                                                            <span key={t} className="bg-muted px-1.5 py-0.5 rounded text-[10px] inline-flex items-center" title={tagLabels[t] || t}>
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[t] || "M5 13l4 4L19 7"} />
+                                                                                </svg>
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 max-w-[200px] truncate text-muted-foreground">{s.comment || "—"}</td>
+                                                            <td className="p-2 text-muted-foreground font-mono text-[10px]">{s.sessionId.slice(0, 8)}...</td>
+                                                        </tr>
+                                                        {expandedSurveyId === s.id && (
+                                                            <tr key={`${s.id}-detail`} className="border-b bg-muted/10">
+                                                                <td colSpan={5} className="p-3">
+                                                                    <div className="flex flex-col gap-2 text-xs">
+                                                                        <div>
+                                                                            <span className="text-muted-foreground font-medium">Comment: </span>
+                                                                            <span>{s.comment || "No comment"}</span>
+                                                                        </div>
+                                                                        {s.tags.length > 0 && (
+                                                                            <div className="flex items-start gap-1.5">
+                                                                                <span className="text-muted-foreground font-medium shrink-0 mt-0.5">Tags: </span>
+                                                                                <div className="flex flex-wrap gap-1.5">
+                                                                                    {s.tags.map(t => {
+                                                                                        const tagLabels: Record<string, string> = {
+                                                                                            fast: "Fast & smooth", great_quality: "Great quality", stable: "Stable & reliable",
+                                                                                            easy: "Easy to use", everything_great: "Everything great!",
+                                                                                            slow: "Slow performance", poor_quality: "Poor quality", unstable: "Unstable / crashes",
+                                                                                            hard_to_use: "Hard to use", other_issue: "Other issue",
+                                                                                            speed: "Speed", quality: "Quality", stability: "Stability",
+                                                                                            ease_of_use: "Easy to use", great: "Great!",
+                                                                                        };
+                                                                                        const icons: Record<string, string> = {
+                                                                                            fast: "M13 10V3L4 14h7v7l9-11h-7z",
+                                                                                            great_quality: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                                                                                            stable: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                                                                                            easy: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                                                            everything_great: "M5 13l4 4L19 7",
+                                                                                            slow: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                                                            poor_quality: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
+                                                                                            unstable: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+                                                                                            hard_to_use: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01",
+                                                                                            other_issue: "M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z",
+                                                                                            speed: "M13 10V3L4 14h7v7l9-11h-7z",
+                                                                                            quality: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                                                                                            stability: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                                                                                            ease_of_use: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                                                                                            great: "M5 13l4 4L19 7",
+                                                                                        };
+                                                                                        return (
+                                                                                            <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                                                                                {icons[t] && (
+                                                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[t]} />
+                                                                                                    </svg>
+                                                                                                )}
+                                                                                                {tagLabels[t] || t}
+                                                                                            </span>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        <div>
+                                                                            <span className="text-muted-foreground font-medium">Session: </span>
+                                                                            <span className="font-mono">{s.sessionId}</span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="text-muted-foreground font-medium">IP: </span>
+                                                                            <span className="font-mono">{s.clientIp}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </td>
                                                             </tr>
