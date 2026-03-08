@@ -21,6 +21,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
     server: Server;
 
     private static readonly GRACE_PERIOD_MS = 35_000; // 30s user countdown + 5s buffer
+    private static readonly MAX_VIEWERS_PER_SESSION = 1;
     private readonly logger = new Logger(SessionGateway.name);
     private clientSessions: Map<string, string> = new Map(); // socketId -> sessionId
     private sessionClients: Map<string, Set<string>> = new Map(); // sessionId -> Set<socketId>
@@ -133,6 +134,16 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
 
         // Viewer mode: join without takeover
         if (data.viewer) {
+            // Enforce viewer limit
+            const currentViewers = this.sessionViewers.get(data.sessionId);
+            if (currentViewers && currentViewers.size >= SessionGateway.MAX_VIEWERS_PER_SESSION) {
+                client.emit('session:error', {
+                    error: 'Viewer limit reached. Only 1 viewer is allowed per session.',
+                    viewerLimitReached: true,
+                });
+                return;
+            }
+
             this.clientIsViewer.set(client.id, true);
             if (!this.sessionViewers.has(data.sessionId)) {
                 this.sessionViewers.set(data.sessionId, new Set());

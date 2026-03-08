@@ -311,8 +311,12 @@ export default function SessionPage() {
                 setViewerCount(data.count);
             });
 
-            socket.on("session:error", () => {
-                router.replace("/session-ended?reason=not_found");
+            socket.on("session:error", (data) => {
+                if (data?.viewerLimitReached) {
+                    router.replace("/session-ended?reason=viewer_limit");
+                } else {
+                    router.replace("/session-ended?reason=not_found");
+                }
             });
 
             // EC1: Another tab took over this session
@@ -744,8 +748,12 @@ export default function SessionPage() {
             if (!isViewer) localStorage.removeItem(`session_${sessionId}`);
             router.replace("/session-ended?reason=expired");
         });
-        socket.on("session:error", () => {
-            router.replace("/session-ended?reason=not_found");
+        socket.on("session:error", (data) => {
+            if (data?.viewerLimitReached) {
+                router.replace("/session-ended?reason=viewer_limit");
+            } else {
+                router.replace("/session-ended?reason=not_found");
+            }
         });
         socket.on("session:takeover", () => {
             stopRecorderGracefully();

@@ -14,7 +14,7 @@ interface RateLimitInfo {
 function SessionEndedContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const reason = searchParams.get("reason"); // "not_found" | "expired" | null
+    const reason = searchParams.get("reason"); // "not_found" | "expired" | "viewer_limit" | null
     const isViewerParam = searchParams.get("viewer") === "true";
     const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
 
@@ -37,24 +37,27 @@ function SessionEndedContent() {
     const isNotFound = reason === "not_found";
     const isExpired = reason === "expired";
     const isAbandoned = reason === "abandoned";
-    const title = isNotFound ? "Session Not Available" : "Session Ended";
-    const subtitle = isNotFound
-        ? "This session has expired or doesn't exist."
-        : isAbandoned
-            ? "Connection was lost and could not be restored."
-            : isExpired
-                ? isViewerParam
-                    ? "The session you were viewing has ended."
-                    : "Your session time has expired."
-                : null;
+    const isViewerLimit = reason === "viewer_limit";
+    const title = isViewerLimit ? "Viewer Limit Reached" : isNotFound ? "Session Not Available" : "Session Ended";
+    const subtitle = isViewerLimit
+        ? "This session already has a viewer. Only 1 viewer is allowed at a time."
+        : isNotFound
+            ? "This session has expired or doesn't exist."
+            : isAbandoned
+                ? "Connection was lost and could not be restored."
+                : isExpired
+                    ? isViewerParam
+                        ? "The session you were viewing has ended."
+                        : "Your session time has expired."
+                    : null;
 
     return (
         <Card className="w-full max-w-md">
             <CardContent className="pt-8 pb-8 text-center">
                 {/* Icon */}
                 <div className="flex justify-center mb-4">
-                    <div className={`h-16 w-16 rounded-full flex items-center justify-center ${isNotFound ? "bg-yellow-500/10" : "bg-primary/10"}`}>
-                        {isNotFound ? (
+                    <div className={`h-16 w-16 rounded-full flex items-center justify-center ${isNotFound || isViewerLimit ? "bg-yellow-500/10" : "bg-primary/10"}`}>
+                        {isNotFound || isViewerLimit ? (
                             <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                             </svg>
