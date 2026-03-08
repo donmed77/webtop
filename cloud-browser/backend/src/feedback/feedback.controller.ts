@@ -1,8 +1,10 @@
 import {
-    Controller, Get, Post, Patch, Delete,
-    Body, Param, Query, Ip, UseGuards,
-    BadRequestException, HttpException, HttpStatus,
+    Controller, Get, Post, Patch, Delete, Res,
+    Body, Param, Query, Ip, UseGuards, UseInterceptors, UploadedFiles,
+    BadRequestException, HttpException, HttpStatus, NotFoundException,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import * as fs from 'fs';
 import { FeedbackService } from './feedback.service';
 import { AdminGuard } from '../admin/admin.guard';
 
@@ -13,9 +15,22 @@ export class FeedbackController {
     // ---- Public endpoint (users submit from session) ----
 
     @Post('feedback')
+    @UseInterceptors(FilesInterceptor('files', FeedbackService.MAX_FILES, {
+        limits: { fileSize: FeedbackService.MAX_FILE_SIZE },
+        fileFilter: (_req, file, cb) => {
+            if (FeedbackService.ALLOWED_MIMES.includes(file.mimetype)) {
+                cb(null, true);
+            } else {
+                cb(new BadRequestException(
+                    `Unsupported file type: ${file.mimetype}. Allowed: ${FeedbackService.ALLOWED_MIMES.join(', ')}`,
+                ), false);
+            }
+        },
+    }))
     submitFeedback(
         @Body() body: { sessionId?: string; type: string; message: string; email?: string },
         @Ip() clientIp: string,
+        @UploadedFiles() files?: Express.Multer.File[],
     ) {
         // Validate type
         const validTypes = ['bug', 'suggestion', 'other'];
@@ -49,6 +64,16 @@ export class FeedbackController {
             }
         }
 
+        // Validate total file size
+        if (files && files.length > 0) {
+            const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+            if (totalSize > FeedbackService.MAX_TOTAL_SIZE) {
+                throw new BadRequestException(
+                    `Total file size exceeds ${FeedbackService.MAX_TOTAL_SIZE / 1024 / 1024}MB limit`,
+                );
+            }
+        }
+
         // Rate limit check
         const rateLimit = this.feedbackService.checkRateLimit(clientIp);
         if (!rateLimit.allowed) {
@@ -67,7 +92,18 @@ export class FeedbackController {
             throw new BadRequestException('Failed to submit feedback');
         }
 
-        return { success: true, id: feedback.id, remaining: rateLimit.remaining - 1 };
+        // Save attachments if any
+        let attachments: ReturnType<FeedbackService['saveAttachments']> = [];
+        if (files && files.length > 0) {
+            attachments = this.feedbackService.saveAttachments(feedback.id, files);
+        }
+
+        return {
+            success: true,
+            id: feedback.id,
+            remaining: rateLimit.remaining - 1,
+            attachmentCount: attachments.length,
+        };
     }
 
     // ---- Admin endpoints ----
@@ -90,6 +126,33 @@ export class FeedbackController {
     @UseGuards(AdminGuard)
     getStats() {
         return this.feedbackService.getStats();
+    }
+
+    @Get('admin/feedback/:id/attachments/:attachmentId')
+    @UseGuards(AdminGuard)
+    serveAttachment(
+        @Param('id') id: string,
+        @Param('attachmentId') attachmentId: string,
+        @Res() res: import('express').Response,
+    ) {
+        const attachment = this.feedbackService.getAttachment(
+            parseInt(id, 10),
+            parseInt(attachmentId, 10),
+        );
+
+        if (!attachment) {
+            throw new NotFoundException('Attachment not found');
+        }
+
+        const filePath = this.feedbackService.getAttachmentPath(attachment);
+        if (!fs.existsSync(filePath)) {
+            throw new NotFoundException('Attachment file not found on disk');
+        }
+
+        res.setHeader('Content-Type', attachment.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${attachment.filename}"`);
+        res.setHeader('Content-Length', attachment.size);
+        fs.createReadStream(filePath).pipe(res);
     }
 
     @Patch('admin/feedback/:id')

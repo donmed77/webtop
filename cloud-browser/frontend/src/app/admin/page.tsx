@@ -1,8 +1,93 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+// Loads attachment media with auth headers (img/video src can't send auth)
+function AuthAttachment({ att, feedbackId, apiUrl, getAuthHeaders }: {
+    att: { id: number; filename: string; mimeType: string; size: number };
+    feedbackId: number;
+    apiUrl: string;
+    getAuthHeaders: () => Record<string, string>;
+}) {
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const [lightbox, setLightbox] = useState(false);
+
+    useEffect(() => {
+        let revoked = false;
+        fetch(`${apiUrl}/api/admin/feedback/${feedbackId}/attachments/${att.id}`, { headers: getAuthHeaders() })
+            .then(r => r.blob())
+            .then(blob => {
+                if (!revoked) setBlobUrl(URL.createObjectURL(blob));
+            })
+            .catch(() => { });
+        return () => { revoked = true; if (blobUrl) URL.revokeObjectURL(blobUrl); };
+    }, [apiUrl, feedbackId, att.id]);
+
+    useEffect(() => {
+        if (!lightbox) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [lightbox]);
+
+    const download = useCallback(() => {
+        if (!blobUrl) return;
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = att.filename;
+        a.click();
+    }, [blobUrl, att.filename]);
+
+    if (!blobUrl) return (
+        <div className="w-32 h-24 rounded-lg border border-border bg-muted/30 animate-pulse flex items-center justify-center">
+            <span className="text-[10px] text-muted-foreground">Loading...</span>
+        </div>
+    );
+
+    return (
+        <>
+            <div className="relative group w-32">
+                {att.mimeType.startsWith('image/') ? (
+                    <img src={blobUrl} alt={att.filename} onClick={() => setLightbox(true)} className="w-32 h-24 rounded-lg object-cover border border-border hover:border-primary transition-colors cursor-pointer" />
+                ) : (
+                    <div onClick={() => setLightbox(true)} className="w-32 h-24 rounded-lg border border-border bg-black flex items-center justify-center cursor-pointer hover:border-primary transition-colors relative overflow-hidden">
+                        <video src={blobUrl} className="w-full h-full object-cover opacity-60" />
+                        <svg className="absolute w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    </div>
+                )}
+                <div className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
+                    <span className="truncate max-w-[80px]">{att.filename}</span>
+                    <span className="shrink-0">({att.size >= 1048576 ? `${(att.size / 1048576).toFixed(1)}MB` : `${(att.size / 1024).toFixed(0)}KB`})</span>
+                    <button onClick={download} className="shrink-0 cursor-pointer hover:text-white transition-colors" title="Download">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Lightbox */}
+            {lightbox && (
+                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8" onClick={() => setLightbox(false)}>
+                    <div className="absolute top-4 right-4 flex items-center gap-3">
+                        <button onClick={(e) => { e.stopPropagation(); download(); }} className="text-white/60 hover:text-white cursor-pointer transition-colors" title="Download">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        </button>
+                        <button onClick={() => setLightbox(false)} className="text-white/60 hover:text-white cursor-pointer transition-colors" title="Close">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/40">{att.filename} · {att.size >= 1048576 ? `${(att.size / 1048576).toFixed(1)}MB` : `${(att.size / 1024).toFixed(0)}KB`}</div>
+                    {att.mimeType.startsWith('image/') ? (
+                        <img src={blobUrl} alt={att.filename} onClick={(e) => e.stopPropagation()} className="max-w-full max-h-full rounded-lg object-contain shadow-2xl" />
+                    ) : (
+                        <video src={blobUrl} controls autoPlay onClick={(e) => e.stopPropagation()} className="max-w-full max-h-full rounded-lg shadow-2xl" />
+                    )}
+                </div>
+            )}
+        </>
+    );
+}
 
 interface Session {
     id: string;
@@ -77,6 +162,7 @@ interface FeedbackItem {
     adminNote: string | null;
     createdAt: string;
     resolvedAt: string | null;
+    attachments?: { id: number; filename: string; mimeType: string; size: number }[];
 }
 
 interface FeedbackStats {
@@ -990,7 +1076,14 @@ export default function AdminPage() {
                                                                 </span>
                                                             </td>
                                                             <td className="p-2 max-w-xs">
-                                                                <p className="truncate break-all">{fb.message}</p>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <p className="truncate break-all">{fb.message}</p>
+                                                                    {fb.attachments && fb.attachments.length > 0 && (
+                                                                        <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400" title={`${fb.attachments.length} attachment(s)`}>
+                                                                            📎 {fb.attachments.length}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                             <td className="p-2 text-xs text-muted-foreground">
                                                                 {fb.email ? (
@@ -1026,7 +1119,13 @@ export default function AdminPage() {
                                                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
                                                                         </Button>
                                                                     )}
-                                                                    <Button size="sm" variant="destructive" onClick={() => feedbackAction(fb.id, "delete")} className="cursor-pointer text-xs h-7" title="Delete">
+                                                                    <Button size="sm" variant="destructive" onClick={() => {
+                                                                        const hasFiles = fb.attachments && fb.attachments.length > 0;
+                                                                        const msg = hasFiles
+                                                                            ? `Delete this feedback and its ${fb.attachments!.length} attached file(s)? This cannot be undone.`
+                                                                            : "Delete this feedback? This cannot be undone.";
+                                                                        if (confirm(msg)) feedbackAction(fb.id, "delete");
+                                                                    }} className="cursor-pointer text-xs h-7" title="Delete">
                                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                                     </Button>
                                                                 </div>
@@ -1048,6 +1147,16 @@ export default function AdminPage() {
                                                                         {fb.adminNote && (
                                                                             <div className="text-xs bg-muted/50 p-2 rounded">
                                                                                 <span className="font-medium">Admin note:</span> {fb.adminNote}
+                                                                            </div>
+                                                                        )}
+                                                                        {fb.attachments && fb.attachments.length > 0 && (
+                                                                            <div>
+                                                                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Attachments ({fb.attachments.length})</span>
+                                                                                <div className="flex flex-wrap gap-3 mt-2">
+                                                                                    {fb.attachments.map((att: { id: number; filename: string; mimeType: string; size: number }) => (
+                                                                                        <AuthAttachment key={att.id} att={att} feedbackId={fb.id} apiUrl={apiUrl} getAuthHeaders={getAuthHeaders} />
+                                                                                    ))}
+                                                                                </div>
                                                                             </div>
                                                                         )}
                                                                     </div>

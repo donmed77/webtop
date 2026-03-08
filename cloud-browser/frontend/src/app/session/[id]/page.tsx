@@ -61,8 +61,43 @@ export default function SessionPage() {
     const [feedbackMessage, setFeedbackMessage] = useState("");
     const [feedbackEmail, setFeedbackEmail] = useState("");
     const [feedbackEmailError, setFeedbackEmailError] = useState("");
+    const [feedbackSubmitError, setFeedbackSubmitError] = useState("");
     const [feedbackSending, setFeedbackSending] = useState(false);
     const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+    const [feedbackFiles, setFeedbackFiles] = useState<File[]>([]);
+    const [feedbackFileError, setFeedbackFileError] = useState("");
+    const [feedbackDragOver, setFeedbackDragOver] = useState(false);
+    const feedbackFileInputRef = useRef<HTMLInputElement>(null);
+    const MAX_FEEDBACK_FILES = 3;
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+
+    const handleFeedbackFiles = useCallback((incoming: File[]) => {
+        setFeedbackFileError("");
+        setFeedbackFiles(prev => {
+            const slots = MAX_FEEDBACK_FILES - prev.length;
+            if (slots <= 0) {
+                setFeedbackFileError(`Max ${MAX_FEEDBACK_FILES} files`);
+                setTimeout(() => setFeedbackFileError(""), 3000);
+                return prev;
+            }
+            const accepted: File[] = [];
+            for (const f of incoming) {
+                if (!ALLOWED_FILE_TYPES.includes(f.type)) {
+                    setFeedbackFileError("Unsupported format — use PNG, JPG, GIF, WebP, MP4, WebM");
+                    setTimeout(() => setFeedbackFileError(""), 3000);
+                    continue;
+                }
+                if (f.size > MAX_FILE_SIZE) {
+                    setFeedbackFileError("File too large (max 10MB)");
+                    setTimeout(() => setFeedbackFileError(""), 3000);
+                    continue;
+                }
+                if (accepted.length < slots) accepted.push(f);
+            }
+            return [...prev, ...accepted];
+        });
+    }, []);
 
     // Mobile toolbar overflow menu
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -171,7 +206,8 @@ export default function SessionPage() {
         }
     }, []);
 
-    // Submit feedback
+    const [uploadProgress, setUploadProgress] = useState(0);
+
     const submitFeedback = useCallback(async () => {
         if (!feedbackMessage.trim() || feedbackSending) return;
 
@@ -185,27 +221,48 @@ export default function SessionPage() {
         }
         setFeedbackEmailError("");
         setFeedbackSending(true);
+        setUploadProgress(0);
+
+        const formData = new FormData();
+        formData.append('sessionId', sessionId);
+        formData.append('type', feedbackType);
+        formData.append('message', feedbackMessage.trim());
+        if (feedbackEmail.trim()) formData.append('email', feedbackEmail.trim());
+        for (const file of feedbackFiles) {
+            formData.append('files', file);
+        }
+
         try {
-            const res = await fetch("/api/feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    sessionId,
-                    type: feedbackType,
-                    message: feedbackMessage.trim(),
-                    email: feedbackEmail.trim() || undefined,
-                }),
+            const result = await new Promise<{ ok: boolean; data?: Record<string, unknown> }>((resolve) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/feedback');
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+                };
+                xhr.onload = () => {
+                    const data = (() => { try { return JSON.parse(xhr.responseText); } catch { return null; } })();
+                    resolve({ ok: xhr.status >= 200 && xhr.status < 300, data });
+                };
+                xhr.onerror = () => resolve({ ok: false });
+                xhr.send(formData);
             });
-            if (res.ok) {
+
+            if (result.ok) {
                 setFeedbackMessage("");
                 setFeedbackEmail("");
+                setFeedbackFiles([]);
+                setFeedbackSubmitError("");
                 setFeedbackOpen(false);
                 setShowFeedbackToast(true);
                 setTimeout(() => setShowFeedbackToast(false), 3000);
+            } else {
+                const msg = Array.isArray(result.data?.message) ? (result.data.message as string[])[0] : ((result.data?.message as string) || "Failed to send feedback");
+                setFeedbackSubmitError(msg);
             }
-        } catch { /* ignore */ }
+        } catch { setFeedbackSubmitError("Network error — try again"); }
+        setUploadProgress(0);
         setFeedbackSending(false);
-    }, [feedbackMessage, feedbackEmail, feedbackSending, feedbackType, sessionId]);
+    }, [feedbackMessage, feedbackEmail, feedbackSending, feedbackType, feedbackFiles, sessionId]);
 
     // Preload + decode shutter sound into AudioBuffer for instant playback
     useEffect(() => {
@@ -1154,27 +1211,78 @@ export default function SessionPage() {
                                             <div>
                                                 <textarea
                                                     value={feedbackMessage}
-                                                    onChange={(e) => setFeedbackMessage(e.target.value.slice(0, 500))}
+                                                    onChange={(e) => { setFeedbackMessage(e.target.value.slice(0, 500)); setFeedbackSubmitError(""); }}
                                                     placeholder="Describe your feedback..."
-                                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none"
+                                                    className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none resize-none ${feedbackSubmitError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-white/20"}`}
                                                     rows={4}
                                                 />
-                                                <div className="flex justify-end mt-1">
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <span className="text-[10px] text-red-400">{feedbackSubmitError}</span>
                                                     <span className={`text-[10px] ${feedbackMessage.length >= 450 ? feedbackMessage.length >= 500 ? "text-red-400" : "text-amber-400" : "text-white/20"}`}>
                                                         {feedbackMessage.length}/500
                                                     </span>
                                                 </div>
                                             </div>
                                             {/* Send */}
+                                            {/* File Attachments — Drop Zone */}
+                                            <div>
+                                                <input
+                                                    ref={feedbackFileInputRef}
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
+                                                    multiple
+                                                    className="hidden"
+                                                    onChange={(e) => { handleFeedbackFiles(Array.from(e.target.files || [])); e.target.value = ''; }}
+                                                />
+                                                {feedbackFiles.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                                        {feedbackFiles.map((file, i) => (
+                                                            <div key={i} className="relative group">
+                                                                {file.type.startsWith('image/') ? (
+                                                                    <img src={URL.createObjectURL(file)} alt="" className="w-12 h-12 rounded-md object-cover border border-white/10" />
+                                                                ) : (
+                                                                    <div className="w-12 h-12 rounded-md border border-white/10 bg-white/5 flex items-center justify-center">
+                                                                        <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                                                    </div>
+                                                                )}
+                                                                <button onClick={() => setFeedbackFiles(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                </button>
+                                                                <span className="absolute bottom-0 left-0 right-0 text-center text-[8px] text-white/50 bg-black/60 rounded-b-md truncate px-0.5">{file.size >= 1048576 ? `${(file.size / 1048576).toFixed(1)}MB` : `${(file.size / 1024).toFixed(0)}KB`}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {feedbackFiles.length < MAX_FEEDBACK_FILES && (
+                                                    <div
+                                                        onClick={() => feedbackFileInputRef.current?.click()}
+                                                        onDragOver={(e) => { e.preventDefault(); setFeedbackDragOver(true); }}
+                                                        onDragLeave={() => setFeedbackDragOver(false)}
+                                                        onDrop={(e) => { e.preventDefault(); setFeedbackDragOver(false); handleFeedbackFiles(Array.from(e.dataTransfer.files)); }}
+                                                        className={`mb-2 border border-dashed rounded-lg px-3 py-2.5 flex items-center justify-center gap-2 cursor-pointer transition-colors ${feedbackDragOver ? "border-blue-400/60 bg-blue-500/10" : "border-white/10 hover:border-white/20 bg-white/[0.02]"}`}
+                                                    >
+                                                        <svg className={`w-4 h-4 ${feedbackDragOver ? "text-blue-400" : "text-white/20"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                        <span className={`text-[10px] ${feedbackDragOver ? "text-blue-400" : "text-white/25"}`}>
+                                                            {feedbackDragOver ? "Drop here" : `Drop or click · ${feedbackFiles.length}/${MAX_FEEDBACK_FILES}`}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {feedbackFileError && (
+                                                <p className="text-[10px] text-red-400 mb-1.5 -mt-1">{feedbackFileError}</p>
+                                            )}
                                             <button
                                                 onClick={submitFeedback}
                                                 disabled={!feedbackMessage.trim() || feedbackSending}
-                                                className={`w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer focus:outline-none ${feedbackMessage.trim()
+                                                className={`relative w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer focus:outline-none overflow-hidden ${feedbackMessage.trim()
                                                     ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
                                                     : "bg-white/5 text-white/20 border border-white/5"
                                                     }`}
                                             >
-                                                {feedbackSending ? "Sending..." : "Send Feedback"}
+                                                {feedbackSending && uploadProgress > 0 && (
+                                                    <div className="absolute inset-0 bg-blue-500/20 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                                                )}
+                                                <span className="relative">{feedbackSending ? (uploadProgress > 0 && uploadProgress < 100 ? `Uploading ${uploadProgress}%` : "Sending...") : "Send Feedback"}</span>
                                             </button>
                                         </div>
                                     </div>
@@ -1316,11 +1424,51 @@ export default function SessionPage() {
                                     </button>
                                 ))}
                             </div>
-                            <textarea value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value.slice(0, 500))} placeholder="Describe your feedback..."
-                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none" rows={3} />
+                            <textarea value={feedbackMessage} onChange={(e) => { setFeedbackMessage(e.target.value.slice(0, 500)); setFeedbackSubmitError(""); }} placeholder="Describe your feedback..."
+                                className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none resize-none ${feedbackSubmitError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-white/20"}`} rows={3} />
+                            {feedbackSubmitError && <p className="text-[10px] text-red-400">{feedbackSubmitError}</p>}
+                            {/* File Attachments (mobile) — Drop Zone */}
+                            {feedbackFiles.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {feedbackFiles.map((file, i) => (
+                                        <div key={i} className="relative">
+                                            {file.type.startsWith('image/') ? (
+                                                <img src={URL.createObjectURL(file)} alt="" className="w-12 h-12 rounded-md object-cover border border-white/10" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-md border border-white/10 bg-white/5 flex items-center justify-center">
+                                                    <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                                </div>
+                                            )}
+                                            <button onClick={() => setFeedbackFiles(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer">
+                                                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {feedbackFiles.length < MAX_FEEDBACK_FILES && (
+                                <div
+                                    onClick={() => feedbackFileInputRef.current?.click()}
+                                    onDragOver={(e) => { e.preventDefault(); setFeedbackDragOver(true); }}
+                                    onDragLeave={() => setFeedbackDragOver(false)}
+                                    onDrop={(e) => { e.preventDefault(); setFeedbackDragOver(false); handleFeedbackFiles(Array.from(e.dataTransfer.files)); }}
+                                    className={`border border-dashed rounded-lg px-3 py-2.5 flex items-center justify-center gap-2 cursor-pointer transition-colors ${feedbackDragOver ? "border-blue-400/60 bg-blue-500/10" : "border-white/10 hover:border-white/20 bg-white/[0.02]"}`}
+                                >
+                                    <svg className={`w-4 h-4 ${feedbackDragOver ? "text-blue-400" : "text-white/20"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    <span className={`text-[10px] ${feedbackDragOver ? "text-blue-400" : "text-white/25"}`}>
+                                        {feedbackDragOver ? "Drop here" : `Drop or click · ${feedbackFiles.length}/${MAX_FEEDBACK_FILES}`}
+                                    </span>
+                                </div>
+                            )}
+                            {feedbackFileError && (
+                                <p className="text-[10px] text-red-400 -mt-0.5">{feedbackFileError}</p>
+                            )}
                             <button onClick={submitFeedback} disabled={!feedbackMessage.trim() || feedbackSending}
-                                className={`w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${feedbackMessage.trim() ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30" : "bg-white/5 text-white/20 border border-white/5"}`}>
-                                {feedbackSending ? "Sending..." : "Send Feedback"}
+                                className={`relative w-full py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer overflow-hidden ${feedbackMessage.trim() ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30" : "bg-white/5 text-white/20 border border-white/5"}`}>
+                                {feedbackSending && uploadProgress > 0 && (
+                                    <div className="absolute inset-0 bg-blue-500/20 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                                )}
+                                <span className="relative">{feedbackSending ? (uploadProgress > 0 && uploadProgress < 100 ? `Uploading ${uploadProgress}%` : "Sending...") : "Send Feedback"}</span>
                             </button>
                         </div>
                     </div>
