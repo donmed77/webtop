@@ -30,6 +30,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private readonly networkName = 'cloud-browser-isolated';
     private readonly dockerBridgeIp: string;
     private healthCheckRunning = false;
+    private cleanupInProgress = false;
 
     // Metrics
     private metrics = {
@@ -101,23 +102,32 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     // Fix #1: Made public so SessionService can call it after loading restored sessions
     async cleanupOrphanedContainers(skipContainerNames: Set<string> = new Set()) {
-        const containers = await this.docker.listContainers({ all: true });
-        for (const containerInfo of containers) {
-            const name = containerInfo.Names[0]?.replace('/', '');
-            if (name?.startsWith('session-')) {
-                if (skipContainerNames.has(name)) {
-                    this.logger.log(`Keeping restored session container: ${name}`);
-                    continue;
-                }
-                this.logger.log(`Cleaning up orphaned container: ${name}`);
-                try {
-                    const container = this.docker.getContainer(containerInfo.Id);
-                    await container.stop().catch(() => { });
-                    await container.remove({ force: true });
-                } catch (err) {
-                    this.logger.error(`Failed to cleanup ${name}: ${err.message}`);
+        this.cleanupInProgress = true;
+        try {
+            const containers = await this.docker.listContainers({ all: true });
+            const cleanupPromises: Promise<void>[] = [];
+            for (const containerInfo of containers) {
+                const name = containerInfo.Names[0]?.replace('/', '');
+                if (name?.startsWith('session-')) {
+                    if (skipContainerNames.has(name)) {
+                        this.logger.log(`Keeping restored session container: ${name}`);
+                        continue;
+                    }
+                    cleanupPromises.push(
+                        this.docker.getContainer(containerInfo.Id)
+                            .remove({ force: true })
+                            .then(() => this.logger.log(`Cleaned up orphan: ${name}`))
+                            .catch(err => this.logger.error(`Failed to cleanup ${name}: ${err.message}`))
+                    );
                 }
             }
+            if (cleanupPromises.length > 0) {
+                this.logger.log(`Cleaning up ${cleanupPromises.length} orphaned containers in parallel...`);
+                await Promise.all(cleanupPromises);
+                this.logger.log(`Orphan cleanup complete (${cleanupPromises.length} removed)`);
+            }
+        } finally {
+            this.cleanupInProgress = false;
         }
     }
 
@@ -167,6 +177,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
      * Destroys surplus warm containers if above target.
      */
     private async replenishPool(): Promise<void> {
+        if (this.cleanupInProgress) return; // Don't create containers during orphan cleanup
         const warmTarget = this.getWarmTarget();
         const warmCount = this.getWarmCount();
         const bootingCount = Array.from(this.pool.values()).filter(c => c.status === 'booting').length;
@@ -243,12 +254,12 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     PortBindings: {
                         '3000/tcp': [{ HostPort: port.toString() }],
                     },
-                    ShmSize: 12 * 1024 * 1024 * 1024, // 12GB - matches @browser spec
+                    ShmSize: 16 * 1024 * 1024 * 1024, // 16GB
                     SecurityOpt: ['seccomp=unconfined', 'no-new-privileges:true'],
                     CapDrop: ['ALL'],
                     CapAdd: ['SYS_ADMIN', 'NET_BIND_SERVICE', 'CHOWN', 'SETUID', 'SETGID', 'DAC_OVERRIDE'],
-                    Memory: 12 * 1024 * 1024 * 1024, // 12GB - matches @browser spec
-                    NanoCpus: 6 * 1e9, // 6 CPUs - matches @browser spec
+                    Memory: 16 * 1024 * 1024 * 1024, // 16GB
+                    NanoCpus: 8 * 1e9, // 8 CPUs
                     RestartPolicy: { Name: 'no' },
                     NetworkMode: this.networkName, // #3: Isolated network
                     // Volume mounts from @browser spec
@@ -275,7 +286,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     'LANG=en_US.UTF-8',
                     'LC_ALL=en_US.UTF-8',
                     // Selkies UI Configuration from @browser spec
-                    'SELKIES_UI_SHOW_SIDEBAR=false',
+                    'SELKIES_UI_SHOW_SIDEBAR=true',
                     'SELKIES_UI_TITLE=Unshort_Link',
                     'SELKIES_UI_SHOW_LOGO=false',
                     'SELKIES_UI_SIDEBAR_SHOW_GAMEPADS=false',
@@ -287,10 +298,14 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     'SELKIES_ENABLE_RESIZE=true',
                     'SELKIES_AUDIO_BITRATE=256000',
                     'SELKIES_AUDIO_ENABLED=true',
-                    'SELKIES_ENCODER=x264enc-striped',
-                    'SELKIES_FRAMERATE=60',
+                    'SELKIES_ENCODER=x264enc',
+                    'SELKIES_FRAMERATE=30',
                     'SELKIES_H264_CRF=25',
-                    'SELKIES_H264_PAINTOVER_CRF=20',
+                    'SELKIES_H264_PAINTOVER_CRF=25',
+                    'SELKIES_USE_PAINT_OVER_QUALITY=false',
+                    'SELKIES_H264_STREAMING_MODE=false',
+                    'SELKIES_H264_FULLCOLOR=false',
+                    'SELKIES_USE_CSS_SCALING=true',
                     // Hide file transfers and apps
                     'SELKIES_UI_SIDEBAR_SHOW_FILES=false',
                     'SELKIES_UI_SIDEBAR_SHOW_APPS=false',
@@ -298,7 +313,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     'SELKIES_SECOND_SCREEN=false',
                     'SELKIES_MICROPHONE_ENABLED=false',
                     'SELKIES_FILE_TRANSFERS=',
-                    'SELKIES_ENABLE_BASIC_UI=false',
+                    'SELKIES_ENABLE_BASIC_UI=true',
                     'SELKIES_BASIC_SETTINGS_ENABLE_AUDIO=true',
                     'SELKIES_BASIC_SETTINGS_ENABLE_CLIPBOARD=true',
                     // Selkies Shared

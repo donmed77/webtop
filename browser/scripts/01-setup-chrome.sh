@@ -221,4 +221,25 @@ chmod 1777 /tmp 2>/dev/null || true
 mkdir -p /config/Downloads 2>/dev/null || true
 chown -R abc:abc /config 2>/dev/null || true
 
+# Inject Cloud Browser toolbar into Selkies web UI
+# (Selkies populates /usr/share/selkies/web/ at startup, so we inject at runtime)
+(
+  SELKIES_WEB="/usr/share/selkies/web"
+  for i in $(seq 1 30); do
+    if [ -f "$SELKIES_WEB/index.html" ]; then
+      cp /opt/toolbar/toolbar.css "$SELKIES_WEB/toolbar.css"
+      cp /opt/toolbar/toolbar.js  "$SELKIES_WEB/toolbar.js"
+      if ! grep -q 'toolbar.css' "$SELKIES_WEB/index.html"; then
+        sed -i 's|</head>|<link rel="stylesheet" href="toolbar.css"></head>|' "$SELKIES_WEB/index.html"
+      fi
+      if ! grep -q 'toolbar.js' "$SELKIES_WEB/index.html"; then
+        sed -i 's|</body>|<script src="toolbar.js"></script></body>|' "$SELKIES_WEB/index.html"
+      fi
+      echo "**** Toolbar injected into Selkies ****"
+      break
+    fi
+    sleep 1
+  done
+) &
+
 echo "**** Chrome and i3 configured ****"
