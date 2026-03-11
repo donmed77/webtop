@@ -188,29 +188,15 @@ fi
 
 chown -R abc:abc "$CHROME_CONFIG_DIR"
 
-# Configure cursor theme
-CURSOR_THEME="Adwaita"
+# GTK dark theme
 mkdir -p /config/.config/gtk-3.0
 cat > /config/.config/gtk-3.0/settings.ini << EOF
 [Settings]
-gtk-cursor-theme-name=$CURSOR_THEME
-gtk-cursor-theme-size=24
 gtk-theme-name=Adwaita-dark
 gtk-application-prefer-dark-theme=true
 EOF
 
-mkdir -p /config/.icons/default
-cat > /config/.icons/default/index.theme << EOF
-[Icon Theme]
-Inherits=$CURSOR_THEME
-EOF
-
-cat > /config/.Xresources << EOF
-Xcursor.theme: $CURSOR_THEME
-Xcursor.size: 24
-EOF
-
-chown -R abc:abc /config/.config/gtk-3.0 /config/.icons /config/.Xresources
+chown -R abc:abc /config/.config/gtk-3.0
 
 # Final runtime security lockdown
 chmod 700 /root /boot 2>/dev/null || true
@@ -220,6 +206,19 @@ chmod 755 /config 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
 mkdir -p /config/Downloads 2>/dev/null || true
 chown -R abc:abc /config 2>/dev/null || true
+
+# KDE Compositing: Enable with balanced latency policy
+# LatencyPolicy: 0=ExtremelyLow, 1=Low, 2=Medium(balanced), 3=High, 4=ExtremelyHigh
+mkdir -p /config/.config
+kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key Enabled true
+kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key LatencyPolicy 2
+chown abc:abc /config/.config/kwinrc 2>/dev/null || true
+# Reload KWin compositor if already running
+su -c "DISPLAY=:1 dbus-send --session --dest=org.kde.KWin --type=method_call /Compositor org.kde.kwin.Compositing.resume" abc 2>/dev/null || true
+
+# Set default cursor theme to Adwaita
+kwriteconfig5 --file /config/.config/kcminputrc --group Mouse --key cursorTheme Adwaita
+chown abc:abc /config/.config/kcminputrc 2>/dev/null || true
 
 # Inject Cloud Browser toolbar into Selkies web UI
 # (Selkies populates /usr/share/selkies/web/ at startup, so we inject at runtime)
