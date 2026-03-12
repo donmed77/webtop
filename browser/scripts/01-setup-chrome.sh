@@ -220,6 +220,15 @@ su -c "DISPLAY=:1 dbus-send --session --dest=org.kde.KWin --type=method_call /Co
 kwriteconfig5 --file /config/.config/kcminputrc --group Mouse --key cursorTheme Adwaita
 chown abc:abc /config/.config/kcminputrc 2>/dev/null || true
 
+# Fix scroll magnitude: cap to 1 event per wheel notch (server-side)
+# This patches the Selkies input handler so each scroll tick fires exactly once,
+# preventing the jumpy multi-event scrolling behavior
+SELKIES_INPUT="/lsiopy/lib/python3.12/site-packages/selkies/input_handler.py"
+if [ -f "$SELKIES_INPUT" ]; then
+  sed -i 's/for _ in range(max(1, scroll_magnitude))/for _ in range(1)/' "$SELKIES_INPUT"
+  echo "**** Scroll magnitude patched ****"
+fi
+
 # Inject Cloud Browser toolbar into Selkies web UI
 # (Selkies populates /usr/share/selkies/web/ at startup, so we inject at runtime)
 (
