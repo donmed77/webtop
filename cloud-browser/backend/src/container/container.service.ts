@@ -31,6 +31,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private readonly dockerBridgeIp: string;
     private healthCheckRunning = false;
     private cleanupInProgress = false;
+    private shuttingDown = false;
 
     // Metrics
     private metrics = {
@@ -78,53 +79,96 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     async onModuleDestroy() {
         this.logger.log('Shutting down container pool...');
+        this.shuttingDown = true;
 
         // Clear health check interval
         if (this.healthCheckInterval) {
             clearInterval(this.healthCheckInterval);
         }
 
-        // Grace period: wait up to 10s for active sessions to end
-        const activeContainers = Array.from(this.pool.values()).filter(c => c.status === 'active');
-        if (activeContainers.length > 0) {
-            this.logger.log(`Waiting up to 10s for ${activeContainers.length} active session(s) to end...`);
-            const deadline = Date.now() + 10_000;
-            while (Date.now() < deadline) {
-                const stillActive = Array.from(this.pool.values()).filter(c => c.status === 'active');
-                if (stillActive.length === 0) break;
-                await new Promise(r => setTimeout(r, 500));
-            }
+        // Parallel force-remove all pool containers with 15s hard timeout
+        const containers = Array.from(this.pool.values());
+        if (containers.length > 0) {
+            this.logger.log(`Destroying ${containers.length} pool containers in parallel...`);
+            const destroyAll = Promise.all(
+                containers.map(c =>
+                    this.docker.getContainer(c.containerId)
+                        .remove({ force: true })
+                        .then(() => { this.releasePort(c.port); })
+                        .catch(() => { this.releasePort(c.port); })
+                )
+            );
+            await Promise.race([
+                destroyAll,
+                new Promise(r => setTimeout(r, 15_000)),
+            ]);
         }
-
-        // Force cleanup
-        await this.destroyAllContainers();
+        this.pool.clear();
+        this.logger.log('Container pool shutdown complete');
     }
 
     // Fix #1: Made public so SessionService can call it after loading restored sessions
     async cleanupOrphanedContainers(skipContainerNames: Set<string> = new Set()) {
         this.cleanupInProgress = true;
         try {
-            const containers = await this.docker.listContainers({ all: true });
-            const cleanupPromises: Promise<void>[] = [];
-            for (const containerInfo of containers) {
-                const name = containerInfo.Names[0]?.replace('/', '');
-                if (name?.startsWith('session-')) {
-                    if (skipContainerNames.has(name)) {
-                        this.logger.log(`Keeping restored session container: ${name}`);
-                        continue;
-                    }
-                    cleanupPromises.push(
-                        this.docker.getContainer(containerInfo.Id)
-                            .remove({ force: true })
-                            .then(() => this.logger.log(`Cleaned up orphan: ${name}`))
-                            .catch(err => this.logger.error(`Failed to cleanup ${name}: ${err.message}`))
-                    );
+            const { execSync } = require('child_process');
+            const deadline = Date.now() + 120_000; // 2 min hard timeout
+            let attempt = 0;
+
+            while (Date.now() < deadline) {
+                attempt++;
+
+                // List all session containers via CLI
+                let lines: string[];
+                try {
+                    const output = execSync(
+                        'docker ps -a --filter "name=session-" --format "{{.Names}} {{.ID}}"',
+                        { encoding: 'utf-8', timeout: 10_000 }
+                    ).trim();
+                    lines = output ? output.split('\n').filter(Boolean) : [];
+                } catch {
+                    lines = [];
                 }
-            }
-            if (cleanupPromises.length > 0) {
-                this.logger.log(`Cleaning up ${cleanupPromises.length} orphaned containers in parallel...`);
-                await Promise.all(cleanupPromises);
-                this.logger.log(`Orphan cleanup complete (${cleanupPromises.length} removed)`);
+
+                // Build orphan list (excluding skip containers)
+                const orphans = lines
+                    .map(l => { const [name, id] = l.split(' '); return { name, id }; })
+                    .filter(c => c.name?.startsWith('session-') && !skipContainerNames.has(c.name));
+
+                if (orphans.length === 0) {
+                    this.logger.log(`Orphan cleanup verified clean (attempt ${attempt})`);
+                    break;
+                }
+
+                this.logger.log(`Orphan cleanup attempt ${attempt}: removing ${orphans.length} containers...`);
+
+                // For each orphan: get PID, kill -9 PID, then docker rm
+                // docker rm -f alone fails silently on KDE/Selkies containers
+                let killed = 0;
+                for (const orphan of orphans) {
+                    try {
+                        // Get container PID
+                        const pid = execSync(
+                            `docker inspect --format '{{.State.Pid}}' ${orphan.name} 2>/dev/null`,
+                            { encoding: 'utf-8', timeout: 5000 }
+                        ).trim();
+
+                        // Kill the PID directly if it's running (PID > 0)
+                        if (pid && parseInt(pid) > 0) {
+                            execSync(`kill -9 ${pid} 2>/dev/null || true`, { timeout: 5000 });
+                        }
+
+                        // Now docker rm will work since the process is dead
+                        execSync(`docker rm -f ${orphan.name} 2>/dev/null || true`, { timeout: 10_000 });
+                        killed++;
+                    } catch {
+                        // Container may already be gone
+                    }
+                }
+                this.logger.log(`Orphan cleanup attempt ${attempt}: killed ${killed}/${orphans.length}`);
+
+                // Brief wait for Docker to process removals
+                await new Promise(r => setTimeout(r, 3000));
             }
         } finally {
             this.cleanupInProgress = false;
@@ -148,7 +192,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     // Fix #1: Made public so SessionService can call after session restoration
     async initializePoolAndHealthCheck() {
         await this.initializePool();
+        // Start health check AFTER pool is fully initialized to prevent
+        // replenishPool() from racing with initializePool()
         this.healthCheckInterval = setInterval(() => this.healthCheck(), 5000);
+        this.logger.log('Health check started (5s interval)');
     }
 
     private async initializePool() {
@@ -177,7 +224,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
      * Destroys surplus warm containers if above target.
      */
     private async replenishPool(): Promise<void> {
-        if (this.cleanupInProgress) return; // Don't create containers during orphan cleanup
+        if (this.cleanupInProgress || this.shuttingDown) return;
         const warmTarget = this.getWarmTarget();
         const warmCount = this.getWarmCount();
         const bootingCount = Array.from(this.pool.values()).filter(c => c.status === 'booting').length;
@@ -238,6 +285,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     private async createWarmContainer(): Promise<PooledContainer> {
+        if (this.shuttingDown) throw new Error('Cannot create containers during shutdown');
         const id = uuidv4().slice(0, 8);
         const port = this.getAvailablePort();
         const containerName = `session-${id}`;
@@ -480,16 +528,16 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     async destroyAllContainers() {
-        for (const [id, container] of this.pool) {
-            try {
-                const dockerContainer = this.docker.getContainer(container.containerId);
-                await dockerContainer.stop({ t: 5 }).catch(() => { });
-                await dockerContainer.remove({ force: true }).catch(() => { });
-                this.releasePort(container.port);
-            } catch (err) {
-                this.logger.error(`Failed to destroy container ${id}`);
-            }
-        }
+        const containers = Array.from(this.pool.values());
+        this.logger.log(`Destroying ${containers.length} containers in parallel...`);
+        await Promise.all(
+            containers.map(c =>
+                this.docker.getContainer(c.containerId)
+                    .remove({ force: true })
+                    .then(() => { this.releasePort(c.port); })
+                    .catch(() => { this.releasePort(c.port); })
+            )
+        );
         this.pool.clear();
     }
 

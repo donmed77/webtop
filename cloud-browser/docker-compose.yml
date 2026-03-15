@@ -38,6 +38,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - backend_data:/app/data
+      - ./backend/dist:/app/dist
     depends_on:
       - redis
 
