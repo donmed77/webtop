@@ -88,28 +88,6 @@ action/start_new_session=false
 action/switch_user=false
 EOF
 
-# --- Lock the Plasma Corona (immutability=2 = SystemImmutable) ---
-# This prevents Add Widgets, Add Panel, Enter Edit Mode from the right-click menu
-PLASMA_CONFIG="/config/.config/plasma-org.kde.plasma.desktop-appletsrc"
-if [ -f "$PLASMA_CONFIG" ]; then
-    # If config exists, set immutability
-    kwriteconfig5 --file "$PLASMA_CONFIG" --group "" --key "immutability" "2"
-else
-    # Create minimal config with immutability locked
-    mkdir -p "$(dirname $PLASMA_CONFIG)"
-    cat > "$PLASMA_CONFIG" << 'EOF'
-[General]
-immutability=2
-EOF
-fi
-chown abc:abc "$PLASMA_CONFIG" 2>/dev/null || true
-
-# --- Disable desktop right-click context menu actions ---
-# Remove the "Configure Desktop" and other action plugins from the desktop containment
-kwriteconfig5 --file "$PLASMA_CONFIG" \
-    --group "ActionPlugins" --group "0" \
-    --key "RightButton;NoModifier" ""
-
 chown -R abc:abc /config/.config/kdeglobals 2>/dev/null || true
 
 echo "**** Plasma desktop locked ****"
