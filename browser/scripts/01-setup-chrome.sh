@@ -66,33 +66,6 @@ chown abc:abc /config/.config/kglobalshortcutsrc 2>/dev/null || true
 echo "**** KDE shortcuts hardened ****"
 
 # =============================================================================
-# Plasma Desktop Lockdown
-# Lock the desktop so users cannot modify widgets, panels, or wallpaper
-# Uses KDE KIOSK Action Restrictions + Plasma Corona immutability
-# =============================================================================
-echo "**** Locking down Plasma desktop ****"
-
-# --- KDE KIOSK: Restrict dangerous actions ---
-# These are system-level restrictions that KDE checks before showing menu items
-# The [$i] suffix means "immutable" — the user cannot override these
-cat >> /config/.config/kdeglobals << 'EOF'
-
-[KDE Action Restrictions][$i]
-plasma/allow_configure_when_locked=false
-action/configdesktop=false
-action/lock widgets=false
-run_command=false
-shell_access=false
-logout=false
-action/start_new_session=false
-action/switch_user=false
-EOF
-
-chown -R abc:abc /config/.config/kdeglobals 2>/dev/null || true
-
-echo "**** Plasma desktop locked ****"
-
-# =============================================================================
 # Chrome Configuration
 # =============================================================================
 

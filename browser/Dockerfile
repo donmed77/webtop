@@ -43,6 +43,22 @@ RUN apt-get remove --purge -y \
     && rm -f /usr/share/applications/org.kde.kfind.desktop \
     && rm -f /usr/share/applications/org.kde.systemsettings.desktop
 
+# =============================================================================
+# KDE KIOSK: System-wide lockdown (cannot be overridden by user)
+# Written to /etc/xdg/kdeglobals — the system-wide KDE config
+# [$i] suffix = immutable — user cannot change these
+# =============================================================================
+RUN printf '\n\
+[KDE Action Restrictions][$i]\n\
+plasma/allow_configure_when_locked=false\n\
+action/configdesktop=false\n\
+action/lock widgets=false\n\
+run_command=false\n\
+shell_access=false\n\
+logout=false\n\
+action/start_new_session=false\n\
+action/switch_user=false\n' >> /etc/xdg/kdeglobals
+
 # Stage toolbar files for runtime injection
 COPY toolbar/toolbar.css /opt/toolbar/toolbar.css
 COPY toolbar/toolbar.js  /opt/toolbar/toolbar.js
