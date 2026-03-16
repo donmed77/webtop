@@ -5,6 +5,7 @@
 
 FROM lscr.io/linuxserver/webtop:ubuntu-kde
 
+
 # =============================================================================
 # Remove unnecessary programs for security & cleanliness
 # =============================================================================
@@ -42,6 +43,20 @@ RUN apt-get remove --purge -y \
     && rm -f /usr/share/applications/org.kde.gwenview.desktop \
     && rm -f /usr/share/applications/org.kde.kfind.desktop \
     && rm -f /usr/share/applications/org.kde.systemsettings.desktop
+
+# =============================================================================
+# Install Google Chrome (AFTER removal step so autoremove can't uninstall it)
+# =============================================================================
+RUN set -e && \
+    apt-get update && \
+    apt-get install -y curl gnupg && \
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable && \
+    google-chrome --version && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # KDE KIOSK: System-wide lockdown (cannot be overridden by user)
