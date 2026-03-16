@@ -33,10 +33,51 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Chrome wrapper with flags + restart loop
+# Chrome wrapper with flags + fast restart loop
 RUN mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-real && \
-    printf '#!/bin/bash\nFLAGS=(\n  --no-sandbox\n  --start-maximized\n  --no-first-run\n  --disable-infobars\n  --disable-session-crashed-bubble\n  --noerrdialogs\n  --force-dark-mode\n  --disable-features=TranslateUI,PasswordManagerOnboarding,MediaRouter\n  --disable-component-update\n  --disable-sync\n  --disable-default-apps\n  --disable-background-mode\n  --disable-prompt-on-repost\n  --disable-domain-reliability\n  --disable-breakpad\n  --metrics-recording-only\n  --no-default-browser-check\n  --no-pings\n  --disk-cache-dir=/tmp/chrome-cache\n  --disk-cache-size=1073741824\n)\nFIRST=true\nwhile true; do\n  if $FIRST; then\n    /usr/bin/google-chrome-real "${FLAGS[@]}" "$@"\n    FIRST=false\n  else\n    /usr/bin/google-chrome-real "${FLAGS[@]}" --no-restore-state chrome://newtab\n  fi\n  sleep 1\ndone\n' > /usr/bin/google-chrome-stable && \
-    chmod +x /usr/bin/google-chrome-stable
+    cat > /usr/bin/google-chrome-stable << 'WRAPPER_EOF'
+#!/bin/bash
+FLAGS=(
+  --no-sandbox
+  --start-maximized
+  --no-first-run
+  --disable-infobars
+  --disable-session-crashed-bubble
+  --noerrdialogs
+  --force-dark-mode
+  --disable-features=TranslateUI,PasswordManagerOnboarding,MediaRouter
+  --disable-component-update
+  --disable-sync
+  --disable-default-apps
+  --disable-background-mode
+  --disable-prompt-on-repost
+  --disable-domain-reliability
+  --disable-breakpad
+  --metrics-recording-only
+  --no-default-browser-check
+  --no-pings
+  --disk-cache-dir=/tmp/chrome-cache
+  --disk-cache-size=1073741824
+)
+CHROME_DIR="$HOME/.config/google-chrome"
+FIRST=true
+while true; do
+  # Kill any orphan Chrome processes that might block the new instance
+  pkill -f google-chrome-real 2>/dev/null
+  sleep 0.2
+  # Clean stale lock files and temp sockets
+  rm -f "$CHROME_DIR/SingletonLock" "$CHROME_DIR/SingletonSocket" "$CHROME_DIR/SingletonCookie" 2>/dev/null
+  rm -rf /tmp/.com.google.Chrome.* 2>/dev/null
+  if $FIRST; then
+    /usr/bin/google-chrome-real "${FLAGS[@]}" "$@"
+    FIRST=false
+  else
+    /usr/bin/google-chrome-real "${FLAGS[@]}" chrome://newtab
+  fi
+  sleep 0.5
+done
+WRAPPER_EOF
+RUN chmod +x /usr/bin/google-chrome-stable
 
 # Chrome policies
 RUN mkdir -p /etc/opt/chrome/policies/managed

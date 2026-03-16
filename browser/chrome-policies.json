@@ -57,15 +57,9 @@
     ],
     "URLBlocklist": [
         "file://*",
-        "chrome://*",
-        "chrome-extension://*",
         "about:*",
         "data:*",
         "javascript:*",
         "view-source:*"
-    ],
-    "URLAllowlist": [
-        "chrome://newtab",
-        "chrome://new-tab-page"
     ]
 }

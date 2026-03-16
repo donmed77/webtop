@@ -99,7 +99,22 @@ if [ -f "$PLASMA_LAYOUT" ]; then
   sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
 fi
 
-# Self-destruct: remove autostart entry so this only runs once
+# --- Background minimize watcher ---
+# Since the taskbar/panel is removed, users can't restore minimized windows.
+# This watcher detects minimized Chrome windows and immediately restores them.
+(
+  while true; do
+    for wid in $(xdotool search --class google-chrome 2>/dev/null); do
+      if xprop -id "$wid" _NET_WM_STATE 2>/dev/null | grep -q "_NET_WM_STATE_HIDDEN"; then
+        xdotool windowactivate "$wid" 2>/dev/null
+      fi
+    done
+    sleep 1
+  done
+) &
+disown
+
+# Self-destruct: remove autostart entry (but watcher keeps running in background)
 rm -f "$HOME/.config/autostart/plasma-lockdown.desktop"
 LOCKDOWN_EOF
 chmod +x "$LOCKDOWN_SCRIPT"
