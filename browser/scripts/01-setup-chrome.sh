@@ -12,6 +12,58 @@ echo "**** Applying KDE security hardening ****"
 
 mkdir -p /config/.config
 
+# =============================================================================
+# Plasma Desktop Lockdown (runs in background, patches AFTER Plasma starts)
+# Plasma generates its default layout when startplasma-x11 launches (after
+# this init script). We wait for it, then patch the config and restart
+# plasmashell to apply our locked-down layout (no panel, no right-click menu).
+# =============================================================================
+(
+  PLASMA_LAYOUT="/config/.config/plasma-org.kde.plasma.desktop-appletsrc"
+
+  # Wait for Plasma to create its default config
+  for i in $(seq 1 60); do
+    if [ -f "$PLASMA_LAYOUT" ] && grep -q "org.kde.panel" "$PLASMA_LAYOUT" 2>/dev/null; then
+      sleep 3  # Let Plasma finish writing
+
+      echo "**** Patching Plasma layout: removing panel and right-click menu ****"
+
+      # Remove the right-click context menu by clearing the action plugin
+      sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
+
+      # Remove the entire panel containment and all its sub-sections
+      # The panel is [Containments][2] with plugin=org.kde.panel
+      python3 -c "
+import re
+with open('$PLASMA_LAYOUT', 'r') as f:
+    content = f.read()
+
+# Remove all [Containments][2]... sections (the panel and its applets)
+# Also remove [Containments][8]... (the system tray inside the panel)
+content = re.sub(r'\[Containments\]\[2\].*?(?=\[Containments\]\[[^28]\]|\[ScreenMapping\]|\Z)', '', content, flags=re.DOTALL)
+content = re.sub(r'\[Containments\]\[8\].*?(?=\[Containments\]\[[^8]\]|\[ScreenMapping\]|\Z)', '', content, flags=re.DOTALL)
+
+# Clean up multiple blank lines
+content = re.sub(r'\n{3,}', '\n\n', content)
+
+with open('$PLASMA_LAYOUT', 'w') as f:
+    f.write(content)
+"
+
+      chown abc:abc "$PLASMA_LAYOUT" 2>/dev/null || true
+
+      # Restart plasmashell to apply the patched config
+      killall plasmashell 2>/dev/null
+      sleep 1
+      su -c "DISPLAY=:1 plasmashell &" abc 2>/dev/null
+
+      echo "**** Plasma layout patched: no panel, no right-click ****"
+      break
+    fi
+    sleep 1
+  done
+) &
+
 # --- Disable KRunner (Alt+Space / Alt+F2) ---
 # KRunner can execute arbitrary commands — critical security risk
 kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
