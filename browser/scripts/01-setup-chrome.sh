@@ -13,56 +13,94 @@ echo "**** Applying KDE security hardening ****"
 mkdir -p /config/.config
 
 # =============================================================================
-# Plasma Desktop Lockdown (runs in background, patches AFTER Plasma starts)
-# Plasma generates its default layout when startplasma-x11 launches (after
-# this init script). We wait for it, then patch the config and restart
-# plasmashell to apply our locked-down layout (no panel, no right-click menu).
+# Plasma Desktop Lockdown (via KDE autostart)
+# Plasma generates its default layout AFTER this init script runs.
+# We create a lockdown script + autostart entry that runs INSIDE the KDE
+# session (with full D-Bus access), patches the layout config, and uses
+# plasmashell --replace to cleanly reload without the panel.
 # =============================================================================
-(
-  PLASMA_LAYOUT="/config/.config/plasma-org.kde.plasma.desktop-appletsrc"
+LOCKDOWN_SCRIPT="/config/.config/plasma-lockdown.sh"
+cat > "$LOCKDOWN_SCRIPT" << 'LOCKDOWN_EOF'
+#!/bin/bash
+# Plasma Desktop Lockdown — runs inside KDE session via autostart
+PLASMA_LAYOUT="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-  # Wait for Plasma to create its default config
-  for i in $(seq 1 60); do
-    if [ -f "$PLASMA_LAYOUT" ] && grep -q "org.kde.panel" "$PLASMA_LAYOUT" 2>/dev/null; then
-      sleep 3  # Let Plasma finish writing
+# Wait for Plasma to write its config (may already be done by autostart time)
+for i in $(seq 1 30); do
+  [ -f "$PLASMA_LAYOUT" ] && grep -q "org.kde.panel" "$PLASMA_LAYOUT" 2>/dev/null && break
+  sleep 1
+done
 
-      echo "**** Patching Plasma layout: removing panel and right-click menu ****"
+if grep -q "org.kde.panel" "$PLASMA_LAYOUT" 2>/dev/null; then
+  # Remove the right-click context menu
+  sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
 
-      # Remove the right-click context menu by clearing the action plugin
-      sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
-
-      # Remove the entire panel containment and all its sub-sections
-      # The panel is [Containments][2] with plugin=org.kde.panel
-      python3 -c "
+  # Remove panel + system tray containment sections
+  python3 << 'PYEOF'
 import re
-with open('$PLASMA_LAYOUT', 'r') as f:
-    content = f.read()
 
-# Remove all [Containments][2]... sections (the panel and its applets)
-# Also remove [Containments][8]... (the system tray inside the panel)
-content = re.sub(r'\[Containments\]\[2\].*?(?=\[Containments\]\[[^28]\]|\[ScreenMapping\]|\Z)', '', content, flags=re.DOTALL)
-content = re.sub(r'\[Containments\]\[8\].*?(?=\[Containments\]\[[^8]\]|\[ScreenMapping\]|\Z)', '', content, flags=re.DOTALL)
+layout_file = "/config/.config/plasma-org.kde.plasma.desktop-appletsrc"
+with open(layout_file, 'r') as f:
+    lines = f.readlines()
+
+# Pass 1: Find containment IDs that are panels or system trays
+panel_prefixes = []
+current_section = ""
+for line in lines:
+    line_s = line.strip()
+    if line_s.startswith('['):
+        current_section = line_s
+    if line_s.startswith('plugin='):
+        plugin = line_s.split('=', 1)[1]
+        if plugin in ('org.kde.panel', 'org.kde.plasma.private.systemtray'):
+            # Extract the containment prefix e.g. "[Containments][2]"
+            match = re.match(r'(\[Containments\]\[\d+\])', current_section)
+            if match:
+                panel_prefixes.append(match.group(1))
+
+# Pass 2: Remove all sections that start with any panel prefix
+result = []
+skip = False
+for line in lines:
+    line_s = line.strip()
+    if line_s.startswith('['):
+        skip = any(line_s.startswith(prefix) for prefix in panel_prefixes)
+    if not skip:
+        result.append(line)
 
 # Clean up multiple blank lines
-content = re.sub(r'\n{3,}', '\n\n', content)
+output = re.sub(r'\n{3,}', '\n\n', ''.join(result))
+with open(layout_file, 'w') as f:
+    f.write(output)
 
-with open('$PLASMA_LAYOUT', 'w') as f:
-    f.write(content)
-"
+if panel_prefixes:
+    print(f"Removed panel sections: {panel_prefixes}")
+else:
+    print("No panel sections found")
+PYEOF
 
-      chown abc:abc "$PLASMA_LAYOUT" 2>/dev/null || true
+  # Cleanly restart plasmashell with the patched config
+  plasmashell --replace &>/dev/null &
+  disown
+fi
 
-      # Restart plasmashell to apply the patched config
-      killall plasmashell 2>/dev/null
-      sleep 1
-      su -c "DISPLAY=:1 plasmashell &" abc 2>/dev/null
+# Self-destruct: remove autostart entry so this only runs once
+rm -f "$HOME/.config/autostart/plasma-lockdown.desktop"
+LOCKDOWN_EOF
+chmod +x "$LOCKDOWN_SCRIPT"
+chown abc:abc "$LOCKDOWN_SCRIPT"
 
-      echo "**** Plasma layout patched: no panel, no right-click ****"
-      break
-    fi
-    sleep 1
-  done
-) &
+# Create autostart entry
+mkdir -p /config/.config/autostart
+cat > /config/.config/autostart/plasma-lockdown.desktop << EOF
+[Desktop Entry]
+Type=Application
+Name=Plasma Lockdown
+Exec=bash /config/.config/plasma-lockdown.sh
+X-KDE-autostart-phase=2
+X-KDE-AutostartScript=true
+EOF
+chown abc:abc /config/.config/autostart/plasma-lockdown.desktop
 
 # --- Disable KRunner (Alt+Space / Alt+F2) ---
 # KRunner can execute arbitrary commands — critical security risk
