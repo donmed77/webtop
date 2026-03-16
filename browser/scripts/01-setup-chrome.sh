@@ -23,27 +23,41 @@ LOCKDOWN_SCRIPT="/config/.config/plasma-lockdown.sh"
 cat > "$LOCKDOWN_SCRIPT" << 'LOCKDOWN_EOF'
 #!/bin/bash
 # Plasma Desktop Lockdown — runs inside KDE session via autostart
+# Has full D-Bus access since it runs as the abc user in the session
+
 PLASMA_LAYOUT="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-# Wait for Plasma to write its config (may already be done by autostart time)
+# Wait for plasmashell to be fully loaded
 for i in $(seq 1 30); do
-  [ -f "$PLASMA_LAYOUT" ] && grep -q "org.kde.panel" "$PLASMA_LAYOUT" 2>/dev/null && break
+  if qdbus org.kde.plasmashell /PlasmaShell 2>/dev/null | grep -q "evaluateScript"; then
+    break
+  fi
   sleep 1
 done
 
-if grep -q "org.kde.panel" "$PLASMA_LAYOUT" 2>/dev/null; then
-  # Remove the right-click context menu
-  sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
+# --- Method 1: Use Plasma scripting API (preferred) ---
+RESULT=$(qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+  // Remove all panels (taskbar, start menu, system tray)
+  var allPanels = panels();
+  for (var i = allPanels.length - 1; i >= 0; i--) {
+    allPanels[i].remove();
+  }
+  // Lock the desktop (prevents Add Widgets, Add Panel, Enter Edit Mode)
+  locked = true;
+' 2>&1)
 
-  # Remove panel + system tray containment sections
-  python3 << 'PYEOF'
+if [ $? -eq 0 ]; then
+  echo "Plasma lockdown via qdbus: SUCCESS"
+else
+  echo "qdbus failed ($RESULT), falling back to config patch..."
+
+  # --- Method 2: Patch config + restart (fallback) ---
+  if [ -f "$PLASMA_LAYOUT" ]; then
+    python3 << 'PYEOF'
 import re
-
 layout_file = "/config/.config/plasma-org.kde.plasma.desktop-appletsrc"
 with open(layout_file, 'r') as f:
     lines = f.readlines()
-
-# Pass 1: Find containment IDs that are panels or system trays
 panel_prefixes = []
 current_section = ""
 for line in lines:
@@ -53,35 +67,28 @@ for line in lines:
     if line_s.startswith('plugin='):
         plugin = line_s.split('=', 1)[1]
         if plugin in ('org.kde.panel', 'org.kde.plasma.private.systemtray'):
-            # Extract the containment prefix e.g. "[Containments][2]"
             match = re.match(r'(\[Containments\]\[\d+\])', current_section)
             if match:
                 panel_prefixes.append(match.group(1))
-
-# Pass 2: Remove all sections that start with any panel prefix
-result = []
+lines_out = []
 skip = False
 for line in lines:
-    line_s = line.strip()
-    if line_s.startswith('['):
-        skip = any(line_s.startswith(prefix) for prefix in panel_prefixes)
+    if line.strip().startswith('['):
+        skip = any(line.strip().startswith(p) for p in panel_prefixes)
     if not skip:
-        result.append(line)
-
-# Clean up multiple blank lines
-output = re.sub(r'\n{3,}', '\n\n', ''.join(result))
+        lines_out.append(line)
 with open(layout_file, 'w') as f:
-    f.write(output)
-
-if panel_prefixes:
-    print(f"Removed panel sections: {panel_prefixes}")
-else:
-    print("No panel sections found")
+    f.write(re.sub(r'\n{3,}', '\n\n', ''.join(lines_out)))
+print(f"Fallback: removed {panel_prefixes}")
 PYEOF
+    plasmashell --replace &>/dev/null &
+    disown
+  fi
+fi
 
-  # Cleanly restart plasmashell with the patched config
-  plasmashell --replace &>/dev/null &
-  disown
+# Always patch right-click menu regardless of method
+if [ -f "$PLASMA_LAYOUT" ]; then
+  sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
 fi
 
 # Self-destruct: remove autostart entry so this only runs once
