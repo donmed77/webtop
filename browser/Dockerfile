@@ -59,6 +59,52 @@ logout=false\n\
 action/start_new_session=false\n\
 action/switch_user=false\n' >> /etc/xdg/kdeglobals
 
+# =============================================================================
+# Security Hardening: Remove abc from privileged groups
+# =============================================================================
+RUN delgroup abc sudo 2>/dev/null || true \
+    && delgroup abc docker 2>/dev/null || true
+
+# =============================================================================
+# Security Hardening: Strip SUID/SGID from unnecessary binaries
+# =============================================================================
+RUN chmod u-s /usr/bin/su 2>/dev/null || true \
+    && chmod u-s /usr/bin/newgrp 2>/dev/null || true \
+    && chmod u-s /usr/bin/chsh 2>/dev/null || true \
+    && chmod u-s /usr/bin/chfn 2>/dev/null || true \
+    && chmod u-s /usr/bin/mount 2>/dev/null || true \
+    && chmod u-s /usr/bin/umount 2>/dev/null || true \
+    && chmod u-s /usr/bin/passwd 2>/dev/null || true \
+    && chmod u-s /usr/bin/gpasswd 2>/dev/null || true \
+    && chmod g-s /usr/bin/chage 2>/dev/null || true \
+    && chmod g-s /usr/bin/expiry 2>/dev/null || true \
+    && chmod g-s /usr/bin/ssh-agent 2>/dev/null || true \
+    && chmod g-s /usr/bin/crontab 2>/dev/null || true \
+    && chmod u-s /usr/bin/fusermount3 2>/dev/null || true \
+    && chmod u-s /usr/bin/sudo 2>/dev/null || true
+
+# =============================================================================
+# Security Hardening: Remove KDE config module .desktop files + crash handler
+# These are accessible through KDE dialogs and provide settings/info access
+# =============================================================================
+RUN rm -f /usr/share/applications/kcm_*.desktop \
+    && rm -f /usr/share/applications/org.kde.drkonqi*.desktop \
+    && rm -f /usr/share/applications/org.kde.kcolorschemeeditor.desktop \
+    && rm -f /usr/share/applications/org.kde.keditfiletype.desktop \
+    && rm -f /usr/share/applications/org.kde.kfontview.desktop \
+    && rm -f /usr/share/applications/org.kde.knetattach.desktop \
+    && rm -f /usr/share/applications/org.kde.knewstuff-dialog.desktop \
+    && rm -f /usr/share/applications/org.kde.kwalletd5.desktop \
+    && rm -f /usr/share/applications/org.kde.kwin_rules_dialog.desktop \
+    && rm -f /usr/share/applications/org.kde.plasma.settings.open.desktop \
+    && rm -f /usr/share/applications/org.kde.klipper.desktop \
+    && rm -f /usr/share/applications/org.kde.systemmonitor.desktop \
+    && rm -f /usr/share/applications/kwincompositing.desktop \
+    && rm -f /usr/share/applications/ktelnetservice5.desktop \
+    && rm -f /usr/share/applications/software-properties*.desktop \
+    && rm -f /usr/share/applications/breezestyleconfig.desktop \
+    && rm -f /usr/share/applications/python3.12.desktop
+
 # Stage toolbar files for runtime injection
 COPY toolbar/toolbar.css /opt/toolbar/toolbar.css
 COPY toolbar/toolbar.js  /opt/toolbar/toolbar.js

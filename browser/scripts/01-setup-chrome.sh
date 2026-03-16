@@ -151,6 +151,32 @@ kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
 kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
     --group "ksmserver" --key "Lock Session" "none,none,Lock Session"
 
+# --- Disable Kill Window (Meta+Ctrl+Esc) ---
+# Lets user click any window to force-kill it
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Kill Window" "none,none,Kill Window"
+
+# --- Disable Show System Activity (Ctrl+Esc) ---
+# Opens KDE System Monitor — shows/kills processes
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kded5" --key "Show System Activity" "none,none,Show System Activity"
+
+# --- Disable Activity Switcher (Meta+Q / Meta+Tab) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "plasmashell" --key "manage activities" "none,none,Show Activity Switcher"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "plasmashell" --key "next activity" "none,none,Walk through activities"
+
+# --- Disable Tiles Editor (Meta+T) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Edit Tiles" "none,none,Toggle Tiles Editor"
+
+# --- Disable Expose/Present Windows (Ctrl+F9/F10) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Expose" "none,none,Toggle Present Windows (Current desktop)"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "ExposeAll" "none,none,Toggle Present Windows (All desktops)"
+
 chown abc:abc /config/.config/kglobalshortcutsrc 2>/dev/null || true
 
 echo "**** KDE shortcuts hardened ****"
