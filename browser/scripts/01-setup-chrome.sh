@@ -1,139 +1,216 @@
 #!/bin/bash
 # =============================================================================
-# i3 and Chrome Configuration Script (Optimized for pre-built image)
-# Chrome and security hardening are already baked into the Docker image
-# This script only handles runtime configuration
+# KDE and Chrome Configuration Script — SECURITY HARDENED
+# Locks down KDE shortcuts, configures Chrome, and injects toolbar
+# NOTE: Chrome preferences removed — they forced CSD mode causing sluggish resize
 # =============================================================================
 
-# Pre-configure i3 to skip first-run wizard
-I3_CONFIG_DIR="/config/.config/i3"
-if [ ! -f "$I3_CONFIG_DIR/config" ]; then
-    echo "**** Creating default i3 config ****"
-    mkdir -p "$I3_CONFIG_DIR"
-    
-    # Copy default i3 config and set Alt as modifier - HARDENED VERSION
-    cat > "$I3_CONFIG_DIR/config" << 'EOF'
-# i3 config file (v4) - SECURITY HARDENED
-set $mod Mod1
+# =============================================================================
+# KDE Shortcut Hardening
+# Disable dangerous shortcuts that could give users shell/system access
+# =============================================================================
+echo "**** Applying KDE security hardening ****"
 
-# Font
-font pango:monospace 8
+mkdir -p /config/.config
 
-# Use Mouse+$mod to drag floating windows
-floating_modifier $mod
+# =============================================================================
+# Plasma Desktop Lockdown (via KDE autostart)
+# Plasma generates its default layout AFTER this init script runs.
+# We create a lockdown script + autostart entry that runs INSIDE the KDE
+# session (with full D-Bus access), patches the layout config, and uses
+# plasmashell --replace to cleanly reload without the panel.
+# =============================================================================
+LOCKDOWN_SCRIPT="/config/.config/plasma-lockdown.sh"
+cat > "$LOCKDOWN_SCRIPT" << 'LOCKDOWN_EOF'
+#!/bin/bash
+# Plasma Desktop Lockdown — runs inside KDE session via autostart
+# Has full D-Bus access since it runs as the abc user in the session
 
-# REMOVED: Terminal access (security)
-# REMOVED: dmenu access (security)
-# REMOVED: Kill window (Alt+Shift+q disabled)
+PLASMA_LAYOUT="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-# Change focus
-bindsym $mod+j focus left
-bindsym $mod+k focus down
-bindsym $mod+l focus up
-bindsym $mod+semicolon focus right
-bindsym $mod+Left focus left
-bindsym $mod+Down focus down
-bindsym $mod+Up focus up
-bindsym $mod+Right focus right
+# Wait for plasmashell to be fully loaded
+for i in $(seq 1 30); do
+  if qdbus org.kde.plasmashell /PlasmaShell 2>/dev/null | grep -q "evaluateScript"; then
+    break
+  fi
+  sleep 1
+done
 
-# Move focused window
-bindsym $mod+Shift+j move left
-bindsym $mod+Shift+k move down
-bindsym $mod+Shift+l move up
-bindsym $mod+Shift+semicolon move right
-bindsym $mod+Shift+Left move left
-bindsym $mod+Shift+Down move down
-bindsym $mod+Shift+Up move up
-bindsym $mod+Shift+Right move right
+# --- Method 1: Use Plasma scripting API (preferred) ---
+RESULT=$(qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+  // Remove all panels (taskbar, start menu, system tray)
+  var allPanels = panels();
+  for (var i = allPanels.length - 1; i >= 0; i--) {
+    allPanels[i].remove();
+  }
+  // Lock the desktop (prevents Add Widgets, Add Panel, Enter Edit Mode)
+  locked = true;
+  // Set wallpaper to solid black
+  var allDesktops = desktops();
+  for (var j = 0; j < allDesktops.length; j++) {
+    allDesktops[j].wallpaperPlugin = "org.kde.color";
+    allDesktops[j].currentConfigGroup = ["Wallpaper", "org.kde.color", "General"];
+    allDesktops[j].writeConfig("Color", "0,0,0");
+  }
+' 2>&1)
 
-# Split orientation
-bindsym $mod+h split h
-bindsym $mod+v split v
+if [ $? -eq 0 ]; then
+  echo "Plasma lockdown via qdbus: SUCCESS"
+else
+  echo "qdbus failed ($RESULT), falling back to config patch..."
 
-# Fullscreen
-bindsym $mod+f fullscreen toggle
-
-# Change container layout
-bindsym $mod+s layout stacking
-bindsym $mod+w layout tabbed
-bindsym $mod+e layout toggle split
-
-# Toggle floating
-bindsym $mod+Shift+space floating toggle
-bindsym $mod+space focus mode_toggle
-
-# Focus parent
-bindsym $mod+a focus parent
-
-# Workspaces
-set $ws1 "1"
-set $ws2 "2"
-set $ws3 "3"
-set $ws4 "4"
-set $ws5 "5"
-set $ws6 "6"
-set $ws7 "7"
-set $ws8 "8"
-set $ws9 "9"
-set $ws10 "10"
-
-bindsym $mod+1 workspace number $ws1
-bindsym $mod+2 workspace number $ws2
-bindsym $mod+3 workspace number $ws3
-bindsym $mod+4 workspace number $ws4
-bindsym $mod+5 workspace number $ws5
-bindsym $mod+6 workspace number $ws6
-bindsym $mod+7 workspace number $ws7
-bindsym $mod+8 workspace number $ws8
-bindsym $mod+9 workspace number $ws9
-bindsym $mod+0 workspace number $ws10
-
-bindsym $mod+Shift+1 move container to workspace number $ws1
-bindsym $mod+Shift+2 move container to workspace number $ws2
-bindsym $mod+Shift+3 move container to workspace number $ws3
-bindsym $mod+Shift+4 move container to workspace number $ws4
-bindsym $mod+Shift+5 move container to workspace number $ws5
-bindsym $mod+Shift+6 move container to workspace number $ws6
-bindsym $mod+Shift+7 move container to workspace number $ws7
-bindsym $mod+Shift+8 move container to workspace number $ws8
-bindsym $mod+Shift+9 move container to workspace number $ws9
-bindsym $mod+Shift+0 move container to workspace number $ws10
-
-# REMOVED: Reload/restart/exit i3 (security)
-
-# Resize mode
-mode "resize" {
-    bindsym j resize shrink width 10 px or 10 ppt
-    bindsym k resize grow height 10 px or 10 ppt
-    bindsym l resize shrink height 10 px or 10 ppt
-    bindsym semicolon resize grow width 10 px or 10 ppt
-    bindsym Left resize shrink width 10 px or 10 ppt
-    bindsym Down resize grow height 10 px or 10 ppt
-    bindsym Up resize shrink height 10 px or 10 ppt
-    bindsym Right resize grow width 10 px or 10 ppt
-    bindsym Return mode "default"
-    bindsym Escape mode "default"
-    bindsym $mod+r mode "default"
-}
-bindsym $mod+r mode "resize"
-
-# Remove window decorations (title bars with buttons)
-default_border none
-default_floating_border none
-for_window [class=".*"] border none
-
-# NOTE: Chrome is NOT auto-started here
-# It will be launched on-demand via /usr/local/bin/launch-chrome.sh
-# This allows passing the URL as an argument when the session starts
-EOF
-    
-    chown -R abc:abc "$I3_CONFIG_DIR"
-    echo "**** i3 config created ****"
+  # --- Method 2: Patch config + restart (fallback) ---
+  if [ -f "$PLASMA_LAYOUT" ]; then
+    python3 << 'PYEOF'
+import re
+layout_file = "/config/.config/plasma-org.kde.plasma.desktop-appletsrc"
+with open(layout_file, 'r') as f:
+    lines = f.readlines()
+panel_prefixes = []
+current_section = ""
+for line in lines:
+    line_s = line.strip()
+    if line_s.startswith('['):
+        current_section = line_s
+    if line_s.startswith('plugin='):
+        plugin = line_s.split('=', 1)[1]
+        if plugin in ('org.kde.panel', 'org.kde.plasma.private.systemtray'):
+            match = re.match(r'(\[Containments\]\[\d+\])', current_section)
+            if match:
+                panel_prefixes.append(match.group(1))
+lines_out = []
+skip = False
+for line in lines:
+    if line.strip().startswith('['):
+        skip = any(line.strip().startswith(p) for p in panel_prefixes)
+    if not skip:
+        lines_out.append(line)
+with open(layout_file, 'w') as f:
+    f.write(re.sub(r'\n{3,}', '\n\n', ''.join(lines_out)))
+print(f"Fallback: removed {panel_prefixes}")
+PYEOF
+    plasmashell --replace &>/dev/null &
+    disown
+  fi
 fi
 
-# Chrome preferences: NOT pre-configured (clean launch like :9500 test image)
+# Always patch right-click menu regardless of method
+if [ -f "$PLASMA_LAYOUT" ]; then
+  sed -i 's/^RightButton;NoModifier=org.kde.contextmenu$/RightButton;NoModifier=/' "$PLASMA_LAYOUT"
+fi
 
-# Final runtime security lockdown
+# Self-destruct: remove autostart entry so this only runs once
+rm -f "$HOME/.config/autostart/plasma-lockdown.desktop"
+LOCKDOWN_EOF
+chmod +x "$LOCKDOWN_SCRIPT"
+chown abc:abc "$LOCKDOWN_SCRIPT"
+
+# Create autostart entry
+mkdir -p /config/.config/autostart
+cat > /config/.config/autostart/plasma-lockdown.desktop << EOF
+[Desktop Entry]
+Type=Application
+Name=Plasma Lockdown
+Exec=bash /config/.config/plasma-lockdown.sh
+X-KDE-autostart-phase=2
+X-KDE-AutostartScript=true
+EOF
+chown abc:abc /config/.config/autostart/plasma-lockdown.desktop
+
+# --- Disable KRunner (Alt+Space / Alt+F2) ---
+# KRunner can execute arbitrary commands — critical security risk
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "org.kde.krunner.desktop" --key "_launch" "none,none,KRunner"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "krunner.desktop" --key "_launch" "none,none,KRunner"
+# Also disable the Alt+F2 "Run Command" shortcut
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Run Command" "none,none,Run Command"
+
+# --- Disable Alt+F4 (Close Window) ---
+# Prevent users from closing Chrome and being stuck on bare desktop
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Window Close" "none,none,Close Window"
+
+# --- Disable Session Logout/Restart/Shutdown shortcuts ---
+# Prevent Ctrl+Alt+Del and other session-ending shortcuts
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "ksmserver" --key "Log Out" "none,none,Log Out"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "ksmserver" --key "Log Out Without Confirmation" "none,none,Log Out Without Confirmation"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "ksmserver" --key "Shut Down Without Confirmation" "none,none,Shut Down Without Confirmation"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "ksmserver" --key "Reboot Without Confirmation" "none,none,Reboot Without Confirmation"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "ksmserver" --key "Halt Without Confirmation" "none,none,Halt Without Confirmation"
+
+# --- Disable terminal-related shortcuts ---
+# Terminals are already uninstalled, but disable shortcuts to avoid errors
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "org.kde.konsole.desktop" --key "_launch" "none,none,Konsole"
+
+# --- Disable Activities / Desktop switching (prevents escape from session) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Show Desktop" "none,none,Show Desktop"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Switch to Desktop 1" "none,none,Switch to Desktop 1"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Switch to Desktop 2" "none,none,Switch to Desktop 2"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Switch to Desktop 3" "none,none,Switch to Desktop 3"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Switch to Desktop 4" "none,none,Switch to Desktop 4"
+
+# --- Disable screen locking ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "ksmserver" --key "Lock Session" "none,none,Lock Session"
+
+# --- Disable Kill Window (Meta+Ctrl+Esc) ---
+# Lets user click any window to force-kill it
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Kill Window" "none,none,Kill Window"
+
+# --- Disable Show System Activity (Ctrl+Esc) ---
+# Opens KDE System Monitor — shows/kills processes
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kded5" --key "Show System Activity" "none,none,Show System Activity"
+
+# --- Disable Activity Switcher (Meta+Q / Meta+Tab) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "plasmashell" --key "manage activities" "none,none,Show Activity Switcher"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "plasmashell" --key "next activity" "none,none,Walk through activities"
+
+# --- Disable Tiles Editor (Meta+T) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Edit Tiles" "none,none,Toggle Tiles Editor"
+
+# --- Disable Expose/Present Windows (Ctrl+F9/F10) ---
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "Expose" "none,none,Toggle Present Windows (Current desktop)"
+kwriteconfig5 --file /config/.config/kglobalshortcutsrc \
+    --group "kwin" --key "ExposeAll" "none,none,Toggle Present Windows (All desktops)"
+
+chown abc:abc /config/.config/kglobalshortcutsrc 2>/dev/null || true
+
+echo "**** KDE shortcuts hardened ****"
+
+# =============================================================================
+# GTK dark theme (Breeze Dark)
+# =============================================================================
+mkdir -p /config/.config/gtk-3.0
+cat > /config/.config/gtk-3.0/settings.ini << EOF
+[Settings]
+gtk-theme-name=Breeze-Dark
+gtk-application-prefer-dark-theme=true
+gtk-icon-theme-name=breeze-dark
+EOF
+chown -R abc:abc /config/.config/gtk-3.0
+
+# =============================================================================
+# Runtime Security Lockdown
+# =============================================================================
 chmod 700 /root /boot 2>/dev/null || true
 chmod 700 /custom-cont-init.d 2>/dev/null || true
 chmod 711 /bin /sbin /usr/bin /usr/sbin /usr/local/bin 2>/dev/null || true
@@ -142,9 +219,11 @@ chmod 1777 /tmp 2>/dev/null || true
 mkdir -p /config/Downloads 2>/dev/null || true
 chown -R abc:abc /config 2>/dev/null || true
 
+# =============================================================================
+# KDE Desktop Configuration
+# =============================================================================
+
 # KDE Compositing: Enable with balanced latency policy
-# LatencyPolicy: 0=ExtremelyLow, 1=Low, 2=Medium(balanced), 3=High, 4=ExtremelyHigh
-mkdir -p /config/.config
 kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key Enabled true
 kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key LatencyPolicy 2
 chown abc:abc /config/.config/kwinrc 2>/dev/null || true
@@ -155,48 +234,34 @@ su -c "DISPLAY=:1 dbus-send --session --dest=org.kde.KWin --type=method_call /Co
 kwriteconfig5 --file /config/.config/kcminputrc --group Mouse --key cursorTheme Adwaita
 chown abc:abc /config/.config/kcminputrc 2>/dev/null || true
 
-# Apply Breeze Dark global theme (appearance + window layout)
+# Apply Breeze Dark global theme
 kwriteconfig5 --file /config/.config/kdeglobals --group General --key ColorScheme BreezeDark
 kwriteconfig5 --file /config/.config/kdeglobals --group General --key Name "Breeze Dark"
 kwriteconfig5 --file /config/.config/kdeglobals --group KDE --key LookAndFeelPackage "org.kde.breezedark.desktop"
 kwriteconfig5 --file /config/.config/kdeglobals --group KDE --key widgetStyle "breeze"
 kwriteconfig5 --file /config/.config/kdeglobals --group Icons --key Theme "breeze-dark"
 kwriteconfig5 --file /config/.config/plasmarc --group Theme --key name "breeze-dark"
-kwriteconfig5 --file /config/.config/kwinrc --group org.kde.kdecoration2 --key theme "Breeze"
 chown abc:abc /config/.config/kdeglobals /config/.config/plasmarc 2>/dev/null || true
 
-# GTK dark theme (for GTK apps like Chrome)
-mkdir -p /config/.config/gtk-3.0
-cat > /config/.config/gtk-3.0/settings.ini << EOF
-[Settings]
-gtk-theme-name=Breeze-Dark
-gtk-application-prefer-dark-theme=true
-gtk-icon-theme-name=breeze-dark
-EOF
-chown -R abc:abc /config/.config/gtk-3.0
-
-echo "**** Breeze Dark theme applied ****"
-
-# Apply Breeze Dark window decorations directly (lookandfeeltool needs DBUS which isn't available)
-# Window decoration library and theme
+# Apply Breeze Dark window decorations
 kwriteconfig5 --file /config/.config/kwinrc --group org.kde.kdecoration2 --key library "org.kde.breeze"
 kwriteconfig5 --file /config/.config/kwinrc --group org.kde.kdecoration2 --key theme "Breeze"
-# Dark title bar colors
 kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key activeBackground "49,54,59"
 kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key activeForeground "252,252,252"
 kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key inactiveBackground "42,46,50"
 kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key inactiveForeground "161,169,177"
 kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key activeBlend "252,252,252"
 kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key inactiveBlend "161,169,177"
-# Window switcher
 kwriteconfig5 --file /config/.config/kwinrc --group WindowSwitcher --key LayoutName "org.kde.breeze.desktop"
 kwriteconfig5 --file /config/.config/kwinrc --group DesktopSwitcher --key LayoutName "org.kde.breeze.desktop"
 chown abc:abc /config/.config/kwinrc /config/.config/kdeglobals 2>/dev/null || true
-echo "**** Breeze Dark window decorations applied ****"
+echo "**** Breeze Dark theme applied ****"
+
+# =============================================================================
+# Selkies Patches
+# =============================================================================
 
 # Fix scroll magnitude: cap to 1 event per wheel notch (server-side)
-# This patches the Selkies input handler so each scroll tick fires exactly once,
-# preventing the jumpy multi-event scrolling behavior
 SELKIES_INPUT="/lsiopy/lib/python3.12/site-packages/selkies/input_handler.py"
 if [ -f "$SELKIES_INPUT" ]; then
   sed -i 's/for _ in range(max(1, scroll_magnitude))/for _ in range(1)/' "$SELKIES_INPUT"
@@ -204,7 +269,6 @@ if [ -f "$SELKIES_INPUT" ]; then
 fi
 
 # Inject Cloud Browser toolbar into Selkies web UI
-# (Selkies populates /usr/share/selkies/web/ at startup, so we inject at runtime)
 (
   SELKIES_WEB="/usr/share/selkies/web"
   for i in $(seq 1 30); do
@@ -224,4 +288,4 @@ fi
   done
 ) &
 
-echo "**** Chrome and i3 configured ****"
+echo "**** KDE and Chrome configured ****"
