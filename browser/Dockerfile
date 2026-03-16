@@ -96,7 +96,9 @@ RUN rm -f /usr/share/applications/kcm_*.desktop \
     && rm -f /usr/share/applications/ktelnetservice5.desktop \
     && rm -f /usr/share/applications/software-properties*.desktop \
     && rm -f /usr/share/applications/breezestyleconfig.desktop \
-    && rm -f /usr/share/applications/python3.12.desktop
+    && rm -f /usr/share/applications/python3.12.desktop \
+    # Remove Plasma desktop right-click context menu plugin entirely
+    && rm -f /usr/lib/x86_64-linux-gnu/qt5/plugins/plasma/containmentactions/plasma_containmentactions_contextmenu.so
 
 # Stage toolbar files
 COPY toolbar/toolbar.css /opt/toolbar/toolbar.css
