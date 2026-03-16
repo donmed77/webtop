@@ -155,6 +155,45 @@ su -c "DISPLAY=:1 dbus-send --session --dest=org.kde.KWin --type=method_call /Co
 kwriteconfig5 --file /config/.config/kcminputrc --group Mouse --key cursorTheme Adwaita
 chown abc:abc /config/.config/kcminputrc 2>/dev/null || true
 
+# Apply Breeze Dark global theme (appearance + window layout)
+kwriteconfig5 --file /config/.config/kdeglobals --group General --key ColorScheme BreezeDark
+kwriteconfig5 --file /config/.config/kdeglobals --group General --key Name "Breeze Dark"
+kwriteconfig5 --file /config/.config/kdeglobals --group KDE --key LookAndFeelPackage "org.kde.breezedark.desktop"
+kwriteconfig5 --file /config/.config/kdeglobals --group KDE --key widgetStyle "breeze"
+kwriteconfig5 --file /config/.config/kdeglobals --group Icons --key Theme "breeze-dark"
+kwriteconfig5 --file /config/.config/plasmarc --group Theme --key name "breeze-dark"
+kwriteconfig5 --file /config/.config/kwinrc --group org.kde.kdecoration2 --key theme "Breeze"
+chown abc:abc /config/.config/kdeglobals /config/.config/plasmarc 2>/dev/null || true
+
+# GTK dark theme (for GTK apps like Chrome)
+mkdir -p /config/.config/gtk-3.0
+cat > /config/.config/gtk-3.0/settings.ini << EOF
+[Settings]
+gtk-theme-name=Breeze-Dark
+gtk-application-prefer-dark-theme=true
+gtk-icon-theme-name=breeze-dark
+EOF
+chown -R abc:abc /config/.config/gtk-3.0
+
+echo "**** Breeze Dark theme applied ****"
+
+# Apply Breeze Dark window decorations directly (lookandfeeltool needs DBUS which isn't available)
+# Window decoration library and theme
+kwriteconfig5 --file /config/.config/kwinrc --group org.kde.kdecoration2 --key library "org.kde.breeze"
+kwriteconfig5 --file /config/.config/kwinrc --group org.kde.kdecoration2 --key theme "Breeze"
+# Dark title bar colors
+kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key activeBackground "49,54,59"
+kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key activeForeground "252,252,252"
+kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key inactiveBackground "42,46,50"
+kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key inactiveForeground "161,169,177"
+kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key activeBlend "252,252,252"
+kwriteconfig5 --file /config/.config/kdeglobals --group "WM" --key inactiveBlend "161,169,177"
+# Window switcher
+kwriteconfig5 --file /config/.config/kwinrc --group WindowSwitcher --key LayoutName "org.kde.breeze.desktop"
+kwriteconfig5 --file /config/.config/kwinrc --group DesktopSwitcher --key LayoutName "org.kde.breeze.desktop"
+chown abc:abc /config/.config/kwinrc /config/.config/kdeglobals 2>/dev/null || true
+echo "**** Breeze Dark window decorations applied ****"
+
 # Fix scroll magnitude: cap to 1 event per wheel notch (server-side)
 # This patches the Selkies input handler so each scroll tick fires exactly once,
 # preventing the jumpy multi-event scrolling behavior
