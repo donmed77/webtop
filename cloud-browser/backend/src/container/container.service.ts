@@ -312,7 +312,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     NetworkMode: this.networkName, // #3: Isolated network
                     // Volume mounts from @browser spec
                     Binds: [
-                        '/root/apps/webtop/browser/chrome-policies.json:/etc/opt/chrome/policies/managed/policies.json:ro',
+                        // Chrome policies removed — clean launch like :9500 test image
                         '/root/apps/webtop/browser/scripts:/custom-cont-init.d:ro',
                         '/root/apps/webtop/browser/assets:/assets:ro',
                     ],
