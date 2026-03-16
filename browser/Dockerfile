@@ -20,9 +20,9 @@ RUN mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-real && \
     printf '#!/bin/bash\nwhile true; do\n  /usr/bin/google-chrome-real \\\n  --no-sandbox \\\n  --start-maximized \\\n  --no-first-run \\\n  --disable-infobars \\\n  --disable-session-crashed-bubble \\\n  --noerrdialogs \\\n  --disable-features=TranslateUI,PasswordManagerOnboarding,MediaRouter \\\n  --disable-component-update \\\n  --disable-sync \\\n  --disable-default-apps \\\n  --disable-background-mode \\\n  --disable-prompt-on-repost \\\n  --disable-domain-reliability \\\n  --disable-breakpad \\\n  --metrics-recording-only \\\n  --no-default-browser-check \\\n  --no-pings \\\n  --disk-cache-dir=/tmp/chrome-cache \\\n  --disk-cache-size=1073741824 \\\n  "$@"\n  sleep 1\ndone\n' > /usr/bin/google-chrome-stable && \
     chmod +x /usr/bin/google-chrome-stable
 
-# Suppress --no-sandbox security warning via Chrome policy
-RUN mkdir -p /etc/opt/chrome/policies/managed && \
-    echo '{"CommandLineFlagSecurityWarningsEnabled": false}' > /etc/opt/chrome/policies/managed/policies.json
+# Chrome policies (all 50 — security, UI, download/extension blocking)
+RUN mkdir -p /etc/opt/chrome/policies/managed
+COPY chrome-policies.json /etc/opt/chrome/policies/managed/policies.json
 
 # Stage toolbar files for runtime injection
 COPY toolbar/toolbar.css /opt/toolbar/toolbar.css
