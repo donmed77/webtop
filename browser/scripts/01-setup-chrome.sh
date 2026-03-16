@@ -44,6 +44,13 @@ RESULT=$(qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScri
   }
   // Lock the desktop (prevents Add Widgets, Add Panel, Enter Edit Mode)
   locked = true;
+  // Set wallpaper to solid black
+  var allDesktops = desktops();
+  for (var j = 0; j < allDesktops.length; j++) {
+    allDesktops[j].wallpaperPlugin = "org.kde.color";
+    allDesktops[j].currentConfigGroup = ["Wallpaper", "org.kde.color", "General"];
+    allDesktops[j].writeConfig("Color", "0,0,0");
+  }
 ' 2>&1)
 
 if [ $? -eq 0 ]; then
