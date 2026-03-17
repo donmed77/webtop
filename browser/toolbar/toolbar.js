@@ -478,15 +478,23 @@
     var wi = window.webrtcInput;
     if (!wi || !wi._triggerMouseWheel) return;
     scrollCount = 0;
-    wi._triggerMouseWheel(dir, 1);
-    scrollInterval = setInterval(function () {
-      scrollCount++;
-      var mag = scrollCount > 10 ? 3 : scrollCount > 5 ? 2 : 1;
-      wi._triggerMouseWheel(dir, mag);
-    }, 60);
+    var lastTime = 0;
+    var scrollDir = dir;
+    wi._triggerMouseWheel(scrollDir, 5);
+    function tick(ts) {
+      if (!scrollInterval) return;
+      if (ts - lastTime > 80) {
+        scrollCount++;
+        var mag = scrollCount > 12 ? 10 : scrollCount > 6 ? 7 : 5;
+        wi._triggerMouseWheel(scrollDir, mag);
+        lastTime = ts;
+      }
+      scrollInterval = requestAnimationFrame(tick);
+    }
+    scrollInterval = requestAnimationFrame(tick);
   }
   function stopScroll() {
-    if (scrollInterval) { clearInterval(scrollInterval); scrollInterval = null; }
+    if (scrollInterval) { cancelAnimationFrame(scrollInterval); scrollInterval = null; }
   }
 
   // --- Close all panels ---
