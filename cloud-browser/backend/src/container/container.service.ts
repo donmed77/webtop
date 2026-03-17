@@ -334,7 +334,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     'LANG=en_US.UTF-8',
                     'LC_ALL=en_US.UTF-8',
                     // Selkies UI Configuration from @browser spec
-                    'SELKIES_UI_SHOW_SIDEBAR=true',
+                    'SELKIES_UI_SHOW_SIDEBAR=false',
                     'SELKIES_UI_TITLE=Unshort_Link',
                     'SELKIES_UI_SHOW_LOGO=false',
                     'SELKIES_UI_SIDEBAR_SHOW_GAMEPADS=false',
@@ -361,7 +361,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     'SELKIES_SECOND_SCREEN=false',
                     'SELKIES_MICROPHONE_ENABLED=false',
                     'SELKIES_FILE_TRANSFERS=',
-                    'SELKIES_ENABLE_BASIC_UI=true',
+                    'SELKIES_ENABLE_BASIC_UI=false',
                     'SELKIES_BASIC_SETTINGS_ENABLE_AUDIO=true',
                     'SELKIES_BASIC_SETTINGS_ENABLE_CLIPBOARD=true',
                     // Selkies Shared
