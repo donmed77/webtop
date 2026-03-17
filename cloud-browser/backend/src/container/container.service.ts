@@ -353,7 +353,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     'SELKIES_USE_PAINT_OVER_QUALITY=false',
                     'SELKIES_H264_STREAMING_MODE=false',
                     'SELKIES_H264_FULLCOLOR=false',
-                    'SELKIES_USE_CSS_SCALING=true',
+                    'SELKIES_USE_CSS_SCALING=false',
                     // Hide file transfers and apps
                     'SELKIES_UI_SIDEBAR_SHOW_FILES=false',
                     'SELKIES_UI_SIDEBAR_SHOW_APPS=false',
