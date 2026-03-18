@@ -232,7 +232,6 @@ chmod 711 /bin /sbin /usr/bin /usr/sbin /usr/local/bin 2>/dev/null || true
 chmod 755 /config 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
 mkdir -p /config/Downloads 2>/dev/null || true
-chown -R abc:abc /config 2>/dev/null || true
 
 # =============================================================================
 # KDE Desktop Configuration
@@ -308,5 +307,8 @@ fi
     sleep 1
   done
 ) &
+
+# Fix ownership on all config files (must be last — after all kwriteconfig5 commands)
+chown -R abc:abc /config 2>/dev/null || true
 
 echo "**** KDE and Chrome configured ****"
