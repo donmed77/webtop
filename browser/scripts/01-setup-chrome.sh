@@ -272,6 +272,12 @@ kwriteconfig5 --file /config/.config/kwinrc --group DesktopSwitcher --key Layout
 chown abc:abc /config/.config/kwinrc /config/.config/kdeglobals 2>/dev/null || true
 echo "**** Breeze Dark theme applied ****"
 
+# Remove KDE Plasma panel (bottom taskbar) — not needed, Chrome fills the desktop
+kwriteconfig5 --file /config/.config/plasmashellrc --group "PlasmaViews" --group "Panel 2" --group "Defaults" --key thickness 0
+# Delete panel containment to prevent it from loading
+sed -i '/\[Containments\]\[2\]/,/^\[Containments\]\[/{ /^\[Containments\]\[2\]/d; /^\[Containments\]\[[^2]/!d; }' /config/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null || true
+echo "**** KDE panel removed ****"
+
 # =============================================================================
 # Selkies Patches
 # =============================================================================
