@@ -1550,7 +1550,7 @@ export default function SessionPage() {
             )}
 
             {/* Floating Mobile Controls — draggable group (scroll ▲ / keyboard / scroll ▼) */}
-            {isTouchDevice && streamReady && (
+            {isTouchDevice && streamReady && !isViewer && (
                 <div
                     className="fixed z-50 flex flex-col items-center gap-1 select-none"
                     style={{
