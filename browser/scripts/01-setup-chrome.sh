@@ -239,6 +239,12 @@ mkdir -p /config/Downloads 2>/dev/null || true
 # Clear desktop shortcuts and lock directory (prevents Chrome PWA/shortcut icons)
 rm -rf /config/Desktop/* "$HOME/Desktop/"* 2>/dev/null || true
 chmod 555 /config/Desktop "$HOME/Desktop" 2>/dev/null || true
+# Redirect XDG Desktop dir so Chrome/apps can't create shortcuts
+mkdir -p /tmp/.no-desktop 2>/dev/null || true
+chmod 555 /tmp/.no-desktop 2>/dev/null || true
+mkdir -p /config/.config 2>/dev/null || true
+echo 'XDG_DESKTOP_DIR="/tmp/.no-desktop"' > /config/.config/user-dirs.dirs
+echo "enabled=False" > /config/.config/user-dirs.conf
 
 # =============================================================================
 # KDE Desktop Configuration
