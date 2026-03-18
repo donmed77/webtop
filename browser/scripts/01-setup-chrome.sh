@@ -236,6 +236,9 @@ chmod 711 /bin /sbin /usr/bin /usr/sbin /usr/local/bin 2>/dev/null || true
 chmod 755 /config 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
 mkdir -p /config/Downloads 2>/dev/null || true
+# Clear desktop shortcuts and lock directory (prevents Chrome PWA/shortcut icons)
+rm -rf /config/Desktop/* "$HOME/Desktop/"* 2>/dev/null || true
+chmod 555 /config/Desktop "$HOME/Desktop" 2>/dev/null || true
 
 # =============================================================================
 # KDE Desktop Configuration
