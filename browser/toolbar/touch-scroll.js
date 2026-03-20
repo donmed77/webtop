@@ -38,6 +38,7 @@
   var startTime = 0;
   var longPressTimer = null;
   var MOVE_THRESHOLD = 10;
+  var TWO_FINGER_MOVE_THRESHOLD = 25;
   var LONG_PRESS_MS = 400;
   var TAP_MAX_MS = 250;
   var SCROLL_SENSITIVITY = 20;
@@ -132,7 +133,7 @@
       if (e.touches.length >= 2) {
         var mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         var my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        if (Math.abs(mx - startX) > MOVE_THRESHOLD || Math.abs(my - startY) > MOVE_THRESHOLD) {
+        if (Math.abs(mx - startX) > TWO_FINGER_MOVE_THRESHOLD || Math.abs(my - startY) > TWO_FINGER_MOVE_THRESHOLD) {
           twoFingerMoved = true;
         }
       }
@@ -203,13 +204,17 @@
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     scrollAccum = 0;
 
-    // Two-finger tap: right-click at midpoint
+    // Two-finger tap: right-click at midpoint (wait for ALL fingers to lift)
     if (mode === "twoFinger") {
-      if (!twoFingerMoved && e.touches.length === 0) {
+      if (e.touches.length > 0) {
+        // One finger still down — stay in twoFinger mode
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+      // All fingers lifted
+      if (!twoFingerMoved) {
         sendRightClick(startX, startY);
       }
-      // Reset to idle whether all fingers lifted or just one
-      // If one finger remains, the next touchstart will begin a fresh gesture
       mode = "idle";
       window._touchScrollActive = false;
       if (e.cancelable) e.preventDefault();
