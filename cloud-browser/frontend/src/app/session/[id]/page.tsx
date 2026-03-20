@@ -165,6 +165,28 @@ export default function SessionPage() {
         check();
     }, []);
 
+    // Lock body scroll on session page (prevents parent page from scrolling on mobile swipe)
+    useEffect(() => {
+        const html = document.documentElement;
+        const body = document.body;
+        html.style.overflow = "hidden";
+        html.style.overscrollBehavior = "none";
+        body.style.overflow = "hidden";
+        body.style.position = "fixed";
+        body.style.width = "100%";
+        body.style.height = "100%";
+        body.style.overscrollBehavior = "none";
+        return () => {
+            html.style.overflow = "";
+            html.style.overscrollBehavior = "";
+            body.style.overflow = "";
+            body.style.position = "";
+            body.style.width = "";
+            body.style.height = "";
+            body.style.overscrollBehavior = "";
+        };
+    }, []);
+
     // Toggle virtual keyboard (mobile only) — mirrors Selkies behavior
     const toggleVirtualKeyboard = useCallback(() => {
         try {

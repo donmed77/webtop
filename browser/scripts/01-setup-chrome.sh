@@ -308,11 +308,15 @@ fi
     if [ -f "$SELKIES_WEB/index.html" ]; then
       cp /opt/toolbar/toolbar.css "$SELKIES_WEB/toolbar.css"
       cp /opt/toolbar/toolbar.js  "$SELKIES_WEB/toolbar.js"
+      cp /opt/toolbar/touch-scroll.js "$SELKIES_WEB/touch-scroll.js"
       if ! grep -q 'toolbar.css' "$SELKIES_WEB/index.html"; then
         sed -i 's|</head>|<link rel="stylesheet" href="toolbar.css"></head>|' "$SELKIES_WEB/index.html"
       fi
       if ! grep -q 'toolbar.js' "$SELKIES_WEB/index.html"; then
         sed -i 's|</body>|<script src="toolbar.js"></script></body>|' "$SELKIES_WEB/index.html"
+      fi
+      if ! grep -q 'touch-scroll.js' "$SELKIES_WEB/index.html"; then
+        sed -i 's|</head>|<script src="touch-scroll.js"></script></head>|' "$SELKIES_WEB/index.html"
       fi
       echo "**** Toolbar injected into Selkies ****"
       break

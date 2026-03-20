@@ -144,6 +144,7 @@ RUN rm -f /usr/share/applications/kcm_*.desktop \
 # Stage toolbar files
 COPY toolbar/toolbar.css /opt/toolbar/toolbar.css
 COPY toolbar/toolbar.js  /opt/toolbar/toolbar.js
+COPY toolbar/touch-scroll.js /opt/toolbar/touch-scroll.js
 
 # Init script (using CURRENT smooth version — no setup script hardening yet)
 COPY scripts/01-setup-chrome.sh /custom-cont-init.d/01-setup-chrome.sh
