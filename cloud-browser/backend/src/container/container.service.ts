@@ -553,6 +553,57 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
+    /**
+     * Wait until a Chrome window is visible inside the container.
+     * Polls xdotool to detect the Chrome window, ensuring the user
+     * never sees a blank KDE desktop when entering the session.
+     */
+    async waitForChromeWindow(containerId: string, timeoutMs = 15000): Promise<void> {
+        const start = Date.now();
+        const container = this.docker.getContainer(containerId);
+
+        while (Date.now() - start < timeoutMs) {
+            try {
+                const exec = await container.exec({
+                    Cmd: ['xdotool', 'search', '--class', 'google-chrome'],
+                    User: 'abc',
+                    Env: ['DISPLAY=:1'],
+                    AttachStdout: true,
+                    AttachStderr: false,
+                });
+
+                const stream = await exec.start({});
+                const hasWindow = await new Promise<boolean>((resolve) => {
+                    let output = '';
+                    stream.on('data', (chunk: Buffer) => { output += chunk.toString(); });
+                    stream.on('end', async () => {
+                        try {
+                            const inspectData = await exec.inspect();
+                            // xdotool returns 0 and window IDs when Chrome is found
+                            resolve(inspectData.ExitCode === 0 && output.trim().length > 0);
+                        } catch {
+                            resolve(false);
+                        }
+                    });
+                    stream.on('error', () => resolve(false));
+                });
+
+                if (hasWindow) {
+                    const elapsed = Date.now() - start;
+                    this.logger.log(`Chrome window detected in ${containerId} after ${elapsed}ms`);
+                    return;
+                }
+            } catch {
+                // Container or exec error — retry
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Timeout — don't block the session, just log a warning
+        this.logger.warn(`Chrome window not detected in ${containerId} within ${timeoutMs}ms — proceeding anyway`);
+    }
+
 
     async releaseContainer(poolId: string) {
         const container = this.pool.get(poolId);

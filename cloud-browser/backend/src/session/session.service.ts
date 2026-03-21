@@ -224,10 +224,14 @@ export class SessionService implements OnModuleInit {
         // Persist active session for restart recovery
         this.loggingService.saveActiveSession(session);
 
-        // Launch Chrome with URL via docker exec (non-blocking)
-        this.containerService.launchChrome(container.containerId, finalUrl).catch(err => {
+        // Launch Chrome and wait for its window to be visible
+        // This ensures the user sees Chrome immediately when entering the session
+        try {
+            await this.containerService.launchChrome(container.containerId, finalUrl);
+            await this.containerService.waitForChromeWindow(container.containerId);
+        } catch (err) {
             this.logger.error(`Failed to launch Chrome for session ${sessionId}: ${err.message}`);
-        });
+        }
 
         return { session };
     }
