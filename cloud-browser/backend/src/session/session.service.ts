@@ -229,6 +229,8 @@ export class SessionService implements OnModuleInit {
         try {
             await this.containerService.launchChrome(container.containerId, finalUrl);
             await this.containerService.waitForChromeWindow(container.containerId);
+            // Paint buffer: Chrome window exists but needs ~500ms-1s to render content
+            await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err) {
             this.logger.error(`Failed to launch Chrome for session ${sessionId}: ${err.message}`);
         }
