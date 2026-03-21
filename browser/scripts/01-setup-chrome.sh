@@ -120,6 +120,9 @@ disown
 
 # Self-destruct: remove autostart entry (but watcher keeps running in background)
 rm -f "$HOME/.config/autostart/plasma-lockdown.desktop"
+
+# Signal that ALL init is complete: KDE configured, panels removed, toolbar injected
+touch /tmp/.init-complete
 LOCKDOWN_EOF
 chmod +x "$LOCKDOWN_SCRIPT"
 chown abc:abc "$LOCKDOWN_SCRIPT"
@@ -323,8 +326,6 @@ fi
     fi
     sleep 1
   done
-  # Signal that init + toolbar injection are fully complete
-  touch /tmp/.init-complete
 ) &
 
 # Fix ownership on all config files (must be last — after all kwriteconfig5 commands)
