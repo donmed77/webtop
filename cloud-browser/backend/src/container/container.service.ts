@@ -412,38 +412,91 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Poll the container's HTTP endpoint until it responds.
-     * Selkies serves on the container's mapped port — once it responds,
-     * the streaming server is fully initialized and ready for connections.
+     * Poll until the container is FULLY ready:
+     *   1. Selkies HTTP server responds (streaming server initialized)
+     *   2. Init scripts have completed (/tmp/.init-complete sentinel exists)
+     * Only when both are true is the container safe for Chrome launch.
      */
     private waitForReady(port: number, timeoutMs = 120000, intervalMs = 2000): Promise<void> {
         return new Promise((resolve, reject) => {
             const start = Date.now();
+            let httpReady = false;
 
             const check = () => {
                 if (Date.now() - start > timeoutMs) {
                     return reject(new Error(`Container on port ${port} did not become ready within ${timeoutMs / 1000}s`));
                 }
 
-                const req = http.get(`http://${this.dockerBridgeIp}:${port}/`, (res) => {
-                    // Any HTTP response means the server is up
-                    res.resume();
-                    resolve();
-                });
+                if (!httpReady) {
+                    // Phase 1: Check Selkies HTTP
+                    const req = http.get(`http://${this.dockerBridgeIp}:${port}/`, (res) => {
+                        res.resume();
+                        httpReady = true;
+                        // Immediately start phase 2
+                        setTimeout(check, 500);
+                    });
 
-                req.on('error', () => {
-                    // Connection refused — container not ready yet, retry
-                    setTimeout(check, intervalMs);
-                });
+                    req.on('error', () => {
+                        setTimeout(check, intervalMs);
+                    });
 
-                req.setTimeout(3000, () => {
-                    req.destroy();
-                    setTimeout(check, intervalMs);
-                });
+                    req.setTimeout(3000, () => {
+                        req.destroy();
+                        setTimeout(check, intervalMs);
+                    });
+                } else {
+                    // Phase 2: Check init script completion via sentinel file
+                    this.checkInitComplete(port).then(complete => {
+                        if (complete) {
+                            resolve();
+                        } else {
+                            setTimeout(check, 1000);
+                        }
+                    }).catch(() => {
+                        setTimeout(check, 1000);
+                    });
+                }
             };
 
             check();
         });
+    }
+
+    /**
+     * Check if the init script has completed by looking for the sentinel file.
+     * Uses docker exec to test for /tmp/.init-complete inside the container.
+     */
+    private async checkInitComplete(port: number): Promise<boolean> {
+        // Find the container by its mapped port
+        for (const container of this.pool.values()) {
+            if (container.port === port) {
+                try {
+                    const dc = this.docker.getContainer(container.containerId);
+                    const exec = await dc.exec({
+                        Cmd: ['test', '-f', '/tmp/.init-complete'],
+                        AttachStdout: false,
+                        AttachStderr: false,
+                    });
+                    const stream = await exec.start({});
+                    // Wait for exec to complete and check exit code
+                    return new Promise<boolean>((resolve) => {
+                        stream.on('end', async () => {
+                            try {
+                                const inspectData = await exec.inspect();
+                                resolve(inspectData.ExitCode === 0);
+                            } catch {
+                                resolve(false);
+                            }
+                        });
+                        stream.on('error', () => resolve(false));
+                        stream.resume(); // Consume stream
+                    });
+                } catch {
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     async acquireContainer(sessionId: string): Promise<PooledContainer | null> {
