@@ -467,7 +467,7 @@ export default function SessionPage() {
         if (status === "active" && !streamReady) {
             const fallbackTimer = setTimeout(() => {
                 setStreamReady(true);
-            }, 5000);
+            }, 3000);
             return () => clearTimeout(fallbackTimer);
         }
     }, [status, streamReady]);
@@ -484,7 +484,7 @@ export default function SessionPage() {
                     originalLog.apply(this, args);
                     const msg = args.join(" ");
                     if (msg.includes("Stream started")) {
-                        setTimeout(() => setStreamReady(true), 1500);
+                        setStreamReady(true);
                     }
                 };
             }
@@ -504,7 +504,7 @@ export default function SessionPage() {
     useEffect(() => {
         const handleStreamMessage = (e: MessageEvent) => {
             if (e.data?.type === "streamStarted") {
-                setTimeout(() => setStreamReady(true), 1500);
+                setStreamReady(true);
             }
             if (e.data?.type === "audioState") {
                 setAudioMuted(e.data.muted);
