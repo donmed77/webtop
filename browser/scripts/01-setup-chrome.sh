@@ -323,12 +323,11 @@ fi
     fi
     sleep 1
   done
+  # Signal that init + toolbar injection are fully complete
+  touch /tmp/.init-complete
 ) &
 
 # Fix ownership on all config files (must be last — after all kwriteconfig5 commands)
 chown -R abc:abc /config 2>/dev/null || true
 
 echo "**** KDE and Chrome configured ****"
-
-# Signal that init is fully complete (used by container readiness check)
-touch /tmp/.init-complete
