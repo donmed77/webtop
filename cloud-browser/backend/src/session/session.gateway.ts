@@ -194,6 +194,29 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
         return this.handleJoinSession(client, data);
     }
 
+    // Dedup: only launch Chrome once per session
+    private chromeLaunched: Set<string> = new Set();
+
+    /**
+     * Client signals the Selkies stream is connected (display resized).
+     * NOW it's safe to launch Chrome — it will open at the correct resolution.
+     */
+    @SubscribeMessage('session:clientReady')
+    async handleClientReady(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() data: { sessionId: string },
+    ) {
+        if (!data?.sessionId) return;
+        if (this.chromeLaunched.has(data.sessionId)) return;
+        this.chromeLaunched.add(data.sessionId);
+
+        this.logger.log(`Client stream ready for ${data.sessionId} — launching Chrome`);
+        await this.sessionService.launchChromeForSession(data.sessionId);
+
+        // Tell the frontend Chrome is up — it can drop the loading spinner
+        client.emit('session:chromeReady', { sessionId: data.sessionId });
+    }
+
     private broadcastTimerUpdates() {
         for (const [sessionId, clients] of this.sessionClients) {
             const timeRemaining = this.sessionService.getSessionTimeRemaining(sessionId);
@@ -228,6 +251,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
     }
 
     notifySessionEnded(sessionId: string, reason: string) {
+        this.chromeLaunched.delete(sessionId);
         const clients = this.sessionClients.get(sessionId);
         if (clients) {
             for (const clientId of clients) {

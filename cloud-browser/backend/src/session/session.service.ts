@@ -224,18 +224,32 @@ export class SessionService implements OnModuleInit {
         // Persist active session for restart recovery
         this.loggingService.saveActiveSession(session);
 
-        // Launch Chrome and wait for its window to be visible
-        // This ensures the user sees Chrome immediately when entering the session
+        // Chrome launch is DEFERRED until the client connects and Selkies
+        // resizes the display. See session.gateway.ts handleClientReady().
+        return { session };
+    }
+
+    /**
+     * Launch Chrome for an active session (called after client stream connects).
+     * At this point Selkies has resized the Xorg display to match the client viewport,
+     * so Chrome opens at the correct resolution.
+     */
+    async launchChromeForSession(sessionId: string): Promise<void> {
+        const session = this.sessions.get(sessionId);
+        if (!session || session.status !== 'active') return;
+
+        const container = this.containerService.getContainerByPoolId(session.poolId);
+        if (!container) {
+            this.logger.error(`No container found for session ${sessionId}`);
+            return;
+        }
+
         try {
-            await this.containerService.launchChrome(container.containerId, finalUrl);
+            await this.containerService.launchChrome(container.containerId, session.url);
             await this.containerService.waitForChromeWindow(container.containerId);
-            // Paint buffer: Chrome window exists but needs ~500ms-1s to render content
-            await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err) {
             this.logger.error(`Failed to launch Chrome for session ${sessionId}: ${err.message}`);
         }
-
-        return { session };
     }
 
     getSession(sessionId: string): Session | undefined {

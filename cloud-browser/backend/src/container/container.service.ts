@@ -677,6 +677,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         };
     }
 
+    getContainerByPoolId(poolId: string): PooledContainer | undefined {
+        return this.pool.get(poolId);
+    }
+
     getActiveContainers(): PooledContainer[] {
         return Array.from(this.pool.values()).filter(c => c.status === 'active');
     }

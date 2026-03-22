@@ -364,6 +364,11 @@ export default function SessionPage() {
                 }
             });
 
+            // Chrome has been launched at the correct resolution — drop spinner
+            socket.on("session:chromeReady", () => {
+                setStreamReady(true);
+            });
+
             socket.on("session:timer", (data) => {
                 setTimeRemaining(data.timeRemaining);
             });
@@ -462,15 +467,21 @@ export default function SessionPage() {
         };
     }, [sessionId, apiUrl, router, checkSession, isViewer]);
 
-    // Fallback timeout: if stream detection fails, reveal after 15s
+    // Fallback timeout: if stream detection fails after 10s, force Chrome launch + reveal
     useEffect(() => {
         if (status === "active" && !streamReady) {
+            let innerTimer: ReturnType<typeof setTimeout>;
             const fallbackTimer = setTimeout(() => {
-                setStreamReady(true);
-            }, 3000);
-            return () => clearTimeout(fallbackTimer);
+                // Force Chrome launch if clientReady was never sent
+                if (socketRef.current?.connected && sessionId) {
+                    socketRef.current.emit("session:clientReady", { sessionId });
+                }
+                // Reveal after additional delay for Chrome to open
+                innerTimer = setTimeout(() => setStreamReady(true), 3000);
+            }, 7000);
+            return () => { clearTimeout(fallbackTimer); clearTimeout(innerTimer); };
         }
-    }, [status, streamReady]);
+    }, [status, streamReady, sessionId]);
 
     // Hook into iframe console.log to detect "Stream started" + poll latency
     const handleIframeLoad = () => {
@@ -484,7 +495,10 @@ export default function SessionPage() {
                     originalLog.apply(this, args);
                     const msg = args.join(" ");
                     if (msg.includes("Stream started")) {
-                        setStreamReady(true);
+                        // Stream is up → display resized → tell backend to launch Chrome
+                        if (socketRef.current?.connected && sessionId) {
+                            socketRef.current.emit("session:clientReady", { sessionId });
+                        }
                     }
                 };
             }
@@ -501,10 +515,14 @@ export default function SessionPage() {
     };
 
     // Listen for postMessage from iframe sub_filter (reliable even on refresh)
+    // streamStarted = Selkies stream connected + display resized → signal backend to launch Chrome
     useEffect(() => {
         const handleStreamMessage = (e: MessageEvent) => {
             if (e.data?.type === "streamStarted") {
-                setStreamReady(true);
+                // Stream is up → display resized → tell backend to launch Chrome
+                if (socketRef.current?.connected && sessionId) {
+                    socketRef.current.emit("session:clientReady", { sessionId });
+                }
             }
             if (e.data?.type === "audioState") {
                 setAudioMuted(e.data.muted);
@@ -512,7 +530,7 @@ export default function SessionPage() {
         };
         window.addEventListener("message", handleStreamMessage);
         return () => window.removeEventListener("message", handleStreamMessage);
-    }, []);
+    }, [sessionId]);
 
     // Toggle audio in the iframe via postMessage
     const toggleAudio = () => {
