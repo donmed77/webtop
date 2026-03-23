@@ -234,7 +234,7 @@ export class SessionService implements OnModuleInit {
      * At this point Selkies has resized the Xorg display to match the client viewport,
      * so Chrome opens at the correct resolution.
      */
-    async launchChromeForSession(sessionId: string): Promise<void> {
+    async launchChromeForSession(sessionId: string, mobile: boolean = false): Promise<void> {
         const session = this.sessions.get(sessionId);
         if (!session || session.status !== 'active') return;
 
@@ -245,7 +245,7 @@ export class SessionService implements OnModuleInit {
         }
 
         try {
-            await this.containerService.launchChrome(container.containerId, session.url);
+            await this.containerService.launchChrome(container.containerId, session.url, mobile);
             await this.containerService.waitForChromeWindow(container.containerId);
         } catch (err) {
             this.logger.error(`Failed to launch Chrome for session ${sessionId}: ${err.message}`);

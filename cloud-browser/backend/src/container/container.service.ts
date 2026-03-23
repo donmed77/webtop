@@ -530,15 +530,20 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
      * Calls /usr/local/bin/launch-chrome.sh which contains all Chrome flags
      * Script is the single source of truth for Chrome configuration
      */
-    async launchChrome(containerId: string, url: string): Promise<void> {
-        this.logger.log(`Launching Chrome in container ${containerId} with URL: ${url}`);
+    async launchChrome(containerId: string, url: string, mobile: boolean = false): Promise<void> {
+        this.logger.log(`Launching Chrome in container ${containerId} with URL: ${url} (mobile: ${mobile})`);
 
         try {
             const container = this.docker.getContainer(containerId);
 
+            const cmd = ['/usr/local/bin/launch-chrome.sh', url];
+            if (mobile) {
+                cmd.push('--zoom=125');
+            }
+
             // Call the launcher script with proper user and display context
             const exec = await container.exec({
-                Cmd: ['/usr/local/bin/launch-chrome.sh', url],
+                Cmd: cmd,
                 User: 'abc',
                 Env: ['DISPLAY=:1'],
                 AttachStdout: false,

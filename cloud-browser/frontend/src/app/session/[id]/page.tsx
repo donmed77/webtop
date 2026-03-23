@@ -474,7 +474,7 @@ export default function SessionPage() {
             const fallbackTimer = setTimeout(() => {
                 // Force Chrome launch if clientReady was never sent
                 if (socketRef.current?.connected && sessionId) {
-                    socketRef.current.emit("session:clientReady", { sessionId });
+                    socketRef.current.emit("session:clientReady", { sessionId, mobile: false });
                 }
                 // Reveal after additional delay for Chrome to open
                 innerTimer = setTimeout(() => setStreamReady(true), 3000);
@@ -521,7 +521,7 @@ export default function SessionPage() {
             if (e.data?.type === "streamStarted") {
                 // Stream is up → display resized → tell backend to launch Chrome
                 if (socketRef.current?.connected && sessionId) {
-                    socketRef.current.emit("session:clientReady", { sessionId });
+                    socketRef.current.emit("session:clientReady", { sessionId, mobile: !!e.data.mobile });
                 }
             }
             if (e.data?.type === "audioState") {

@@ -204,14 +204,14 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
     @SubscribeMessage('session:clientReady')
     async handleClientReady(
         @ConnectedSocket() client: Socket,
-        @MessageBody() data: { sessionId: string },
+        @MessageBody() data: { sessionId: string; mobile?: boolean },
     ) {
         if (!data?.sessionId) return;
         if (this.chromeLaunched.has(data.sessionId)) return;
         this.chromeLaunched.add(data.sessionId);
 
-        this.logger.log(`Client stream ready for ${data.sessionId} — launching Chrome`);
-        await this.sessionService.launchChromeForSession(data.sessionId);
+        this.logger.log(`Client stream ready for ${data.sessionId} (mobile: ${!!data.mobile}) — launching Chrome`);
+        await this.sessionService.launchChromeForSession(data.sessionId, !!data.mobile);
 
         // Tell the frontend Chrome is up — it can drop the loading spinner
         client.emit('session:chromeReady', { sessionId: data.sessionId });
