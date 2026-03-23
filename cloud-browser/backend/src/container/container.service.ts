@@ -302,12 +302,12 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     PortBindings: {
                         '3000/tcp': [{ HostPort: port.toString() }],
                     },
-                    ShmSize: 9 * 1024 * 1024 * 1024, // 9GB
+                    ShmSize: 12 * 1024 * 1024 * 1024, // 12GB
                     SecurityOpt: ['seccomp=unconfined', 'no-new-privileges:true'],
                     CapDrop: ['ALL'],
                     CapAdd: ['SYS_ADMIN', 'NET_BIND_SERVICE', 'CHOWN', 'SETUID', 'SETGID', 'DAC_OVERRIDE'],
-                    Memory: 9 * 1024 * 1024 * 1024, // 9GB
-                    NanoCpus: 3 * 1e9, // 3 CPUs
+                    Memory: 12 * 1024 * 1024 * 1024, // 12GB
+                    NanoCpus: 6 * 1e9, // 6 CPUs
                     RestartPolicy: { Name: 'no' },
                     NetworkMode: this.networkName, // #3: Isolated network
                     // Volume mounts from @browser spec
