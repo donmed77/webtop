@@ -467,21 +467,29 @@ export default function SessionPage() {
         };
     }, [sessionId, apiUrl, router, checkSession, isViewer]);
 
-    // Fallback timeout: if stream detection fails after 10s, force Chrome launch + reveal
+    // Fallback: if streamStarted postMessage never fires, force Chrome launch after 7s
     useEffect(() => {
         if (status === "active" && !streamReady) {
-            let innerTimer: ReturnType<typeof setTimeout>;
             const fallbackTimer = setTimeout(() => {
                 // Force Chrome launch if clientReady was never sent
                 if (socketRef.current?.connected && sessionId) {
                     socketRef.current.emit("session:clientReady", { sessionId, mobile: false });
                 }
-                // Reveal after additional delay for Chrome to open
-                innerTimer = setTimeout(() => setStreamReady(true), 3000);
+                // Do NOT drop spinner here — wait for chromeReady event
             }, 7000);
-            return () => { clearTimeout(fallbackTimer); clearTimeout(innerTimer); };
+            return () => { clearTimeout(fallbackTimer); };
         }
     }, [status, streamReady, sessionId]);
+
+    // Safety timeout: if chromeReady never arrives within 10s, force reveal (graceful fallback)
+    useEffect(() => {
+        if (status === "active" && !streamReady) {
+            const safetyTimer = setTimeout(() => {
+                setStreamReady(true);
+            }, 10000);
+            return () => { clearTimeout(safetyTimer); };
+        }
+    }, [status, streamReady]);
 
     // Hook into iframe console.log to detect "Stream started" + poll latency
     const handleIframeLoad = () => {
