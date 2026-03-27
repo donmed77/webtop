@@ -90,7 +90,6 @@ export class SessionController {
         return {
             id: session.id,
             status: session.status,
-            port: session.port,
             url: session.url,
             startedAt: session.startedAt,
             expiresAt: session.expiresAt,
