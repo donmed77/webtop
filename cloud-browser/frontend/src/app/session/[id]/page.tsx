@@ -481,9 +481,16 @@ export default function SessionPage() {
         }
     }, [status, streamReady, sessionId]);
 
-    // No safety timeout — spinner stays until chromeReady confirms Chrome is running.
-    // The 7s fallback above ensures clientReady is always emitted, and the backend
-    // always responds with chromeReady once Chrome opens.
+    // Safety timeout: if chromeReady never arrives within 20s, force reveal (graceful fallback)
+    // Normal path completes in ~5s, fallback path in ~12s — 20s only fires on genuine failure
+    useEffect(() => {
+        if (status === "active" && !streamReady) {
+            const safetyTimer = setTimeout(() => {
+                setStreamReady(true);
+            }, 20000);
+            return () => { clearTimeout(safetyTimer); };
+        }
+    }, [status, streamReady]);
 
     // Hook into iframe console.log to detect "Stream started" + poll latency
     const handleIframeLoad = () => {
