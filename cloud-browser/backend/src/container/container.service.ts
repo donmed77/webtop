@@ -4,6 +4,7 @@ import Docker from 'dockerode';
 import { v4 as uuidv4 } from 'uuid';
 import { Mutex } from 'async-mutex';
 import http from 'http';
+import * as fs from 'fs';
 
 interface PooledContainer {
     id: string;
@@ -28,6 +29,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private readonly portRangeEnd: number;
     private readonly containerImage: string;
     private readonly networkName = 'cloud-browser-isolated';
+    private readonly seccompProfile: string;
     private readonly dockerBridgeIp: string;
     private healthCheckRunning = false;
     private cleanupInProgress = false;
@@ -48,6 +50,17 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.portRangeEnd = this.configService.get<number>('PORT_RANGE_END', 4100);
         this.containerImage = this.configService.get<string>('CONTAINER_IMAGE', 'webtop-browser:latest');
         this.dockerBridgeIp = this.configService.get<string>('DOCKER_BRIDGE_IP', '172.17.0.1');
+
+        // Load hardened seccomp profile for session containers
+        const seccompPath = '/app/seccomp-chrome.json';
+        try {
+            this.seccompProfile = fs.readFileSync(seccompPath, 'utf-8');
+            JSON.parse(this.seccompProfile); // Validate JSON
+            this.logger.log('Loaded hardened seccomp profile from ' + seccompPath);
+        } catch (e) {
+            this.logger.warn(`Failed to load seccomp profile from ${seccompPath}, falling back to unconfined: ${e.message}`);
+            this.seccompProfile = 'unconfined';
+        }
     }
 
     private healthCheckInterval: NodeJS.Timeout;
@@ -303,7 +316,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                         '3000/tcp': [{ HostPort: port.toString() }],
                     },
                     ShmSize: 12 * 1024 * 1024 * 1024, // 12GB
-                    SecurityOpt: ['seccomp=unconfined', 'no-new-privileges:true'],
+                    SecurityOpt: [`seccomp=${this.seccompProfile}`, 'no-new-privileges:true'],
                     CapDrop: ['ALL'],
                     CapAdd: ['SYS_ADMIN', 'NET_BIND_SERVICE', 'CHOWN', 'SETUID', 'SETGID', 'DAC_OVERRIDE'],
                     Memory: 12 * 1024 * 1024 * 1024, // 12GB

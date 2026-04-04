@@ -39,6 +39,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - backend_data:/app/data
       - ./backend/dist:/app/dist
+      - ../browser/seccomp-chrome.json:/app/seccomp-chrome.json:ro
     depends_on:
       - redis
 
