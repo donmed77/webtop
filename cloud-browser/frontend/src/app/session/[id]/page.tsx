@@ -506,7 +506,7 @@ export default function SessionPage() {
                     if (msg.includes("Stream started")) {
                         // Stream is up → display resized → tell backend to launch Chrome
                         if (socketRef.current?.connected && sessionId) {
-                            socketRef.current.emit("session:clientReady", { sessionId });
+                            socketRef.current.emit("session:clientReady", { sessionId, mobile: isTouchDevice });
                         }
                     }
                 };

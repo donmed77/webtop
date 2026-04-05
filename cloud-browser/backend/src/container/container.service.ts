@@ -551,7 +551,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
             const cmd = ['/usr/local/bin/launch-chrome.sh', url];
             if (mobile) {
-                cmd.push('--zoom=125');
+                cmd.push('--zoom=150');
             }
 
             // Call the launcher script with proper user and display context
