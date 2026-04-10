@@ -156,6 +156,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
                 sessionToken: session.sessionToken,
                 timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
                 isViewer: true,
+                chromeAlreadyLaunched: this.chromeLaunched.has(data.sessionId),
             });
 
             this.emitViewerCount(data.sessionId);
@@ -179,6 +180,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             sessionToken: session.sessionToken,
             timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
             isPrimary: true,
+            chromeAlreadyLaunched: this.chromeLaunched.has(data.sessionId),
         });
 
         // Send current viewer count to the new primary

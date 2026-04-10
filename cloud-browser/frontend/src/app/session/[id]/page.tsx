@@ -354,6 +354,11 @@ export default function SessionPage() {
                 setTimeRemaining(data.timeRemaining);
                 setStatus("active");
 
+                // Chrome already running (refresh / tab switch) — skip waiting for chromeReady
+                if (data.chromeAlreadyLaunched) {
+                    setStreamReady(true);
+                }
+
                 // Only store session info for controller (not viewer)
                 if (!isViewer) {
                     localStorage.setItem(`session_${sessionId}`, JSON.stringify({
@@ -834,6 +839,12 @@ export default function SessionPage() {
             setSessionToken(data.sessionToken);
             setTimeRemaining(data.timeRemaining);
             setStatus("active");
+
+            // Chrome already running — skip waiting for chromeReady
+            if (data.chromeAlreadyLaunched) {
+                setStreamReady(true);
+            }
+
             // Show toast indicating session was resumed
             setShowTakeoverToast(true);
             setTimeout(() => setShowTakeoverToast(false), 3000);
