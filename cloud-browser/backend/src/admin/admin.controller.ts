@@ -80,7 +80,7 @@ export class AdminController {
             sessionsToday: this.sessionService.getSessionsToday(),
             sessionsThisWeek: weekCount,
             peakConcurrent: this.sessionService.getPeakConcurrent(),
-            avgDuration: Math.round(this.sessionService.getAvgSessionDuration()),
+            avgDurationToday: this.loggingService.getTodayAvgDuration(),
             avgDurationWeek: weekAvgDuration,
             sessionDuration: this.sessionService.getSessionDuration(),
             poolSize: this.containerService.getPoolSize(),

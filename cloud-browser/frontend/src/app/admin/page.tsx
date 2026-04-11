@@ -127,10 +127,13 @@ interface Stats {
     sessionsToday: number;
     sessionsThisWeek: number;
     peakConcurrent: number;
-    avgDuration: number;
+    avgDurationToday: number | null;
     avgDurationWeek: number;
     sessionDuration: number;
     poolSize: number;
+    maxContainers: number;
+    initialWarm: number;
+    poolStatus: PoolStatus;
     paused: boolean;
 }
 
@@ -605,8 +608,8 @@ export default function AdminPage() {
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <Card>
                                 <CardContent className="pt-6">
-                                    <div className="text-2xl font-bold">{stats?.avgDuration ? formatTime(stats.avgDuration) : "-"}</div>
-                                    <p className="text-muted-foreground text-sm">Avg Duration (rolling)</p>
+                                    <div className="text-2xl font-bold">{stats?.avgDurationToday ? formatTime(stats.avgDurationToday) : "-"}</div>
+                                    <p className="text-muted-foreground text-sm">Avg Duration (Today)</p>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -617,8 +620,8 @@ export default function AdminPage() {
                             </Card>
                             <Card>
                                 <CardContent className="pt-6">
-                                    <div className="text-2xl font-bold">{stats?.poolSize || 0}</div>
-                                    <p className="text-muted-foreground text-sm">Pool Size</p>
+                                    <div className="text-2xl font-bold">{stats?.initialWarm || 0}</div>
+                                    <p className="text-muted-foreground text-sm">Warm Target</p>
                                 </CardContent>
                             </Card>
                         </div>

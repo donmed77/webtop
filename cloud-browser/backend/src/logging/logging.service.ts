@@ -92,6 +92,12 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 started_at TEXT NOT NULL,
                 expires_at TEXT NOT NULL
             );
+
+            -- Persist daily peak concurrent count across restarts
+            CREATE TABLE IF NOT EXISTS daily_peak (
+                date TEXT PRIMARY KEY,
+                peak INTEGER NOT NULL DEFAULT 0
+            );
         `);
 
         this.logger.log('Database schema initialized');
@@ -317,6 +323,75 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
             this.db.prepare("DELETE FROM active_sessions WHERE expires_at <= datetime('now')").run();
         } catch (err) {
             this.logger.error(`Failed to clear expired sessions: ${err.message}`);
+        }
+    }
+
+    // ---- Restart-resilient stats ----
+
+    /** Count all sessions started today (from SQLite, not in-memory) */
+    getTodaySessionCount(): number {
+        try {
+            const result = this.db.prepare(`
+                SELECT COUNT(*) as count FROM session_logs
+                WHERE DATE(started_at) = DATE('now')
+            `).get() as { count: number };
+            return result.count;
+        } catch {
+            return 0;
+        }
+    }
+
+    /** Average duration of all completed sessions today */
+    getTodayAvgDuration(): number | null {
+        try {
+            const result = this.db.prepare(`
+                SELECT ROUND(AVG(duration), 0) as avg FROM session_logs
+                WHERE DATE(started_at) = DATE('now') AND duration IS NOT NULL
+            `).get() as { avg: number | null };
+            return result.avg;
+        } catch {
+            return null;
+        }
+    }
+
+    /** Average duration of the last N completed sessions (from SQLite) */
+    getRecentAvgDuration(n: number): number | null {
+        try {
+            const result = this.db.prepare(`
+                SELECT AVG(duration) as avg FROM (
+                    SELECT duration FROM session_logs
+                    WHERE duration IS NOT NULL
+                    ORDER BY ended_at DESC
+                    LIMIT ?
+                )
+            `).get(n) as { avg: number | null };
+            return result.avg ? Math.round(result.avg) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /** Save today's peak concurrent count */
+    saveDailyPeak(peak: number): void {
+        try {
+            this.db.prepare(`
+                INSERT INTO daily_peak (date, peak) VALUES (DATE('now'), ?)
+                ON CONFLICT(date) DO UPDATE SET peak = MAX(peak, excluded.peak)
+            `).run(peak);
+        } catch (err) {
+            this.logger.error(`Failed to save daily peak: ${err.message}`);
+        }
+    }
+
+    /** Get today's peak concurrent count */
+    getDailyPeak(): number {
+        try {
+            const result = this.db.prepare(`
+                SELECT peak FROM daily_peak WHERE date = DATE('now')
+            `).get() as { peak: number } | undefined;
+            return result?.peak || 0;
+        } catch {
+            return 0;
         }
     }
 }

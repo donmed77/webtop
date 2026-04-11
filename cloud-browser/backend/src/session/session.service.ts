@@ -104,7 +104,9 @@ export class SessionService implements OnModuleInit {
             }
         }
 
-        this.sessionsToday = savedSessions.length;
+        // Load today's stats from SQLite (survives restarts)
+        this.sessionsToday = this.loggingService.getTodaySessionCount();
+        this.peakConcurrent = this.loggingService.getDailyPeak();
         this.updatePeakConcurrent();
 
         this.logger.log(`Loaded ${this.blockedIps.size} blocked, ${this.whitelistedIps.size} whitelisted, ${this.ipSessionCount.size} rate limits, ${restoredCount}/${savedSessions.length} active sessions from DB`);
@@ -137,6 +139,8 @@ export class SessionService implements OnModuleInit {
         const activeCount = this.getActiveSessions().length;
         if (activeCount > this.peakConcurrent) {
             this.peakConcurrent = activeCount;
+            // Persist to SQLite so it survives restarts
+            this.loggingService.saveDailyPeak(this.peakConcurrent);
         }
     }
 
@@ -334,7 +338,10 @@ export class SessionService implements OnModuleInit {
      * Q5: Get rolling average of actual session durations (last 20)
      */
     getAvgSessionDuration(): number {
-        if (this.sessionDurations.length === 0) return this.sessionDuration; // Fallback to config
+        if (this.sessionDurations.length === 0) {
+            // After restart, fall back to SQLite history instead of config default
+            return this.loggingService.getRecentAvgDuration(20) || this.sessionDuration;
+        }
         return this.sessionDurations.reduce((a, b) => a + b, 0) / this.sessionDurations.length;
     }
 
