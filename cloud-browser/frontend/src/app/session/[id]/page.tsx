@@ -165,6 +165,17 @@ export default function SessionPage() {
         check();
     }, []);
 
+    // Reset latency on tab return — avoids showing WebRTC reconnection spikes
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                setLatency(null);
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+        return () => document.removeEventListener("visibilitychange", handleVisibility);
+    }, []);
+
     // Lock body scroll on session page (prevents parent page from scrolling on mobile swipe)
     useEffect(() => {
         const html = document.documentElement;
@@ -357,6 +368,7 @@ export default function SessionPage() {
                 // Chrome already running (refresh / tab switch) — skip waiting for chromeReady
                 if (data.chromeAlreadyLaunched) {
                     setStreamReady(true);
+                    setLatency(null);
                 }
 
                 // Only store session info for controller (not viewer)
@@ -823,6 +835,7 @@ export default function SessionPage() {
     const handleResume = () => {
         setStreamReady(false);
         setStatus("connecting");
+        setLatency(null);
         // Reconnect and reclaim primary
         const socket = io(apiUrl, {
             reconnection: true,
@@ -843,6 +856,7 @@ export default function SessionPage() {
             // Chrome already running — skip waiting for chromeReady
             if (data.chromeAlreadyLaunched) {
                 setStreamReady(true);
+                setLatency(null);
             }
 
             // Show toast indicating session was resumed
