@@ -94,16 +94,15 @@ export class AdminController {
 
     @Get('history')
     getSessionHistory(
-        @Query('limit') limit?: string,
-        @Query('offset') offset?: string,
+        @Query('days') days?: string,
         @Query('search') search?: string,
     ) {
-        const limitNum = parseInt(limit || '50', 10);
-        const offsetNum = parseInt(offset || '0', 10);
+        const daysNum = Math.min(parseInt(days || '7', 10), 30);
+        const endDate = new Date().toISOString();
+        const startDate = new Date(Date.now() - daysNum * 86400000).toISOString();
 
-        let logs = this.loggingService.getLogs(500, 0);
+        let logs = this.loggingService.getLogsByDateRange(startDate, endDate);
 
-        // Filter by URL search if provided
         if (search) {
             const searchLower = search.toLowerCase();
             logs = logs.filter(log =>
@@ -112,14 +111,7 @@ export class AdminController {
             );
         }
 
-        const paginated = logs.slice(offsetNum, offsetNum + limitNum);
-
-        return {
-            logs: paginated,  // Fix #2: Full IPs for admin (behind Basic Auth)
-            total: logs.length,
-            limit: limitNum,
-            offset: offsetNum,
-        };
+        return { logs, total: logs.length, days: daysNum };
     }
 
     // ---- D5: Rate Limits ----

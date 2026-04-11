@@ -288,8 +288,8 @@ export default function AdminPage() {
     const fetchHistory = async (search?: string) => {
         try {
             const url = search
-                ? `${apiUrl}/api/admin/history?limit=50&search=${encodeURIComponent(search)}`
-                : `${apiUrl}/api/admin/history?limit=50`;
+                ? `${apiUrl}/api/admin/history?days=7&search=${encodeURIComponent(search)}`
+                : `${apiUrl}/api/admin/history?days=7`;
             const res = await fetch(url, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
@@ -799,7 +799,7 @@ export default function AdminPage() {
                 {activeTab === "history" && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Session History ({historyTotal} total)</CardTitle>
+                            <CardTitle>Session History — Last 7 Days ({historyTotal} sessions)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSearch} className="flex gap-2 mb-4">
