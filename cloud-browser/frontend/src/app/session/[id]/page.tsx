@@ -198,42 +198,30 @@ export default function SessionPage() {
         };
     }, []);
 
-    // Toggle virtual keyboard (mobile only) — mirrors Selkies behavior
+    // Toggle virtual keyboard (mobile only) — uses _kbdAllowed flag to gate Selkies' focus calls
     const toggleVirtualKeyboard = useCallback(() => {
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const iframeDoc = (iframeRef.current?.contentWindow as any)?.document;
+            const iframeWindow = iframeRef.current?.contentWindow as any;
+            const iframeDoc = iframeWindow?.document;
             if (!iframeDoc) return;
 
             const kbdInput = iframeDoc.getElementById("keyboard-input-assist") as HTMLInputElement | null;
-            const overlayInput = iframeDoc.getElementById("overlayInput") as HTMLElement | null;
-
             if (!kbdInput) return;
 
-            // If already focused, blur to dismiss keyboard
-            if (iframeDoc.activeElement === kbdInput) {
+            // If keyboard is open, close it
+            if (iframeWindow._kbdAllowed) {
                 kbdInput.blur();
                 kbdInput.setAttribute("aria-hidden", "true");
+                iframeWindow._kbdAllowed = false;
                 return;
             }
 
-            // Focus to pop keyboard
+            // Open keyboard — set flag BEFORE focus so the prototype interceptor allows it
+            iframeWindow._kbdAllowed = true;
             kbdInput.removeAttribute("aria-hidden");
             kbdInput.value = "";
             kbdInput.focus();
-
-            // Dismiss on overlay touch (like Selkies does)
-            // Delay listener attachment so the current touch cycle doesn't immediately trigger it
-            if (overlayInput) {
-                setTimeout(() => {
-                    overlayInput.addEventListener("touchstart", () => {
-                        if (iframeDoc.activeElement === kbdInput) {
-                            kbdInput.blur();
-                            kbdInput.setAttribute("aria-hidden", "true");
-                        }
-                    }, { once: true, passive: true });
-                }, 300);
-            }
         } catch (e) {
             console.warn("Could not toggle virtual keyboard:", e);
         }

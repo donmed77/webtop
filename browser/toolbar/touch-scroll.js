@@ -16,6 +16,14 @@
   if (!isMobile) return;
   console.log("[touch-scroll] v4: Touch device detected");
 
+  // Focus gate: block Selkies from auto-focusing #keyboard-input-assist (Android keyboard fix)
+  var _origFocus = HTMLElement.prototype.focus;
+  window._kbdAllowed = false;
+  HTMLElement.prototype.focus = function(o) {
+    if (this.id === "keyboard-input-assist" && !window._kbdAllowed) return;
+    return _origFocus.call(this, o);
+  };
+
   window._touchScrollActive = false;
 
   // Override addEventListener to wrap ALL touch handlers
@@ -235,6 +243,12 @@
       var elapsed = Date.now() - startTime;
       if (elapsed < TAP_MAX_MS) {
         sendTap(startX, startY);
+      }
+      // Dismiss virtual keyboard on any tap (Android fix)
+      if (window._kbdAllowed) {
+        var kbd = document.getElementById("keyboard-input-assist");
+        if (kbd) { kbd.blur(); kbd.setAttribute("aria-hidden", "true"); }
+        window._kbdAllowed = false;
       }
     }
 
