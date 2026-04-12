@@ -135,6 +135,7 @@ interface Stats {
     initialWarm: number;
     poolStatus: PoolStatus;
     paused: boolean;
+    rateLimitPerDay: number;
 }
 
 interface SessionLog {
@@ -232,6 +233,7 @@ export default function AdminPage() {
     // Config form state
     const [newPoolSize, setNewPoolSize] = useState("");
     const [newDuration, setNewDuration] = useState("");
+    const [newRateLimit, setNewRateLimit] = useState("");
 
     const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -460,13 +462,15 @@ export default function AdminPage() {
 
     const handleConfigSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const config: { poolSize?: number; sessionDuration?: number } = {};
+        const config: { poolSize?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
         if (newPoolSize) config.poolSize = parseInt(newPoolSize, 10);
         if (newDuration) config.sessionDuration = parseInt(newDuration, 10);
+        if (newRateLimit) config.rateLimitPerDay = parseInt(newRateLimit, 10);
         if (Object.keys(config).length > 0) {
             systemAction("config", config);
             setNewPoolSize("");
             setNewDuration("");
+            setNewRateLimit("");
         }
     };
 
@@ -1047,6 +1051,20 @@ export default function AdminPage() {
                                                 placeholder={`${stats?.sessionDuration || 300}`}
                                                 value={newDuration}
                                                 onChange={(e) => setNewDuration(e.target.value)}
+                                                className="w-full px-3 py-2 border rounded-md bg-background"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm text-muted-foreground block mb-1">
+                                                Rate Limit (current: {stats?.rateLimitPerDay || "?"} sessions/day, range: 1-1000)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="1000"
+                                                placeholder={`${stats?.rateLimitPerDay || 10}`}
+                                                value={newRateLimit}
+                                                onChange={(e) => setNewRateLimit(e.target.value)}
                                                 className="w-full px-3 py-2 border rounded-md bg-background"
                                             />
                                         </div>

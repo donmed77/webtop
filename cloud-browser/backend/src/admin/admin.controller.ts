@@ -87,6 +87,7 @@ export class AdminController {
             maxContainers: this.containerService.getMaxContainers(),
             initialWarm: this.containerService.getInitialWarm(),
             paused: this.sessionService.isPaused(),
+            rateLimitPerDay: this.sessionService.getRateLimit(),
         };
     }
 
@@ -186,7 +187,7 @@ export class AdminController {
     }
 
     @Post('config')
-    async updateConfig(@Body() config: { maxContainers?: number; sessionDuration?: number }) {
+    async updateConfig(@Body() config: { maxContainers?: number; sessionDuration?: number; rateLimitPerDay?: number }) {
         const changes: string[] = [];
 
         if (config.maxContainers && config.maxContainers >= 1 && config.maxContainers <= 100) {
@@ -197,6 +198,11 @@ export class AdminController {
         if (config.sessionDuration && config.sessionDuration >= 60 && config.sessionDuration <= 1800) {
             this.sessionService.setSessionDuration(config.sessionDuration);
             changes.push(`Session duration → ${config.sessionDuration}s`);
+        }
+
+        if (config.rateLimitPerDay && config.rateLimitPerDay >= 1 && config.rateLimitPerDay <= 1000) {
+            this.sessionService.setRateLimit(config.rateLimitPerDay);
+            changes.push(`Rate limit → ${config.rateLimitPerDay}/day`);
         }
 
         return { success: true, changes };

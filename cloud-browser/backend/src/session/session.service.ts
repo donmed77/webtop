@@ -23,7 +23,7 @@ export class SessionService implements OnModuleInit {
     private sessions: Map<string, Session> = new Map();
     private ipSessionCount: Map<string, number> = new Map();
     private sessionDuration: number;
-    private readonly rateLimitPerDay: number;
+    private rateLimitPerDay: number;
     private checkInterval: NodeJS.Timeout;
     private sessionDurations: number[] = []; // Q5: Rolling avg of actual session durations
 
@@ -160,6 +160,15 @@ export class SessionService implements OnModuleInit {
         const count = this.ipSessionCount.get(clientIp) || 0;
         const remaining = this.rateLimitPerDay - count;
         return { allowed: remaining > 0, remaining: Math.max(0, remaining) };
+    }
+
+    setRateLimit(limit: number): void {
+        this.rateLimitPerDay = limit;
+        this.logger.log(`Rate limit updated to ${limit} sessions/day`);
+    }
+
+    getRateLimit(): number {
+        return this.rateLimitPerDay;
     }
 
     async createSession(url: string, clientIp: string): Promise<{ session?: Session; queued?: boolean; error?: string }> {
