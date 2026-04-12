@@ -142,6 +142,7 @@ interface SessionLog {
     sessionId: string;
     url: string;
     clientIp: string;
+    countryCode: string | null;
     startedAt: string;
     endedAt: string | null;
     reason: string | null;
@@ -833,7 +834,23 @@ export default function AdminPage() {
                                                 <tr key={log.id} className="border-b">
                                                     <td className="p-2 font-mono text-xs">{log.sessionId.slice(0, 8)}...</td>
                                                     <td className="p-2 max-w-xs truncate">{log.url}</td>
-                                                    <td className="p-2 font-mono text-xs">{log.clientIp}</td>
+                                                    <td className="p-2 font-mono text-xs">
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            {log.countryCode ? (
+                                                                <img
+                                                                    src={`https://flagcdn.com/w20/${log.countryCode.toLowerCase()}.png`}
+                                                                    alt={log.countryCode}
+                                                                    title={log.countryCode}
+                                                                    width={20}
+                                                                    height={15}
+                                                                    className="inline-block rounded-sm"
+                                                                />
+                                                            ) : (
+                                                                <span title="Unknown">🌐</span>
+                                                            )}
+                                                            {log.clientIp}
+                                                        </span>
+                                                    </td>
                                                     <td className="p-2">{formatFullDate(log.startedAt)}</td>
                                                     <td className="p-2">{log.duration ? formatTime(log.duration) : "-"}</td>
                                                     <td className="p-2">

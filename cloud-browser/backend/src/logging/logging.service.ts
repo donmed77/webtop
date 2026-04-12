@@ -3,12 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as geoip from 'geoip-lite';
 
 export interface SessionLog {
     id: number;
     sessionId: string;
     url: string;
     clientIp: string;
+    countryCode: string | null;
     startedAt: string;
     endedAt: string | null;
     reason: string | null;
@@ -100,6 +102,14 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
             );
         `);
 
+        // Add country_code column if it doesn't exist (migration)
+        try {
+            this.db.exec(`ALTER TABLE session_logs ADD COLUMN country_code TEXT`);
+            this.logger.log('Added country_code column to session_logs');
+        } catch {
+            // Column already exists — ignore
+        }
+
         this.logger.log('Database schema initialized');
     }
 
@@ -108,12 +118,14 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
      */
     logSessionStart(sessionId: string, url: string, clientIp: string): void {
         try {
+            const geo = geoip.lookup(clientIp);
+            const countryCode = geo?.country || null;
             const stmt = this.db.prepare(`
-                INSERT INTO session_logs (session_id, url, client_ip, started_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO session_logs (session_id, url, client_ip, country_code, started_at)
+                VALUES (?, ?, ?, ?, ?)
             `);
-            stmt.run(sessionId, url, clientIp, new Date().toISOString());
-            this.logger.debug(`Logged session start: ${sessionId}`);
+            stmt.run(sessionId, url, clientIp, countryCode, new Date().toISOString());
+            this.logger.debug(`Logged session start: ${sessionId} (${countryCode || 'unknown'})`);
         } catch (err) {
             this.logger.error(`Failed to log session start: ${err.message}`);
         }
@@ -160,6 +172,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 session_id as sessionId,
                 url,
                 client_ip as clientIp,
+                country_code as countryCode,
                 started_at as startedAt,
                 ended_at as endedAt,
                 reason,
@@ -189,6 +202,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 session_id as sessionId,
                 url,
                 client_ip as clientIp,
+                country_code as countryCode,
                 started_at as startedAt,
                 ended_at as endedAt,
                 reason,
