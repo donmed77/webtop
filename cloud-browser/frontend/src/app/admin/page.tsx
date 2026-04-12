@@ -464,7 +464,7 @@ export default function AdminPage() {
         e.preventDefault();
         const config: { poolSize?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
         if (newPoolSize) config.poolSize = parseInt(newPoolSize, 10);
-        if (newDuration) config.sessionDuration = parseInt(newDuration, 10);
+        if (newDuration) config.sessionDuration = parseInt(newDuration, 10) * 60; // minutes → seconds
         if (newRateLimit) config.rateLimitPerDay = parseInt(newRateLimit, 10);
         if (Object.keys(config).length > 0) {
             systemAction("config", config);
@@ -1024,49 +1024,75 @@ export default function AdminPage() {
                                 <CardTitle>Runtime Configuration</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <form onSubmit={handleConfigSubmit} className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <form onSubmit={handleConfigSubmit} className="space-y-6">
+                                    <div className="space-y-5">
+                                        {/* Pool Size Slider */}
                                         <div>
-                                            <label className="text-sm text-muted-foreground block mb-1">
-                                                Pool Size (current: {stats?.poolSize || "?"}, range: 1-20)
-                                            </label>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-sm font-medium">Pool Size</label>
+                                                <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
+                                                    {newPoolSize || stats?.poolSize || 3}
+                                                </span>
+                                            </div>
                                             <input
-                                                type="number"
+                                                type="range"
                                                 min="1"
-                                                max="20"
-                                                placeholder={`${stats?.poolSize || 3}`}
-                                                value={newPoolSize}
+                                                max="50"
+                                                value={newPoolSize || stats?.poolSize || 3}
                                                 onChange={(e) => setNewPoolSize(e.target.value)}
-                                                className="w-full px-3 py-2 border rounded-md bg-background"
+                                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
                                             />
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                <span>1</span>
+                                                <span className="text-muted-foreground/60">Current: {stats?.poolSize || "?"}</span>
+                                                <span>50</span>
+                                            </div>
                                         </div>
+
+                                        {/* Session Duration Slider (minutes) */}
                                         <div>
-                                            <label className="text-sm text-muted-foreground block mb-1">
-                                                Session Duration (current: {stats?.sessionDuration ? formatTime(stats.sessionDuration) : "?"}, range: 60-1800s)
-                                            </label>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-sm font-medium">Session Duration</label>
+                                                <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
+                                                    {newDuration || (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)} min
+                                                </span>
+                                            </div>
                                             <input
-                                                type="number"
-                                                min="60"
-                                                max="1800"
-                                                placeholder={`${stats?.sessionDuration || 300}`}
-                                                value={newDuration}
-                                                onChange={(e) => setNewDuration(e.target.value)}
-                                                className="w-full px-3 py-2 border rounded-md bg-background"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm text-muted-foreground block mb-1">
-                                                Rate Limit (current: {stats?.rateLimitPerDay || "?"} sessions/day, range: 1-1000)
-                                            </label>
-                                            <input
-                                                type="number"
+                                                type="range"
                                                 min="1"
-                                                max="1000"
-                                                placeholder={`${stats?.rateLimitPerDay || 10}`}
-                                                value={newRateLimit}
-                                                onChange={(e) => setNewRateLimit(e.target.value)}
-                                                className="w-full px-3 py-2 border rounded-md bg-background"
+                                                max="60"
+                                                value={newDuration || (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)}
+                                                onChange={(e) => setNewDuration(e.target.value)}
+                                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
                                             />
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                <span>1 min</span>
+                                                <span className="text-muted-foreground/60">Current: {stats?.sessionDuration ? formatTime(stats.sessionDuration) : "?"}</span>
+                                                <span>60 min</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Rate Limit Slider */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-sm font-medium">Rate Limit</label>
+                                                <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
+                                                    {newRateLimit || stats?.rateLimitPerDay || 10} /day
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="100"
+                                                value={newRateLimit || stats?.rateLimitPerDay || 10}
+                                                onChange={(e) => setNewRateLimit(e.target.value)}
+                                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                <span>1</span>
+                                                <span className="text-muted-foreground/60">Current: {stats?.rateLimitPerDay || "?"} /day</span>
+                                                <span>100</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <Button type="submit" className="cursor-pointer">

@@ -195,12 +195,12 @@ export class AdminController {
             changes.push(`Max containers → ${config.maxContainers}`);
         }
 
-        if (config.sessionDuration && config.sessionDuration >= 60 && config.sessionDuration <= 1800) {
+        if (config.sessionDuration && config.sessionDuration >= 60 && config.sessionDuration <= 3600) {
             this.sessionService.setSessionDuration(config.sessionDuration);
             changes.push(`Session duration → ${config.sessionDuration}s`);
         }
 
-        if (config.rateLimitPerDay && config.rateLimitPerDay >= 1 && config.rateLimitPerDay <= 1000) {
+        if (config.rateLimitPerDay && config.rateLimitPerDay >= 1 && config.rateLimitPerDay <= 100) {
             this.sessionService.setRateLimit(config.rateLimitPerDay);
             changes.push(`Rate limit → ${config.rateLimitPerDay}/day`);
         }
