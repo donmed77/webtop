@@ -108,7 +108,7 @@ export default function QueuePage() {
                         <div className="text-4xl mb-4">⏳</div>
                         <h2 className="text-xl font-semibold mb-2">Daily Limit Reached</h2>
                         <p className="text-muted-foreground mb-6">
-                            You&apos;ve used all 10 sessions for today. Come back tomorrow for more browsing!
+                            You&apos;ve reached your daily session limit. Come back tomorrow for more browsing!
                         </p>
                         <Button onClick={() => router.push("/")} className="cursor-pointer">
                             Back to Home

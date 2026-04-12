@@ -204,6 +204,14 @@ export class SessionService implements OnModuleInit {
         const sessionId = uuidv4();
         const sessionToken = crypto.randomBytes(16).toString('hex');
 
+        // Enforce max concurrent sessions cap
+        const activeCount = this.getActiveCount();
+        const maxSessions = this.containerService.getMaxSessions();
+        if (activeCount >= maxSessions) {
+            this.logger.log(`Max sessions reached (${activeCount}/${maxSessions}), queuing request`);
+            return { queued: true };
+        }
+
         // Acquire a warm container (fast - container already running without Chrome)
         const container = await this.containerService.acquireContainer(sessionId);
         if (!container) {

@@ -805,8 +805,8 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     getPoolSize(): number {
-        // For queue wait time estimation: return maxContainers as the effective pool capacity
-        return this.maxContainers;
+        // For queue wait time estimation: return maxSessions as the effective capacity
+        return this.initialWarm;
     }
 
     getMaxContainers(): number {

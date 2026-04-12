@@ -206,6 +206,11 @@ export class QueueService implements OnModuleDestroy {
         const warmCount = this.containerService.getWarmCount();
         if (warmCount === 0) return;
 
+        // Don't dequeue if we're already at max concurrent sessions
+        const activeCount = this.sessionService.getActiveCount();
+        const maxSessions = this.containerService.getMaxSessions();
+        if (activeCount >= maxSessions) return;
+
         // Process next waiting entry
         const entry = this.queue.find(e => e.status === 'waiting');
         if (!entry) return;
