@@ -85,6 +85,7 @@ export class AdminController {
             sessionDuration: this.sessionService.getSessionDuration(),
             poolSize: this.containerService.getPoolSize(),
             maxContainers: this.containerService.getMaxContainers(),
+            maxSessions: this.containerService.getMaxSessions(),
             initialWarm: this.containerService.getInitialWarm(),
             paused: this.sessionService.isPaused(),
             rateLimitPerDay: this.sessionService.getRateLimit(),
@@ -187,12 +188,12 @@ export class AdminController {
     }
 
     @Post('config')
-    async updateConfig(@Body() config: { maxContainers?: number; sessionDuration?: number; rateLimitPerDay?: number }) {
+    async updateConfig(@Body() config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number }) {
         const changes: string[] = [];
 
-        if (config.maxContainers && config.maxContainers >= 1 && config.maxContainers <= 100) {
-            await this.containerService.setMaxContainers(config.maxContainers);
-            changes.push(`Max containers → ${config.maxContainers}`);
+        if (config.maxSessions && config.maxSessions >= 1 && config.maxSessions <= 50) {
+            await this.containerService.setMaxSessions(config.maxSessions);
+            changes.push(`Max sessions → ${config.maxSessions} (maxContainers → ${config.maxSessions * 2})`);
         }
 
         if (config.sessionDuration && config.sessionDuration >= 60 && config.sessionDuration <= 3600) {

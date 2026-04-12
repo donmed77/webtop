@@ -23,7 +23,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private usedPorts: Set<number> = new Set();
     private readonly acquireMutex = new Mutex();
 
-    private readonly initialWarm: number;
+    private initialWarm: number;
     private maxContainers: number;
     private readonly portRangeStart: number;
     private readonly portRangeEnd: number;
@@ -814,6 +814,23 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     getInitialWarm(): number {
+        return this.initialWarm;
+    }
+
+    /**
+     * Set max concurrent sessions.
+     * warmTarget = maxSessions, maxContainers = maxSessions * 2 (headroom for replenishment)
+     */
+    async setMaxSessions(maxSessions: number): Promise<void> {
+        const oldWarm = this.initialWarm;
+        const oldMax = this.maxContainers;
+        this.initialWarm = maxSessions;
+        this.maxContainers = maxSessions * 2;
+        this.logger.log(`Max sessions changed: warm ${oldWarm}→${maxSessions}, maxContainers ${oldMax}→${this.maxContainers}`);
+        await this.replenishPool();
+    }
+
+    getMaxSessions(): number {
         return this.initialWarm;
     }
 

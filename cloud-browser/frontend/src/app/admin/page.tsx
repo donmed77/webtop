@@ -132,6 +132,7 @@ interface Stats {
     sessionDuration: number;
     poolSize: number;
     maxContainers: number;
+    maxSessions: number;
     initialWarm: number;
     poolStatus: PoolStatus;
     paused: boolean;
@@ -462,8 +463,8 @@ export default function AdminPage() {
 
     const handleConfigSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const config: { poolSize?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
-        if (newPoolSize) config.poolSize = parseInt(newPoolSize, 10);
+        const config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
+        if (newPoolSize) config.maxSessions = parseInt(newPoolSize, 10);
         if (newDuration) config.sessionDuration = parseInt(newDuration, 10) * 60; // minutes → seconds
         if (newRateLimit) config.rateLimitPerDay = parseInt(newRateLimit, 10);
         if (Object.keys(config).length > 0) {
@@ -625,8 +626,8 @@ export default function AdminPage() {
                             </Card>
                             <Card>
                                 <CardContent className="pt-6">
-                                    <div className="text-2xl font-bold">{stats?.initialWarm || 0}</div>
-                                    <p className="text-muted-foreground text-sm">Warm Target</p>
+                                    <div className="text-2xl font-bold">{stats?.maxSessions || stats?.initialWarm || 0}</div>
+                                    <p className="text-muted-foreground text-sm">Max Sessions</p>
                                 </CardContent>
                             </Card>
                         </div>
@@ -1026,25 +1027,25 @@ export default function AdminPage() {
                             <CardContent>
                                 <form onSubmit={handleConfigSubmit} className="space-y-6">
                                     <div className="space-y-5">
-                                        {/* Pool Size Slider */}
+                                        {/* Max Sessions Slider */}
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="text-sm font-medium">Pool Size</label>
+                                                <label className="text-sm font-medium">Max Sessions</label>
                                                 <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
-                                                    {newPoolSize || stats?.poolSize || 3}
+                                                    {newPoolSize || stats?.maxSessions || stats?.initialWarm || 3}
                                                 </span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min="1"
                                                 max="50"
-                                                value={newPoolSize || stats?.poolSize || 3}
+                                                value={newPoolSize || stats?.maxSessions || stats?.initialWarm || 3}
                                                 onChange={(e) => setNewPoolSize(e.target.value)}
                                                 className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                                 <span>1</span>
-                                                <span className="text-muted-foreground/60">Current: {stats?.poolSize || "?"}</span>
+                                                <span className="text-muted-foreground/60">Current: {stats?.maxSessions || stats?.initialWarm || "?"}</span>
                                                 <span>50</span>
                                             </div>
                                         </div>
