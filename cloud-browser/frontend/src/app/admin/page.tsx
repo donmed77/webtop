@@ -1040,7 +1040,7 @@ export default function AdminPage() {
                                                 max="50"
                                                 value={newPoolSize || stats?.poolSize || 3}
                                                 onChange={(e) => setNewPoolSize(e.target.value)}
-                                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                                                className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                                 <span>1</span>
@@ -1063,7 +1063,7 @@ export default function AdminPage() {
                                                 max="60"
                                                 value={newDuration || (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)}
                                                 onChange={(e) => setNewDuration(e.target.value)}
-                                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                                                className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                                 <span>1 min</span>
@@ -1086,7 +1086,7 @@ export default function AdminPage() {
                                                 max="100"
                                                 value={newRateLimit || stats?.rateLimitPerDay || 10}
                                                 onChange={(e) => setNewRateLimit(e.target.value)}
-                                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                                                className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                                 <span>1</span>
