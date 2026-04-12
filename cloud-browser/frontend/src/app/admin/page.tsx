@@ -838,12 +838,14 @@ export default function AdminPage() {
                                                         <span className="inline-flex items-center gap-1.5">
                                                             {log.countryCode ? (
                                                                 <img
-                                                                    src={`https://flagcdn.com/w20/${log.countryCode.toLowerCase()}.png`}
+                                                                    src={`https://flagcdn.com/w40/${log.countryCode.toLowerCase()}.png`}
+                                                                    srcSet={`https://flagcdn.com/w40/${log.countryCode.toLowerCase()}.png 1x, https://flagcdn.com/w80/${log.countryCode.toLowerCase()}.png 2x`}
                                                                     alt={log.countryCode}
                                                                     title={log.countryCode}
                                                                     width={20}
                                                                     height={15}
-                                                                    className="inline-block rounded-sm"
+                                                                    className="inline-block border border-white/20"
+                                                                    style={{ objectFit: 'cover' }}
                                                                 />
                                                             ) : (
                                                                 <span title="Unknown">🌐</span>
