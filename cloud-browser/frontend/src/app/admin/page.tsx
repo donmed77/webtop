@@ -231,10 +231,15 @@ export default function AdminPage() {
     const [expandedSurveyId, setExpandedSurveyId] = useState<number | null>(null);
     const [surveyStats, setSurveyStats] = useState<SurveyStats | null>(null);
 
-    // Config form state
+    // Config form state — track which sliders the user has touched
     const [newPoolSize, setNewPoolSize] = useState("");
     const [newDuration, setNewDuration] = useState("");
     const [newRateLimit, setNewRateLimit] = useState("");
+    const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
+
+    const markDirty = (field: string) => {
+        setDirtyFields(prev => new Set(prev).add(field));
+    };
 
     const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -461,17 +466,24 @@ export default function AdminPage() {
         fetchHistory(searchQuery);
     };
 
-    const handleConfigSubmit = (e: React.FormEvent) => {
+    const handleConfigSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
-        if (newPoolSize) config.maxSessions = parseInt(newPoolSize, 10);
-        if (newDuration) config.sessionDuration = parseInt(newDuration, 10) * 60; // minutes → seconds
-        if (newRateLimit) config.rateLimitPerDay = parseInt(newRateLimit, 10);
+        if (dirtyFields.has('maxSessions') && newPoolSize) {
+            config.maxSessions = parseInt(newPoolSize, 10);
+        }
+        if (dirtyFields.has('duration') && newDuration) {
+            config.sessionDuration = parseInt(newDuration, 10) * 60; // minutes → seconds
+        }
+        if (dirtyFields.has('rateLimit') && newRateLimit) {
+            config.rateLimitPerDay = parseInt(newRateLimit, 10);
+        }
         if (Object.keys(config).length > 0) {
-            systemAction("config", config);
+            await systemAction("config", config);
             setNewPoolSize("");
             setNewDuration("");
             setNewRateLimit("");
+            setDirtyFields(new Set());
         }
     };
 
@@ -1032,15 +1044,15 @@ export default function AdminPage() {
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className="text-sm font-medium">Max Sessions</label>
                                                 <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
-                                                    {newPoolSize || stats?.maxSessions || stats?.initialWarm || 3}
+                                                    {dirtyFields.has('maxSessions') ? newPoolSize : (stats?.maxSessions || stats?.initialWarm || 3)}
                                                 </span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min="1"
                                                 max="50"
-                                                value={newPoolSize || stats?.maxSessions || stats?.initialWarm || 3}
-                                                onChange={(e) => setNewPoolSize(e.target.value)}
+                                                value={dirtyFields.has('maxSessions') ? newPoolSize : (stats?.maxSessions || stats?.initialWarm || 3)}
+                                                onChange={(e) => { setNewPoolSize(e.target.value); markDirty('maxSessions'); }}
                                                 className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -1055,15 +1067,15 @@ export default function AdminPage() {
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className="text-sm font-medium">Session Duration</label>
                                                 <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
-                                                    {newDuration || (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)} min
+                                                    {dirtyFields.has('duration') ? newDuration : (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)} min
                                                 </span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min="1"
                                                 max="60"
-                                                value={newDuration || (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)}
-                                                onChange={(e) => setNewDuration(e.target.value)}
+                                                value={dirtyFields.has('duration') ? newDuration : (stats?.sessionDuration ? Math.round(stats.sessionDuration / 60) : 5)}
+                                                onChange={(e) => { setNewDuration(e.target.value); markDirty('duration'); }}
                                                 className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -1078,15 +1090,15 @@ export default function AdminPage() {
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className="text-sm font-medium">Rate Limit</label>
                                                 <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
-                                                    {newRateLimit || stats?.rateLimitPerDay || 10} /day
+                                                    {dirtyFields.has('rateLimit') ? newRateLimit : (stats?.rateLimitPerDay || 10)} /day
                                                 </span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min="1"
                                                 max="100"
-                                                value={newRateLimit || stats?.rateLimitPerDay || 10}
-                                                onChange={(e) => setNewRateLimit(e.target.value)}
+                                                value={dirtyFields.has('rateLimit') ? newRateLimit : (stats?.rateLimitPerDay || 10)}
+                                                onChange={(e) => { setNewRateLimit(e.target.value); markDirty('rateLimit'); }}
                                                 className="w-full"
                                             />
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
