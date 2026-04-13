@@ -421,9 +421,11 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (!authenticated) return;
+        // Pause auto-refresh while user is editing sliders to prevent re-render flicker
+        if (dirtyFields.size > 0) return;
         const interval = setInterval(fetchAll, 3000);
         return () => clearInterval(interval);
-    }, [authenticated]);
+    }, [authenticated, dirtyFields.size]);
 
     useEffect(() => {
         if (!authenticated) return;
@@ -480,10 +482,14 @@ export default function AdminPage() {
         }
         if (Object.keys(config).length > 0) {
             await systemAction("config", config);
-            setNewPoolSize("");
-            setNewDuration("");
-            setNewRateLimit("");
-            setDirtyFields(new Set());
+            // Delay clearing dirty state so the next fetchAll (inside systemAction)
+            // picks up the new server values before sliders fall back to stats
+            setTimeout(() => {
+                setNewPoolSize("");
+                setNewDuration("");
+                setNewRateLimit("");
+                setDirtyFields(new Set());
+            }, 500);
         }
     };
 
