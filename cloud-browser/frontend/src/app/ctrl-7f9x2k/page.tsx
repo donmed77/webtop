@@ -196,6 +196,16 @@ interface SurveyStats {
     dailyAverages: { date: string; average: number; count: number }[];
 }
 
+interface ServerHealth {
+    cpu: { cores: number; model: string; percent: number; loadAvg: number[] };
+    memory: { totalBytes: number; usedBytes: number; freeBytes: number; percent: number };
+    disk: { total: number; used: number; available: number; percent: number };
+    diskIO: { readMBps: number; writeMBps: number };
+    network: { rxMBps: number; txMBps: number; rxTotalGB: number; txTotalGB: number };
+    uptime: number;
+    containers: Array<{ name: string; cpu: number; memMb: number; netRx: string; netTx: string }>;
+}
+
 type Tab = "overview" | "history" | "ratelimits" | "controls" | "feedback" | "surveys";
 
 export default function AdminPage() {
@@ -233,6 +243,9 @@ export default function AdminPage() {
     const [expandedSurveyId, setExpandedSurveyId] = useState<number | null>(null);
     const [surveyStats, setSurveyStats] = useState<SurveyStats | null>(null);
 
+    // Server health state
+    const [serverHealth, setServerHealth] = useState<ServerHealth | null>(null);
+
     // Config form state — track which sliders the user has touched
     const [newPoolSize, setNewPoolSize] = useState("");
     const [newDuration, setNewDuration] = useState("");
@@ -267,7 +280,8 @@ export default function AdminPage() {
                 fetch(`${apiUrl}/api/admin/queue`, { headers: authHeader }),
                 fetch(`${apiUrl}/api/admin/pool`, { headers: authHeader }),
                 fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: authHeader }),
-            ]).then(async ([statsRes, sessionsRes, queueRes, poolRes, fbStatsRes]) => {
+                fetch(`${apiUrl}/api/admin/server-health`, { headers: authHeader }),
+            ]).then(async ([statsRes, sessionsRes, queueRes, poolRes, fbStatsRes, healthRes]) => {
                 if (statsRes.ok) {
                     setUsername(u);
                     setPassword(p);
@@ -278,6 +292,7 @@ export default function AdminPage() {
                     if (queueRes.ok) setQueue(await queueRes.json());
                     if (poolRes.ok) setPool(await poolRes.json());
                     if (fbStatsRes.ok) setFeedbackStats(await fbStatsRes.json());
+                    if (healthRes.ok) setServerHealth(await healthRes.json());
                 } else {
                     sessionStorage.removeItem("admin_creds");
                 }
@@ -321,12 +336,13 @@ export default function AdminPage() {
 
     const fetchAll = async () => {
         try {
-            const [sessionsRes, queueRes, poolRes, statsRes, fbStatsRes] = await Promise.all([
+            const [sessionsRes, queueRes, poolRes, statsRes, fbStatsRes, healthRes] = await Promise.all([
                 fetch(`${apiUrl}/api/admin/sessions`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/queue`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/pool`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/stats`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/server-health`, { headers: getAuthHeaders() }),
             ]);
 
             if (sessionsRes.ok) setSessions(await sessionsRes.json());
@@ -334,6 +350,7 @@ export default function AdminPage() {
             if (poolRes.ok) setPool(await poolRes.json());
             if (statsRes.ok) setStats(await statsRes.json());
             if (fbStatsRes.ok) setFeedbackStats(await fbStatsRes.json());
+            if (healthRes.ok) setServerHealth(await healthRes.json());
         } catch (err) {
             console.error("Failed to fetch data:", err);
         } finally {
@@ -714,7 +731,7 @@ export default function AdminPage() {
                             </Card>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="text-2xl font-bold">{stats?.avgDurationToday ? formatTime(stats.avgDurationToday) : "-"}</div>
@@ -733,7 +750,159 @@ export default function AdminPage() {
                                     <p className="text-muted-foreground text-sm">Max Sessions</p>
                                 </CardContent>
                             </Card>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-2xl font-bold text-primary">{pool?.metrics?.poolHitRate || "-"}</div>
+                                    <p className="text-muted-foreground text-sm">Pool Hit Rate</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-2xl font-bold">{pool?.metrics?.avgBootTimeMs && pool.metrics.avgBootTimeMs > 0 ? `${(pool.metrics.avgBootTimeMs / 1000).toFixed(1)}s` : "—"}</div>
+                                    <p className="text-muted-foreground text-sm">Avg Boot Time</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-2xl font-bold">{pool?.metrics?.totalAcquires ?? 0}</div>
+                                    <p className="text-muted-foreground text-sm">Total Acquires</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-2xl font-bold">{pool?.metrics ? `${pool.metrics.portsUsed}/${pool.metrics.portsTotal}` : "-"}</div>
+                                    <p className="text-muted-foreground text-sm">Ports Used</p>
+                                </CardContent>
+                            </Card>
                         </div>
+
+                        {/* Server Health */}
+                        {serverHealth && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base">Server Health</CardTitle>
+                                        <span className="text-xs text-muted-foreground font-mono">
+                                            {serverHealth.cpu.model.replace(/\s+/g, ' ').slice(0, 40)} · {serverHealth.cpu.cores} cores · up {Math.floor(serverHealth.uptime / 86400)}d {Math.floor((serverHealth.uptime % 86400) / 3600)}h
+                                        </span>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                                        {/* CPU */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">CPU</span>
+                                                <span className="font-mono font-medium">{serverHealth.cpu.percent}%</span>
+                                            </div>
+                                            <div className="h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                        serverHealth.cpu.percent > 80 ? 'bg-red-500' :
+                                                        serverHealth.cpu.percent > 60 ? 'bg-yellow-500' :
+                                                        'bg-emerald-500'
+                                                    }`}
+                                                    style={{ width: `${Math.min(serverHealth.cpu.percent, 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground font-mono">
+                                                Load: {serverHealth.cpu.loadAvg.join(' / ')}
+                                            </div>
+                                        </div>
+
+                                        {/* RAM */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">RAM</span>
+                                                <span className="font-mono font-medium">
+                                                    {(serverHealth.memory.usedBytes / 1073741824).toFixed(1)} / {(serverHealth.memory.totalBytes / 1073741824).toFixed(0)} GB
+                                                </span>
+                                            </div>
+                                            <div className="h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                        serverHealth.memory.percent > 85 ? 'bg-red-500' :
+                                                        serverHealth.memory.percent > 70 ? 'bg-yellow-500' :
+                                                        'bg-blue-500'
+                                                    }`}
+                                                    style={{ width: `${Math.min(serverHealth.memory.percent, 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground font-mono">
+                                                {serverHealth.memory.percent}% used · {(serverHealth.memory.freeBytes / 1073741824).toFixed(1)} GB free
+                                            </div>
+                                        </div>
+
+                                        {/* Disk */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Disk</span>
+                                                <span className="font-mono font-medium">
+                                                    {(serverHealth.disk.used / 1073741824).toFixed(0)} / {(serverHealth.disk.total / 1073741824).toFixed(0)} GB
+                                                </span>
+                                            </div>
+                                            <div className="h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                        serverHealth.disk.percent > 90 ? 'bg-red-500' :
+                                                        serverHealth.disk.percent > 75 ? 'bg-yellow-500' :
+                                                        'bg-purple-500'
+                                                    }`}
+                                                    style={{ width: `${Math.min(serverHealth.disk.percent, 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground font-mono">
+                                                {serverHealth.disk.percent}% used · {(serverHealth.disk.available / 1073741824).toFixed(0)} GB free
+                                            </div>
+                                        </div>
+
+                                        {/* Disk I/O */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Disk I/O</span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                                    <span className="font-mono text-sm font-medium">{serverHealth.diskIO.readMBps}</span>
+                                                    <span className="text-[10px] text-muted-foreground">MB/s</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <svg className="w-3 h-3 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                                    <span className="font-mono text-sm font-medium">{serverHealth.diskIO.writeMBps}</span>
+                                                    <span className="text-[10px] text-muted-foreground">MB/s</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground font-mono">
+                                                Read / Write
+                                            </div>
+                                        </div>
+
+                                        {/* Network */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Network</span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                                    <span className="font-mono text-sm font-medium">{serverHealth.network.rxMBps}</span>
+                                                    <span className="text-[10px] text-muted-foreground">MB/s</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <svg className="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                                    <span className="font-mono text-sm font-medium">{serverHealth.network.txMBps}</span>
+                                                    <span className="text-[10px] text-muted-foreground">MB/s</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground font-mono">
+                                                ↓ {serverHealth.network.rxTotalGB} GB · ↑ {serverHealth.network.txTotalGB} GB total
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {/* Active Sessions — D2 */}
                         <Card>
@@ -838,7 +1007,13 @@ export default function AdminPage() {
                             <CardContent>
                                 {pool?.containers && pool.containers.length > 0 ? (
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        {pool.containers.map((container) => (
+                                        {pool.containers.map((container) => {
+                                            // Match container with health stats by name prefix
+                                            const healthStat = serverHealth?.containers.find(
+                                                c => container.id.startsWith(c.name.replace('session-', ''))
+                                                  || c.name === `session-${container.id.slice(0, 8)}`
+                                            );
+                                            return (
                                             <div
                                                 key={container.id}
                                                 className={`p-4 rounded-lg border ${container.status === "warm"
@@ -871,34 +1046,28 @@ export default function AdminPage() {
                                                         </span>
                                                     )}
                                                 </div>
+                                                {/* Per-container resource metrics */}
+                                                {healthStat && (
+                                                    <div className="mt-2 pt-2 border-t border-border/50 flex flex-wrap gap-2">
+                                                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+                                                            CPU {healthStat.cpu}%
+                                                        </span>
+                                                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
+                                                            RAM {healthStat.memMb >= 1024 ? `${(healthStat.memMb / 1024).toFixed(1)}G` : `${healthStat.memMb}M`}
+                                                        </span>
+                                                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                                                            ↓{healthStat.netRx} ↑{healthStat.netTx}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <p className="text-muted-foreground text-sm">No containers</p>
                                 )}
 
-                                {/* Pool Metrics */}
-                                {pool?.metrics && (
-                                    <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="text-center p-2 rounded bg-muted/30">
-                                            <div className="text-lg font-semibold text-primary">{pool.metrics.poolHitRate}</div>
-                                            <div className="text-xs text-muted-foreground">Hit Rate</div>
-                                        </div>
-                                        <div className="text-center p-2 rounded bg-muted/30">
-                                            <div className="text-lg font-semibold">{pool.metrics.avgBootTimeMs > 0 ? `${(pool.metrics.avgBootTimeMs / 1000).toFixed(1)}s` : "—"}</div>
-                                            <div className="text-xs text-muted-foreground">Avg Boot Time</div>
-                                        </div>
-                                        <div className="text-center p-2 rounded bg-muted/30">
-                                            <div className="text-lg font-semibold">{pool.metrics.totalAcquires}</div>
-                                            <div className="text-xs text-muted-foreground">Total Acquires</div>
-                                        </div>
-                                        <div className="text-center p-2 rounded bg-muted/30">
-                                            <div className="text-lg font-semibold">{pool.metrics.portsUsed}/{pool.metrics.portsTotal}</div>
-                                            <div className="text-xs text-muted-foreground">Ports Used</div>
-                                        </div>
-                                    </div>
-                                )}
                             </CardContent>
                         </Card>
                         </>
