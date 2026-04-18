@@ -203,6 +203,7 @@ export default function AdminPage() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [authError, setAuthError] = useState("");
+    const [restoring, setRestoring] = useState(true); // true while checking sessionStorage
 
     const [sessions, setSessions] = useState<Session[]>([]);
     const [queue, setQueue] = useState<QueueEntry[]>([]);
@@ -247,6 +248,38 @@ export default function AdminPage() {
         Authorization: `Basic ${btoa(`${username}:${password}`)}`,
     });
 
+    // Restore session from sessionStorage on mount
+    useEffect(() => {
+        const saved = sessionStorage.getItem("admin_creds");
+        if (!saved) {
+            setRestoring(false);
+            return;
+        }
+        try {
+            const { u, p } = JSON.parse(saved);
+            // Validate saved credentials are still valid
+            fetch(`${apiUrl}/api/admin/stats`, {
+                headers: { Authorization: `Basic ${btoa(`${u}:${p}`)}` },
+            }).then(res => {
+                if (res.ok) {
+                    setUsername(u);
+                    setPassword(p);
+                    setAuthenticated(true);
+                } else {
+                    // Credentials expired or changed — clear stale session
+                    sessionStorage.removeItem("admin_creds");
+                }
+            }).catch(() => {
+                sessionStorage.removeItem("admin_creds");
+            }).finally(() => {
+                setRestoring(false);
+            });
+        } catch {
+            sessionStorage.removeItem("admin_creds");
+            setRestoring(false);
+        }
+    }, []);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setAuthError("");
@@ -258,6 +291,8 @@ export default function AdminPage() {
             });
 
             if (res.ok) {
+                // Persist credentials so page refresh doesn't log out
+                sessionStorage.setItem("admin_creds", JSON.stringify({ u: username, p: password }));
                 setAuthenticated(true);
                 fetchAll();
             } else {
@@ -507,6 +542,14 @@ export default function AdminPage() {
         return new Date(dateStr).toLocaleString();
     };
 
+    if (restoring) {
+        return (
+            <main className="min-h-screen bg-background flex items-center justify-center p-4">
+                <p className="text-muted-foreground text-sm">Loading...</p>
+            </main>
+        );
+    }
+
     if (!authenticated) {
         return (
             <main className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -555,7 +598,7 @@ export default function AdminPage() {
                             </span>
                         )}
                     </div>
-                    <Button variant="outline" onClick={() => setAuthenticated(false)} className="cursor-pointer">
+                    <Button variant="outline" onClick={() => { sessionStorage.removeItem("admin_creds"); setAuthenticated(false); }} className="cursor-pointer">
                         Logout
                     </Button>
                 </div>
