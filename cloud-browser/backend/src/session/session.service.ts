@@ -451,6 +451,24 @@ export class SessionService implements OnModuleInit {
         this.logger.log(`Rate limit cleared for IP: ${ip}`);
     }
 
+    async killAllSessions(): Promise<number> {
+        const active = this.getActiveSessions();
+        let killed = 0;
+        for (const session of active) {
+            await this.endSession(session.id, 'admin_killed');
+            killed++;
+        }
+        this.logger.log(`Admin killed all sessions: ${killed} terminated`);
+        return killed;
+    }
+
+    clearAllRateLimits(): number {
+        const count = this.ipSessionCount.size;
+        this.ipSessionCount.clear();
+        this.logger.log(`Admin cleared all rate limits: ${count} IPs reset`);
+        return count;
+    }
+
     getBlockedIps(): string[] {
         return Array.from(this.blockedIps);
     }

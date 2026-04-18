@@ -202,6 +202,18 @@ export class AdminController {
         return { success: true, pool: this.containerService.getPoolStatus() };
     }
 
+    @Post('kill-all-sessions')
+    async killAllSessions() {
+        const killed = await this.sessionService.killAllSessions();
+        return { success: true, killed };
+    }
+
+    @Post('clear-all-rate-limits')
+    clearAllRateLimits() {
+        const cleared = this.sessionService.clearAllRateLimits();
+        return { success: true, cleared };
+    }
+
     @Post('config')
     async updateConfig(@Body() config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number }) {
         const changes: string[] = [];

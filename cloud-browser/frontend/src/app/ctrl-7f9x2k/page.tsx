@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw } from "lucide-react";
 
 // Loads attachment media with auth headers (img/video src can't send auth)
 function AuthAttachment({ att, feedbackId, apiUrl, getAuthHeaders }: {
@@ -1292,22 +1293,99 @@ export default function AdminPage() {
                                 <CardTitle>Session Controls</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex flex-wrap gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {/* Pause / Resume */}
                                     {stats?.paused ? (
-                                        <Button onClick={() => systemAction("resume")} className="cursor-pointer bg-green-600 hover:bg-green-700">
-                                            ▶ Resume Sessions
-                                        </Button>
+                                        <button
+                                            onClick={() => systemAction("resume")}
+                                            className="flex items-center gap-3 p-4 rounded-lg border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-colors cursor-pointer text-left"
+                                        >
+                                            <div className="p-2 rounded-md bg-green-500/20">
+                                                <Play className="w-5 h-5 text-green-400" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-green-400">Resume Sessions</div>
+                                                <div className="text-xs text-muted-foreground">Accept new session requests</div>
+                                            </div>
+                                        </button>
                                     ) : (
-                                        <Button onClick={() => systemAction("pause")} variant="destructive" className="cursor-pointer">
-                                            ⏸ Pause Sessions
-                                        </Button>
+                                        <button
+                                            onClick={() => systemAction("pause")}
+                                            className="flex items-center gap-3 p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 hover:bg-yellow-500/20 transition-colors cursor-pointer text-left"
+                                        >
+                                            <div className="p-2 rounded-md bg-yellow-500/20">
+                                                <Pause className="w-5 h-5 text-yellow-400" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-yellow-400">Pause Sessions</div>
+                                                <div className="text-xs text-muted-foreground">Stop accepting new requests</div>
+                                            </div>
+                                        </button>
                                     )}
-                                    <Button onClick={() => systemAction("drain-queue")} variant="outline" className="cursor-pointer">
-                                        🗑 Drain Queue
-                                    </Button>
-                                    <Button onClick={() => systemAction("restart-pool")} variant="outline" className="cursor-pointer">
-                                        🔄 Restart Pool
-                                    </Button>
+
+                                    {/* Drain Queue */}
+                                    <button
+                                        onClick={() => systemAction("drain-queue")}
+                                        className="flex items-center gap-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer text-left"
+                                    >
+                                        <div className="p-2 rounded-md bg-muted">
+                                            <Trash2 className="w-5 h-5 text-muted-foreground" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium">Drain Queue</div>
+                                            <div className="text-xs text-muted-foreground">Clear all pending requests</div>
+                                        </div>
+                                    </button>
+
+                                    {/* Restart Pool */}
+                                    <button
+                                        onClick={() => systemAction("restart-pool")}
+                                        className="flex items-center gap-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer text-left"
+                                    >
+                                        <div className="p-2 rounded-md bg-muted">
+                                            <RefreshCw className="w-5 h-5 text-muted-foreground" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium">Restart Pool</div>
+                                            <div className="text-xs text-muted-foreground">Recycle warm containers</div>
+                                        </div>
+                                    </button>
+
+                                    {/* Kill All Sessions */}
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Kill ALL active sessions? This will immediately terminate every user's session.")) {
+                                                systemAction("kill-all-sessions");
+                                            }
+                                        }}
+                                        className="flex items-center gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer text-left"
+                                    >
+                                        <div className="p-2 rounded-md bg-red-500/20">
+                                            <XCircle className="w-5 h-5 text-red-400" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-red-400">Kill All Sessions</div>
+                                            <div className="text-xs text-muted-foreground">Terminate all active users</div>
+                                        </div>
+                                    </button>
+
+                                    {/* Reset All Rate Limits */}
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Reset ALL rate limits? Every IP's daily counter will be cleared.")) {
+                                                systemAction("clear-all-rate-limits");
+                                            }
+                                        }}
+                                        className="flex items-center gap-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer text-left"
+                                    >
+                                        <div className="p-2 rounded-md bg-muted">
+                                            <RotateCcw className="w-5 h-5 text-muted-foreground" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium">Reset All Rate Limits</div>
+                                            <div className="text-xs text-muted-foreground">Clear every IP&apos;s daily counter</div>
+                                        </div>
+                                    </button>
                                 </div>
                             </CardContent>
                         </Card>
