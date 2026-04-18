@@ -204,6 +204,7 @@ export default function AdminPage() {
     const [password, setPassword] = useState("");
     const [authError, setAuthError] = useState("");
     const [restoring, setRestoring] = useState(true); // true while checking sessionStorage
+    const [dataLoading, setDataLoading] = useState(true); // true until first fetchAll completes
 
     const [sessions, setSessions] = useState<Session[]>([]);
     const [queue, setQueue] = useState<QueueEntry[]>([]);
@@ -253,30 +254,43 @@ export default function AdminPage() {
         const saved = sessionStorage.getItem("admin_creds");
         if (!saved) {
             setRestoring(false);
+            setDataLoading(false);
             return;
         }
         try {
             const { u, p } = JSON.parse(saved);
-            // Validate saved credentials are still valid
-            fetch(`${apiUrl}/api/admin/stats`, {
-                headers: { Authorization: `Basic ${btoa(`${u}:${p}`)}` },
-            }).then(res => {
-                if (res.ok) {
+            const authHeader = { Authorization: `Basic ${btoa(`${u}:${p}`)}` };
+            // Validate credentials and pre-fetch all data in parallel
+            Promise.all([
+                fetch(`${apiUrl}/api/admin/stats`, { headers: authHeader }),
+                fetch(`${apiUrl}/api/admin/sessions`, { headers: authHeader }),
+                fetch(`${apiUrl}/api/admin/queue`, { headers: authHeader }),
+                fetch(`${apiUrl}/api/admin/pool`, { headers: authHeader }),
+                fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: authHeader }),
+            ]).then(async ([statsRes, sessionsRes, queueRes, poolRes, fbStatsRes]) => {
+                if (statsRes.ok) {
                     setUsername(u);
                     setPassword(p);
                     setAuthenticated(true);
+                    // Pre-populate data from the same request batch
+                    setStats(await statsRes.json());
+                    if (sessionsRes.ok) setSessions(await sessionsRes.json());
+                    if (queueRes.ok) setQueue(await queueRes.json());
+                    if (poolRes.ok) setPool(await poolRes.json());
+                    if (fbStatsRes.ok) setFeedbackStats(await fbStatsRes.json());
                 } else {
-                    // Credentials expired or changed — clear stale session
                     sessionStorage.removeItem("admin_creds");
                 }
             }).catch(() => {
                 sessionStorage.removeItem("admin_creds");
             }).finally(() => {
                 setRestoring(false);
+                setDataLoading(false);
             });
         } catch {
             sessionStorage.removeItem("admin_creds");
             setRestoring(false);
+            setDataLoading(false);
         }
     }, []);
 
@@ -307,26 +321,24 @@ export default function AdminPage() {
 
     const fetchAll = async () => {
         try {
-            const [sessionsRes, queueRes, poolRes, statsRes] = await Promise.all([
+            const [sessionsRes, queueRes, poolRes, statsRes, fbStatsRes] = await Promise.all([
                 fetch(`${apiUrl}/api/admin/sessions`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/queue`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/pool`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/stats`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: getAuthHeaders() }),
             ]);
 
             if (sessionsRes.ok) setSessions(await sessionsRes.json());
             if (queueRes.ok) setQueue(await queueRes.json());
             if (poolRes.ok) setPool(await poolRes.json());
             if (statsRes.ok) setStats(await statsRes.json());
+            if (fbStatsRes.ok) setFeedbackStats(await fbStatsRes.json());
         } catch (err) {
             console.error("Failed to fetch data:", err);
+        } finally {
+            setDataLoading(false);
         }
-
-        // Always fetch feedback stats for the badge
-        try {
-            const fbStatsRes = await fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: getAuthHeaders() });
-            if (fbStatsRes.ok) setFeedbackStats(await fbStatsRes.json());
-        } catch { /* ignore */ }
     };
 
     const fetchHistory = async (search?: string) => {
@@ -458,6 +470,7 @@ export default function AdminPage() {
         if (!authenticated) return;
         // Pause auto-refresh while user is editing sliders to prevent re-render flicker
         if (dirtyFields.size > 0) return;
+        fetchAll(); // Fetch immediately, don't wait for first interval tick
         const interval = setInterval(fetchAll, 3000);
         return () => clearInterval(interval);
     }, [authenticated, dirtyFields.size]);
@@ -633,6 +646,35 @@ export default function AdminPage() {
                 {activeTab === "overview" && (
                     <>
                         {/* Stats Cards — DT5 */}
+                        {dataLoading && !stats ? (
+                            <div className="space-y-4 animate-pulse">
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                    {Array.from({ length: 6 }).map((_, i) => (
+                                        <Card key={i}>
+                                            <CardContent className="pt-6">
+                                                <div className="h-8 w-16 bg-muted/40 rounded mb-2" />
+                                                <div className="h-4 w-24 bg-muted/30 rounded" />
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {Array.from({ length: 3 }).map((_, i) => (
+                                        <Card key={i}>
+                                            <CardContent className="pt-6">
+                                                <div className="h-8 w-20 bg-muted/40 rounded mb-2" />
+                                                <div className="h-4 w-28 bg-muted/30 rounded" />
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                                <Card>
+                                    <CardHeader><div className="h-6 w-40 bg-muted/40 rounded" /></CardHeader>
+                                    <CardContent><div className="h-4 w-32 bg-muted/30 rounded" /></CardContent>
+                                </Card>
+                            </div>
+                        ) : (
+                        <>
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                             <Card>
                                 <CardContent className="pt-6">
@@ -859,6 +901,8 @@ export default function AdminPage() {
                                 )}
                             </CardContent>
                         </Card>
+                        </>
+                        )}
                     </>
                 )}
 
