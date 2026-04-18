@@ -115,11 +115,19 @@ export class FeedbackController {
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ) {
-        return this.feedbackService.getAllFeedback(
+        const geoip = require('geoip-lite');
+        const result = this.feedbackService.getAllFeedback(
             status,
             parseInt(limit || '50', 10),
             parseInt(offset || '0', 10),
         );
+        return {
+            ...result,
+            feedback: result.feedback.map((item: any) => ({
+                ...item,
+                countryCode: geoip.lookup(item.clientIp)?.country || null,
+            })),
+        };
     }
 
     @Get('admin/feedback/stats')

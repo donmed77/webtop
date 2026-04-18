@@ -7,6 +7,7 @@ import { LoggingService } from '../logging/logging.service';
 import { AdminGuard } from './admin.guard';
 import * as os from 'os';
 import { execSync } from 'child_process';
+import * as geoip from 'geoip-lite';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -32,7 +33,8 @@ export class AdminController {
             id: session.id,
             port: session.port,
             url: session.url,
-            clientIp: session.clientIp,  // Fix #2: Full IP for admin (behind Basic Auth)
+            clientIp: session.clientIp,
+            countryCode: geoip.lookup(session.clientIp)?.country || null,
             startedAt: session.startedAt,
             expiresAt: session.expiresAt,
             timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
@@ -127,8 +129,14 @@ export class AdminController {
 
     @Get('rate-limits')
     getRateLimits() {
+        const stats = this.sessionService.getRateLimitStats();
+        // Enrich stats with country codes
+        const enrichedStats = stats.map((s: any) => ({
+            ...s,
+            countryCode: geoip.lookup(s.ip)?.country || null,
+        }));
         return {
-            stats: this.sessionService.getRateLimitStats(),
+            stats: enrichedStats,
             limitedIps: this.sessionService.getRateLimitedIps(),
             blockedIps: this.sessionService.getBlockedIps(),
             whitelistedIps: this.sessionService.getWhitelistedIps(),

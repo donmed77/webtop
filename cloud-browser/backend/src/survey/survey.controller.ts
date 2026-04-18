@@ -57,10 +57,18 @@ export class SurveyController {
         @Query('page') page?: string,
         @Query('limit') limit?: string,
     ) {
-        return this.surveyService.getSurveys(
+        const geoip = require('geoip-lite');
+        const result = this.surveyService.getSurveys(
             parseInt(page || '1', 10),
             Math.min(parseInt(limit || '50', 10), 100),
         );
+        return {
+            ...result,
+            surveys: result.surveys.map((s: any) => ({
+                ...s,
+                countryCode: geoip.lookup(s.clientIp)?.country || null,
+            })),
+        };
     }
 
     @Get('admin/surveys/stats')

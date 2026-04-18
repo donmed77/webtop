@@ -89,11 +89,30 @@ function AuthAttachment({ att, feedbackId, apiUrl, getAuthHeaders }: {
     );
 }
 
+function FlagIP({ ip, countryCode }: { ip: string; countryCode?: string | null }) {
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            {countryCode ? (
+                <img
+                    src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`}
+                    srcSet={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png 1x, https://flagcdn.com/w80/${countryCode.toLowerCase()}.png 2x`}
+                    alt={countryCode}
+                    title={countryCode}
+                    className="inline-block w-5 h-auto border border-white/20"
+                    loading="lazy"
+                />
+            ) : null}
+            <span className="font-mono text-xs">{ip}</span>
+        </span>
+    );
+}
+
 interface Session {
     id: string;
     port: string;
     url: string;
     clientIp: string;
+    countryCode: string | null;
     startedAt: string;
     expiresAt: string;
     timeRemaining: number;
@@ -153,6 +172,7 @@ interface SessionLog {
 
 interface RateLimitStat {
     ip: string;
+    countryCode: string | null;
     count: number;
     remaining: number;
 }
@@ -161,6 +181,7 @@ interface FeedbackItem {
     id: number;
     sessionId: string | null;
     clientIp: string;
+    countryCode: string | null;
     email: string | null;
     type: string;
     message: string;
@@ -185,6 +206,7 @@ interface SurveyItem {
     tags: string[];
     comment: string | null;
     clientIp: string;
+    countryCode: string | null;
     createdAt: string;
 }
 
@@ -932,7 +954,7 @@ export default function AdminPage() {
                                                         <td className="p-2 font-mono text-xs">{session.id.slice(0, 8)}...</td>
                                                         <td className="p-2">{session.port}</td>
                                                         <td className="p-2 max-w-xs truncate">{session.url}</td>
-                                                        <td className="p-2 font-mono text-xs">{session.clientIp}</td>
+                                                        <td className="p-2"><FlagIP ip={session.clientIp} countryCode={session.countryCode} /></td>
                                                         <td className="p-2">{formatDate(session.startedAt)}</td>
                                                         <td className="p-2 font-mono">{formatTime(session.timeRemaining)}</td>
                                                         <td className="p-2">
@@ -1113,24 +1135,8 @@ export default function AdminPage() {
                                                 <tr key={log.id} className="border-b">
                                                     <td className="p-2 font-mono text-xs">{log.sessionId.slice(0, 8)}...</td>
                                                     <td className="p-2 max-w-xs truncate">{log.url}</td>
-                                                    <td className="p-2 font-mono text-xs">
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            {log.countryCode ? (
-                                                                <img
-                                                                    src={`https://flagcdn.com/w40/${log.countryCode.toLowerCase()}.png`}
-                                                                    srcSet={`https://flagcdn.com/w40/${log.countryCode.toLowerCase()}.png 1x, https://flagcdn.com/w80/${log.countryCode.toLowerCase()}.png 2x`}
-                                                                    alt={log.countryCode}
-                                                                    title={log.countryCode}
-                                                                    width={20}
-                                                                    height={15}
-                                                                    className="inline-block border border-white/20"
-                                                                    style={{ objectFit: 'cover' }}
-                                                                />
-                                                            ) : (
-                                                                <span title="Unknown">🌐</span>
-                                                            )}
-                                                            {log.clientIp}
-                                                        </span>
+                                                    <td className="p-2">
+                                                        <FlagIP ip={log.clientIp} countryCode={log.countryCode} />
                                                     </td>
                                                     <td className="p-2">{formatFullDate(log.startedAt)}</td>
                                                     <td className="p-2">{log.duration ? formatTime(log.duration) : "-"}</td>
@@ -1235,7 +1241,7 @@ export default function AdminPage() {
                                             <tbody>
                                                 {rateLimits.map((stat) => (
                                                     <tr key={stat.ip} className="border-b">
-                                                        <td className="p-2 font-mono text-xs">{stat.ip}</td>
+                                                        <td className="p-2"><FlagIP ip={stat.ip} countryCode={stat.countryCode} /></td>
                                                         <td className="p-2">{stat.count}/{dailyLimit}</td>
                                                         <td className="p-2">{stat.remaining}</td>
                                                         <td className="p-2">
@@ -1522,7 +1528,7 @@ export default function AdminPage() {
                                                                             <p className="text-sm whitespace-pre-wrap break-all mt-1">{fb.message}</p>
                                                                         </div>
                                                                         <div className="flex gap-6 text-xs text-muted-foreground">
-                                                                            <span>IP: <span className="font-mono">{fb.clientIp}</span></span>
+                                                                            <span>IP: <FlagIP ip={fb.clientIp} countryCode={fb.countryCode} /></span>
                                                                             {fb.sessionId && <span>Session: <span className="font-mono">{fb.sessionId.slice(0, 8)}...</span></span>}
                                                                             {fb.resolvedAt && <span>Resolved: {formatFullDate(fb.resolvedAt)}</span>}
                                                                         </div>
@@ -1846,7 +1852,7 @@ export default function AdminPage() {
                                                                         </div>
                                                                         <div>
                                                                             <span className="text-muted-foreground font-medium">IP: </span>
-                                                                            <span className="font-mono">{s.clientIp}</span>
+                                                                            <FlagIP ip={s.clientIp} countryCode={s.countryCode} />
                                                                         </div>
                                                                     </div>
                                                                 </td>
