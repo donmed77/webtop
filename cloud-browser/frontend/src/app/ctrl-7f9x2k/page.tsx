@@ -252,6 +252,7 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [searchQuery, setSearchQuery] = useState("");
+    const [rateLimitSearch, setRateLimitSearch] = useState("");
     const [actionMsg, setActionMsg] = useState("");
 
     // Feedback state
@@ -1224,8 +1225,20 @@ export default function AdminPage() {
                                 <CardTitle>Session Usage by IP (Today)</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                {rateLimits.length === 0 ? (
-                                    <p className="text-muted-foreground text-sm">No session data today</p>
+                                <div className="flex gap-2 mb-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Filter by IP address..."
+                                        value={rateLimitSearch}
+                                        onChange={(e) => setRateLimitSearch(e.target.value)}
+                                        className="flex-1 px-3 py-2 border rounded-md bg-background"
+                                    />
+                                    {rateLimitSearch && (
+                                        <Button variant="outline" onClick={() => setRateLimitSearch("")} className="cursor-pointer">Clear</Button>
+                                    )}
+                                </div>
+                                {(rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits).length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">{rateLimitSearch ? "No IPs match your filter" : "No session data today"}</p>
                                 ) : (
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
@@ -1239,7 +1252,7 @@ export default function AdminPage() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {rateLimits.map((stat) => (
+                                                {(rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits).map((stat) => (
                                                     <tr key={stat.ip} className="border-b">
                                                         <td className="p-2"><FlagIP ip={stat.ip} countryCode={stat.countryCode} /></td>
                                                         <td className="p-2">{stat.count}/{dailyLimit}</td>
