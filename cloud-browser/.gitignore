@@ -1,1 +1,8 @@
 frontend/frontend.log
+
+# Environment files (contain secrets)
+.env
+.env.local
+backend/.env
+backend/.env.local
+frontend/.env.local
