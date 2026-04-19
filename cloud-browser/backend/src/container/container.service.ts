@@ -846,4 +846,11 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         const avgMs = this.metrics.bootTimes.reduce((a, b) => a + b, 0) / this.metrics.bootTimes.length;
         return Math.ceil(avgMs / 1000);
     }
+
+    resetMetrics(): void {
+        this.metrics.totalAcquires = 0;
+        this.metrics.acquireFailures = 0;
+        this.metrics.bootTimes = [];
+        this.logger.log('Admin reset container metrics (acquires, bootTimes)');
+    }
 }

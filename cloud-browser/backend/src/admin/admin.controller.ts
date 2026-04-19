@@ -238,7 +238,11 @@ export class AdminController {
 
         if (categories.includes('overview')) {
             this.loggingService.resetDailyPeaks();
-            result.peaksCleared = 1;
+            this.loggingService.resetSessionLogs(); // Sessions This Week, Avg Duration derive from logs
+            this.sessionService.resetOverviewStats();
+            this.sessionService.clearAllRateLimits();
+            this.containerService.resetMetrics();
+            result.overviewCleared = 1;
         }
         if (categories.includes('history')) {
             result.sessionsCleared = this.loggingService.resetSessionLogs();

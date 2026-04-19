@@ -469,6 +469,13 @@ export class SessionService implements OnModuleInit {
         return count;
     }
 
+    resetOverviewStats(): void {
+        this.sessionsToday = 0;
+        this.peakConcurrent = 0;
+        this.sessionDurations = [];
+        this.logger.log('Admin reset overview stats (sessionsToday, peakConcurrent, avgDuration)');
+    }
+
     getBlockedIps(): string[] {
         return Array.from(this.blockedIps);
     }

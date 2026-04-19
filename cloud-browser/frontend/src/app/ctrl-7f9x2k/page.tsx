@@ -1514,6 +1514,7 @@ export default function AdminPage() {
                                                     if (res.ok) {
                                                         const data = await res.json();
                                                         const parts: string[] = [];
+                                                        if (data.overviewCleared) parts.push("overview stats");
                                                         if (data.peaksCleared) parts.push(`${data.peaksCleared} peak(s)`);
                                                         if (data.sessionsCleared) parts.push(`${data.sessionsCleared} session(s)`);
                                                         if (data.rateLimitsCleared) parts.push(`${data.rateLimitsCleared} rate limit(s)`);
