@@ -574,15 +574,26 @@ export default function AdminPage() {
             config.rateLimitPerDay = parseInt(newRateLimit, 10);
         }
         if (Object.keys(config).length > 0) {
-            await systemAction("config", config);
-            // Delay clearing dirty state so the next fetchAll (inside systemAction)
-            // picks up the new server values before sliders fall back to stats
-            setTimeout(() => {
-                setNewPoolSize("");
-                setNewDuration("");
-                setNewRateLimit("");
-                setDirtyFields(new Set());
-            }, 500);
+            try {
+                const res = await fetch(`${apiUrl}/api/admin/config`, {
+                    method: "POST",
+                    headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                    body: JSON.stringify(config),
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    showAction(`config: ${JSON.stringify(data.changes || data)}`);
+                    // Fetch fresh values BEFORE clearing dirty state
+                    // so sliders transition directly from dirty→new server value
+                    await fetchAll();
+                    setNewPoolSize("");
+                    setNewDuration("");
+                    setNewRateLimit("");
+                    setDirtyFields(new Set());
+                }
+            } catch (err) {
+                console.error("Failed to apply config", err);
+            }
         }
     };
 
