@@ -214,6 +214,22 @@ export class AdminController {
         return { success: true, cleared };
     }
 
+    @Post('cleanup-orphans')
+    async cleanupOrphans() {
+        // Build skip set from active sessions so we don't kill those containers
+        const activeSessions = this.sessionService.getActiveSessions();
+        const skipNames = new Set(activeSessions.map(s => `session-${s.poolId}`));
+        await this.containerService.cleanupOrphanedContainers(skipNames);
+        return { success: true, message: 'Orphan cleanup completed' };
+    }
+
+    @Post('reset-dashboard')
+    resetDashboard() {
+        const result = this.loggingService.resetAllData();
+        this.sessionService.clearAllRateLimits();
+        return { success: true, ...result };
+    }
+
     @Post('config')
     async updateConfig(@Body() config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number }) {
         const changes: string[] = [];

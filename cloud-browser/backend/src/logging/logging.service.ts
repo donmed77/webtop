@@ -408,4 +408,22 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
             return 0;
         }
     }
+
+    /** Reset all dashboard data (session logs, active sessions, daily peak) */
+    resetAllData(): { sessionsCleared: number; peaksCleared: number } {
+        try {
+            const sessions = this.db.prepare('SELECT COUNT(*) as count FROM session_logs').get() as { count: number };
+            const peaks = this.db.prepare('SELECT COUNT(*) as count FROM daily_peak').get() as { count: number };
+
+            this.db.exec('DELETE FROM session_logs');
+            this.db.exec('DELETE FROM active_sessions');
+            this.db.exec('DELETE FROM daily_peak');
+
+            this.logger.log(`Admin reset all data: ${sessions.count} session logs, ${peaks.count} daily peaks cleared`);
+            return { sessionsCleared: sessions.count, peaksCleared: peaks.count };
+        } catch (err) {
+            this.logger.error(`Failed to reset data: ${err.message}`);
+            return { sessionsCleared: 0, peaksCleared: 0 };
+        }
+    }
 }

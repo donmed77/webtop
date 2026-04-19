@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw } from "lucide-react";
+import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw, Search } from "lucide-react";
 
 // Loads attachment media with auth headers (img/video src can't send auth)
 function AuthAttachment({ att, feedbackId, apiUrl, getAuthHeaders }: {
@@ -1384,6 +1384,42 @@ export default function AdminPage() {
                                         <div>
                                             <div className="font-medium">Reset All Rate Limits</div>
                                             <div className="text-xs text-muted-foreground">Clear every IP&apos;s daily counter</div>
+                                        </div>
+                                    </button>
+
+                                    {/* Cleanup Orphans */}
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Scan for and terminate orphaned containers that aren't tracked by any active session?")) {
+                                                systemAction("cleanup-orphans");
+                                            }
+                                        }}
+                                        className="flex items-center gap-3 p-4 rounded-lg border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 transition-colors cursor-pointer text-left"
+                                    >
+                                        <div className="p-2 rounded-md bg-orange-500/20">
+                                            <Search className="w-5 h-5 text-orange-400" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-orange-400">Cleanup Orphans</div>
+                                            <div className="text-xs text-muted-foreground">Find & kill stale containers</div>
+                                        </div>
+                                    </button>
+
+                                    {/* Reset Dashboard */}
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("RESET ALL DASHBOARD DATA?\n\nThis will permanently delete:\n• All session history\n• All daily stats & peaks\n• All rate limit counters\n\nThis action cannot be undone.")) {
+                                                systemAction("reset-dashboard");
+                                            }
+                                        }}
+                                        className="flex items-center gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer text-left"
+                                    >
+                                        <div className="p-2 rounded-md bg-red-500/20">
+                                            <Trash2 className="w-5 h-5 text-red-400" />
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-red-400">Reset Dashboard</div>
+                                            <div className="text-xs text-muted-foreground">Clear all history & stats</div>
                                         </div>
                                     </button>
                                 </div>
