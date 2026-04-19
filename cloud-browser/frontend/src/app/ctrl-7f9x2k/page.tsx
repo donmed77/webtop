@@ -979,8 +979,9 @@ export default function AdminPage() {
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    onClick={() => window.open(`/browser/${session.port}/`, "_blank")}
+                                                                    onClick={() => window.open(`/browser/${session.port}/#shared`, "_blank")}
                                                                     className="cursor-pointer"
+                                                                    title="Stealth view-only (owner won't know)"
                                                                 >
                                                                     View
                                                                 </Button>
