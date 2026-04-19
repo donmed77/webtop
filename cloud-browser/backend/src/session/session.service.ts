@@ -45,7 +45,7 @@ export class SessionService implements OnModuleInit {
         private loggingService: LoggingService,
     ) {
         this.sessionDuration = this.configService.get<number>('SESSION_DURATION', 300);
-        this.rateLimitPerDay = this.configService.get<number>('RATE_LIMIT_PER_DAY', 10);
+        this.rateLimitPerDay = this.configService.get<number>('RATE_LIMIT_PER_DAY', 3);
 
         // Check for expired sessions every second (matches timer broadcast frequency)
         this.checkInterval = setInterval(() => this.checkExpiredSessions(), 1000);
