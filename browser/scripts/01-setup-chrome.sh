@@ -255,7 +255,7 @@ echo "enabled=False" > /config/.config/user-dirs.conf
 
 # KDE Compositing: Enable with balanced latency policy
 kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key Enabled true
-kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key LatencyPolicy 2
+kwriteconfig5 --file /config/.config/kwinrc --group Compositing --key LatencyPolicy 0
 chown abc:abc /config/.config/kwinrc 2>/dev/null || true
 # Reload KWin compositor if already running
 su -c "DISPLAY=:1 dbus-send --session --dest=org.kde.KWin --type=method_call /Compositor org.kde.kwin.Compositing.resume" abc 2>/dev/null || true

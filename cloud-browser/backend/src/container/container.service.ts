@@ -728,6 +728,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
             for (const [id, container] of this.pool) {
                 if (container.status === 'destroying') continue;
+                // Active sessions are monitored by session timer; skip Docker inspect
+                // to avoid API contention that causes WebSocket micro-jitter
+                if (container.status === 'active') continue;
 
                 // Timeout booting containers after 2 minutes
                 if (container.status === 'booting') {

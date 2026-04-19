@@ -517,11 +517,17 @@ export default function SessionPage() {
                 };
             }
 
-            // Poll Selkies' network_stats for latency
+            // Poll Selkies' network_stats for latency (EWMA smoothed to reduce jitter noise)
             if (latencyIntervalRef.current) clearInterval(latencyIntervalRef.current);
             latencyIntervalRef.current = setInterval(() => {
                 const ms = iframeWindow?.network_stats?.latency_ms;
-                if (ms !== undefined && ms !== null) setLatency(Math.round(ms));
+                if (ms !== undefined && ms !== null) {
+                    setLatency(prev => {
+                        if (prev === null) return Math.round(ms);
+                        // EWMA alpha=0.3: smooths DataChannel measurement noise
+                        return Math.round(prev * 0.7 + ms * 0.3);
+                    });
+                }
             }, 1000);
         } catch {
             // Cross-origin fallback — rely on the postMessage listener or fallback timeout
