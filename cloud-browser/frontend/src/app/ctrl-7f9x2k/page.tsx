@@ -256,6 +256,7 @@ export default function AdminPage() {
     const [rateLimitSearch, setRateLimitSearch] = useState("");
     const [actionMsg, setActionMsg] = useState("");
     const [showResetModal, setShowResetModal] = useState(false);
+    const [viewerOverlay, setViewerOverlay] = useState<{ port: string | number; ip: string } | null>(null);
     const [resetCategories, setResetCategories] = useState<Record<string, boolean>>({
         overview: false, history: false, rateLimits: false, feedback: false, surveys: false,
     });
@@ -979,7 +980,7 @@ export default function AdminPage() {
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    onClick={() => window.open(`/browser/${session.port}/#shared`, "_blank")}
+                                                                    onClick={() => setViewerOverlay({ port: session.port, ip: session.clientIp })}
                                                                     className="cursor-pointer"
                                                                     title="Stealth view-only (owner won't know)"
                                                                 >
@@ -1542,6 +1543,46 @@ export default function AdminPage() {
                                             Reset Selected
                                         </Button>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Stealth Viewer Overlay */}
+                        {viewerOverlay && (
+                            <div
+                                className="fixed inset-0 z-[100] bg-black flex flex-col"
+                                onKeyDown={(e) => { if (e.key === "Escape") setViewerOverlay(null); }}
+                                tabIndex={0}
+                                ref={(el) => el?.focus()}
+                            >
+                                {/* Top bar */}
+                                <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/90 border-b border-zinc-700 text-sm">
+                                    <div className="flex items-center gap-3">
+                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                                            LIVE
+                                        </span>
+                                        <span className="text-zinc-400">
+                                            Viewing port <span className="text-white font-mono">{viewerOverlay.port}</span>
+                                            {" · "}
+                                            <span className="text-white font-mono">{viewerOverlay.ip}</span>
+                                        </span>
+                                        <span className="text-zinc-500 text-xs">View-only · No input forwarded</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setViewerOverlay(null)}
+                                        className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer text-xs"
+                                    >
+                                        Close (Esc)
+                                    </button>
+                                </div>
+                                {/* Stream iframe — pointer-events:none blocks ALL input */}
+                                <div className="flex-1 relative">
+                                    <iframe
+                                        src={`/browser/${viewerOverlay.port}/#shared`}
+                                        className="w-full h-full border-0"
+                                        style={{ pointerEvents: "none" }}
+                                    />
                                 </div>
                             </div>
                         )}
