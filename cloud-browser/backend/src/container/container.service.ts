@@ -121,8 +121,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Fix #1: Made public so SessionService can call it after loading restored sessions
-    async cleanupOrphanedContainers(skipContainerNames: Set<string> = new Set()) {
+    async cleanupOrphanedContainers(skipContainerNames: Set<string> = new Set()): Promise<{ found: number; killed: number }> {
         this.cleanupInProgress = true;
+        let totalFound = 0;
+        let totalKilled = 0;
         try {
             const { execSync } = require('child_process');
             const deadline = Date.now() + 120_000; // 2 min hard timeout
@@ -153,6 +155,8 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     break;
                 }
 
+                if (attempt === 1) totalFound = orphans.length;
+
                 this.logger.log(`Orphan cleanup attempt ${attempt}: removing ${orphans.length} containers...`);
 
                 // For each orphan: get PID, kill -9 PID, then docker rm
@@ -174,6 +178,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                         // Now docker rm will work since the process is dead
                         execSync(`docker rm -f ${orphan.name} 2>/dev/null || true`, { timeout: 10_000 });
                         killed++;
+                        totalKilled++;
                     } catch {
                         // Container may already be gone
                     }
@@ -186,6 +191,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         } finally {
             this.cleanupInProgress = false;
         }
+        return { found: totalFound, killed: totalKilled };
     }
 
     // Fix #1: Register a restored session's container back into the pool

@@ -409,21 +409,30 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    /** Reset all dashboard data (session logs, active sessions, daily peak) */
-    resetAllData(): { sessionsCleared: number; peaksCleared: number } {
+    /** Reset session logs (history) */
+    resetSessionLogs(): number {
         try {
-            const sessions = this.db.prepare('SELECT COUNT(*) as count FROM session_logs').get() as { count: number };
-            const peaks = this.db.prepare('SELECT COUNT(*) as count FROM daily_peak').get() as { count: number };
-
+            const count = (this.db.prepare('SELECT COUNT(*) as count FROM session_logs').get() as { count: number }).count;
             this.db.exec('DELETE FROM session_logs');
             this.db.exec('DELETE FROM active_sessions');
-            this.db.exec('DELETE FROM daily_peak');
-
-            this.logger.log(`Admin reset all data: ${sessions.count} session logs, ${peaks.count} daily peaks cleared`);
-            return { sessionsCleared: sessions.count, peaksCleared: peaks.count };
+            this.logger.log(`Admin reset: ${count} session logs cleared`);
+            return count;
         } catch (err) {
-            this.logger.error(`Failed to reset data: ${err.message}`);
-            return { sessionsCleared: 0, peaksCleared: 0 };
+            this.logger.error(`Failed to reset session logs: ${err.message}`);
+            return 0;
+        }
+    }
+
+    /** Reset daily peak stats (overview) */
+    resetDailyPeaks(): number {
+        try {
+            const count = (this.db.prepare('SELECT COUNT(*) as count FROM daily_peak').get() as { count: number }).count;
+            this.db.exec('DELETE FROM daily_peak');
+            this.logger.log(`Admin reset: ${count} daily peaks cleared`);
+            return count;
+        } catch (err) {
+            this.logger.error(`Failed to reset daily peaks: ${err.message}`);
+            return 0;
         }
     }
 }

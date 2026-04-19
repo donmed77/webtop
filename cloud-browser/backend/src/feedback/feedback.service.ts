@@ -356,4 +356,23 @@ export class FeedbackService implements OnModuleInit {
             return false;
         }
     }
+
+    /** Reset all feedback data */
+    resetAllData(): number {
+        try {
+            const count = (this.db.prepare('SELECT COUNT(*) as count FROM feedback').get() as { count: number }).count;
+            this.db.exec('DELETE FROM feedback_attachments');
+            this.db.exec('DELETE FROM feedback');
+            // Clean up uploads directory
+            if (fs.existsSync(this.uploadsDir)) {
+                fs.rmSync(this.uploadsDir, { recursive: true, force: true });
+                fs.mkdirSync(this.uploadsDir, { recursive: true });
+            }
+            this.logger.log(`Admin reset: ${count} feedback entries cleared`);
+            return count;
+        } catch (err) {
+            this.logger.error(`Failed to reset feedback: ${err.message}`);
+            return 0;
+        }
+    }
 }

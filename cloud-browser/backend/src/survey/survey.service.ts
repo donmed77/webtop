@@ -172,4 +172,17 @@ export class SurveyService implements OnModuleInit {
             })),
         };
     }
+
+    /** Reset all survey data */
+    resetAllData(): number {
+        try {
+            const count = (this.db.prepare('SELECT COUNT(*) as count FROM session_surveys').get() as { count: number }).count;
+            this.db.exec('DELETE FROM session_surveys');
+            this.logger.log(`Admin reset: ${count} survey entries cleared`);
+            return count;
+        } catch (err) {
+            this.logger.error(`Failed to reset surveys: ${err.message}`);
+            return 0;
+        }
+    }
 }

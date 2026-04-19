@@ -255,6 +255,10 @@ export default function AdminPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [rateLimitSearch, setRateLimitSearch] = useState("");
     const [actionMsg, setActionMsg] = useState("");
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [resetCategories, setResetCategories] = useState<Record<string, boolean>>({
+        overview: false, history: false, rateLimits: false, feedback: false, surveys: false,
+    });
 
     // Feedback state
     const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
@@ -1389,10 +1393,23 @@ export default function AdminPage() {
 
                                     {/* Cleanup Orphans */}
                                     <button
-                                        onClick={() => {
-                                            if (confirm("Scan for and terminate orphaned containers that aren't tracked by any active session?")) {
-                                                systemAction("cleanup-orphans");
-                                            }
+                                        onClick={async () => {
+                                            if (!confirm("Scan for and terminate orphaned containers?")) return;
+                                            try {
+                                                const res = await fetch(`${apiUrl}/api/admin/cleanup-orphans`, {
+                                                    method: "POST",
+                                                    headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                                                });
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    if (data.found === 0) {
+                                                        showAction("No orphaned containers found — system is clean ✓");
+                                                    } else {
+                                                        showAction(`Found ${data.found} orphan(s), killed ${data.killed} — cleanup complete`);
+                                                    }
+                                                    fetchAll();
+                                                }
+                                            } catch (err) { console.error("Cleanup failed", err); }
                                         }}
                                         className="flex items-center gap-3 p-4 rounded-lg border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 transition-colors cursor-pointer text-left"
                                     >
@@ -1405,12 +1422,11 @@ export default function AdminPage() {
                                         </div>
                                     </button>
 
-                                    {/* Reset Dashboard */}
+                                    {/* Reset Dashboard — opens modal */}
                                     <button
                                         onClick={() => {
-                                            if (confirm("RESET ALL DASHBOARD DATA?\n\nThis will permanently delete:\n• All session history\n• All daily stats & peaks\n• All rate limit counters\n\nThis action cannot be undone.")) {
-                                                systemAction("reset-dashboard");
-                                            }
+                                            setResetCategories({ overview: false, history: false, rateLimits: false, feedback: false, surveys: false });
+                                            setShowResetModal(true);
                                         }}
                                         className="flex items-center gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer text-left"
                                     >
@@ -1419,12 +1435,103 @@ export default function AdminPage() {
                                         </div>
                                         <div>
                                             <div className="font-medium text-red-400">Reset Dashboard</div>
-                                            <div className="text-xs text-muted-foreground">Clear all history & stats</div>
+                                            <div className="text-xs text-muted-foreground">Select data to clear</div>
                                         </div>
                                     </button>
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Reset Dashboard Modal */}
+                        {showResetModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                                <div className="bg-background border rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
+                                    <div>
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                            <Trash2 className="w-5 h-5 text-red-400" />
+                                            Reset Dashboard Data
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground mt-1">Select which data you want to permanently delete:</p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {[
+                                            { key: "overview", label: "Overview", desc: "Daily peak stats and counters" },
+                                            { key: "history", label: "History", desc: "All session logs and records" },
+                                            { key: "rateLimits", label: "Rate Limits", desc: "All IP rate limit counters" },
+                                            { key: "feedback", label: "Feedback", desc: "All feedback entries and attachments" },
+                                            { key: "surveys", label: "Surveys", desc: "All survey responses and ratings" },
+                                        ].map(({ key, label, desc }) => (
+                                            <label key={key} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 cursor-pointer transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={resetCategories[key]}
+                                                    onChange={(e) => setResetCategories(prev => ({ ...prev, [key]: e.target.checked }))}
+                                                    className="mt-0.5 w-4 h-4 accent-red-500 cursor-pointer"
+                                                />
+                                                <div>
+                                                    <div className="font-medium text-sm">{label}</div>
+                                                    <div className="text-xs text-muted-foreground">{desc}</div>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 pt-2">
+                                        <button
+                                            onClick={() => {
+                                                const all = !Object.values(resetCategories).every(Boolean);
+                                                setResetCategories(prev => Object.fromEntries(Object.keys(prev).map(k => [k, all])));
+                                            }}
+                                            className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
+                                        >
+                                            {Object.values(resetCategories).every(Boolean) ? "Deselect All" : "Select All"}
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-1">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setShowResetModal(false)}
+                                            className="flex-1 cursor-pointer"
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            disabled={!Object.values(resetCategories).some(Boolean)}
+                                            onClick={async () => {
+                                                const selected = Object.entries(resetCategories)
+                                                    .filter(([, v]) => v)
+                                                    .map(([k]) => k);
+                                                setShowResetModal(false);
+                                                try {
+                                                    const res = await fetch(`${apiUrl}/api/admin/reset-dashboard`, {
+                                                        method: "POST",
+                                                        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ categories: selected }),
+                                                    });
+                                                    if (res.ok) {
+                                                        const data = await res.json();
+                                                        const parts: string[] = [];
+                                                        if (data.peaksCleared) parts.push(`${data.peaksCleared} peak(s)`);
+                                                        if (data.sessionsCleared) parts.push(`${data.sessionsCleared} session(s)`);
+                                                        if (data.rateLimitsCleared) parts.push(`${data.rateLimitsCleared} rate limit(s)`);
+                                                        if (data.feedbackCleared) parts.push(`${data.feedbackCleared} feedback`);
+                                                        if (data.surveysCleared) parts.push(`${data.surveysCleared} survey(s)`);
+                                                        showAction(`Reset complete: ${parts.join(", ") || "nothing to clear"}`);
+                                                        fetchAll();
+                                                    }
+                                                } catch (err) { console.error("Reset failed", err); }
+                                            }}
+                                            className="flex-1 cursor-pointer"
+                                        >
+                                            Reset Selected
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Runtime Configuration */}
                         <Card>

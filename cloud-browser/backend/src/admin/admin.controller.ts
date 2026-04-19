@@ -4,6 +4,8 @@ import { SessionGateway } from '../session/session.gateway';
 import { QueueService } from '../queue/queue.service';
 import { ContainerService } from '../container/container.service';
 import { LoggingService } from '../logging/logging.service';
+import { FeedbackService } from '../feedback/feedback.service';
+import { SurveyService } from '../survey/survey.service';
 import { AdminGuard } from './admin.guard';
 import * as os from 'os';
 import { execSync } from 'child_process';
@@ -22,6 +24,8 @@ export class AdminController {
         private queueService: QueueService,
         private containerService: ContainerService,
         private loggingService: LoggingService,
+        private feedbackService: FeedbackService,
+        private surveyService: SurveyService,
     ) { }
 
     // ---- D2: Active Sessions ----
@@ -216,18 +220,40 @@ export class AdminController {
 
     @Post('cleanup-orphans')
     async cleanupOrphans() {
-        // Build skip set from active sessions so we don't kill those containers
+        // Build skip set from active sessions + warm pool so we don't kill those
         const activeSessions = this.sessionService.getActiveSessions();
-        const skipNames = new Set(activeSessions.map(s => `session-${s.poolId}`));
-        await this.containerService.cleanupOrphanedContainers(skipNames);
-        return { success: true, message: 'Orphan cleanup completed' };
+        const poolStatus = this.containerService.getPoolStatus();
+        const skipNames = new Set([
+            ...activeSessions.map(s => `session-${s.poolId}`),
+            ...poolStatus.containers.map(c => `session-${c.id}`),
+        ]);
+        const result = await this.containerService.cleanupOrphanedContainers(skipNames);
+        return { success: true, ...result };
     }
 
     @Post('reset-dashboard')
-    resetDashboard() {
-        const result = this.loggingService.resetAllData();
-        this.sessionService.clearAllRateLimits();
-        return { success: true, ...result };
+    resetDashboard(@Body() body: { categories?: string[] }) {
+        const categories = body?.categories || ['overview', 'history', 'rateLimits', 'feedback', 'surveys'];
+        const result: Record<string, number> = {};
+
+        if (categories.includes('overview')) {
+            this.loggingService.resetDailyPeaks();
+            result.peaksCleared = 1;
+        }
+        if (categories.includes('history')) {
+            result.sessionsCleared = this.loggingService.resetSessionLogs();
+        }
+        if (categories.includes('rateLimits')) {
+            result.rateLimitsCleared = this.sessionService.clearAllRateLimits();
+        }
+        if (categories.includes('feedback')) {
+            result.feedbackCleared = this.feedbackService.resetAllData();
+        }
+        if (categories.includes('surveys')) {
+            result.surveysCleared = this.surveyService.resetAllData();
+        }
+
+        return { success: true, categories, ...result };
     }
 
     @Post('config')
