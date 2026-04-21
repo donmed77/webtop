@@ -150,10 +150,10 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             }
             this.sessionViewers.get(data.sessionId)!.add(client.id);
 
+            // SECURITY #3: Don't send sessionToken to viewers — prevents escalation
             client.emit('session:joined', {
                 sessionId: session.id,
                 port: session.port,
-                sessionToken: session.sessionToken,
                 timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
                 isViewer: true,
                 chromeAlreadyLaunched: this.chromeLaunched.has(data.sessionId),

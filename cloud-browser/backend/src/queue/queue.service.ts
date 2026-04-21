@@ -110,6 +110,11 @@ export class QueueService implements OnModuleDestroy {
         return this.queue.length;
     }
 
+    // SECURITY #13: Check if IP already has a pending queue entry
+    hasEntryForIp(clientIp: string): boolean {
+        return this.ipQueueMap.has(clientIp);
+    }
+
     /**
      * Calculate realistic estimated wait time for a specific queue position.
      * Maps each position to the Nth soonest-ending active session + boot time.

@@ -6,7 +6,7 @@ services:
     container_name: cloud-browser-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
 
@@ -17,7 +17,7 @@ services:
     container_name: cloud-browser-backend
     restart: unless-stopped
     ports:
-      - "3005:3005"
+      - "127.0.0.1:3005:3005"
     environment:
       - TZ=${TZ:-UTC}
       - NODE_ENV=production
@@ -51,7 +51,7 @@ services:
     container_name: cloud-browser-frontend
     restart: unless-stopped
     ports:
-      - "3002:3000"
+      - "127.0.0.1:3002:3000"
     environment:
       - TZ=${TZ:-UTC}
       - NEXT_PUBLIC_API_URL=https://test.unshortlink.com/api

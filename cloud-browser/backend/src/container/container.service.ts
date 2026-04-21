@@ -52,14 +52,15 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.dockerBridgeIp = this.configService.get<string>('DOCKER_BRIDGE_IP', '172.17.0.1');
 
         // Load hardened seccomp profile for session containers
+        // SECURITY #6: Hard-fail if seccomp profile is missing or corrupt — never run unconfined
         const seccompPath = '/app/seccomp-chrome.json';
         try {
             this.seccompProfile = fs.readFileSync(seccompPath, 'utf-8');
             JSON.parse(this.seccompProfile); // Validate JSON
             this.logger.log('Loaded hardened seccomp profile from ' + seccompPath);
         } catch (e) {
-            this.logger.warn(`Failed to load seccomp profile from ${seccompPath}, falling back to unconfined: ${e.message}`);
-            this.seccompProfile = 'unconfined';
+            this.logger.error(`FATAL: Cannot load seccomp profile from ${seccompPath}: ${e.message}`);
+            throw new Error(`Seccomp profile missing or corrupt at ${seccompPath}. Refusing to start without security profile.`);
         }
     }
 
@@ -126,9 +127,13 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         let totalFound = 0;
         let totalKilled = 0;
         try {
-            const { execSync } = require('child_process');
+            // SECURITY #11: Use execFileSync (no shell) to prevent command injection
+            const { execFileSync } = require('child_process');
             const deadline = Date.now() + 120_000; // 2 min hard timeout
             let attempt = 0;
+
+            // Validate container name format: session-[8 hex chars]
+            const validName = (name: string) => /^session-[a-f0-9]{8}$/.test(name);
 
             while (Date.now() < deadline) {
                 attempt++;
@@ -136,8 +141,8 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 // List all session containers via CLI
                 let lines: string[];
                 try {
-                    const output = execSync(
-                        'docker ps -a --filter "name=session-" --format "{{.Names}} {{.ID}}"',
+                    const output = execFileSync(
+                        'docker', ['ps', '-a', '--filter', 'name=session-', '--format', '{{.Names}} {{.ID}}'],
                         { encoding: 'utf-8', timeout: 10_000 }
                     ).trim();
                     lines = output ? output.split('\n').filter(Boolean) : [];
@@ -148,7 +153,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 // Build orphan list (excluding skip containers)
                 const orphans = lines
                     .map(l => { const [name, id] = l.split(' '); return { name, id }; })
-                    .filter(c => c.name?.startsWith('session-') && !skipContainerNames.has(c.name));
+                    .filter(c => c.name?.startsWith('session-') && validName(c.name) && !skipContainerNames.has(c.name));
 
                 if (orphans.length === 0) {
                     this.logger.log(`Orphan cleanup verified clean (attempt ${attempt})`);
@@ -165,18 +170,19 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 for (const orphan of orphans) {
                     try {
                         // Get container PID
-                        const pid = execSync(
-                            `docker inspect --format '{{.State.Pid}}' ${orphan.name} 2>/dev/null`,
+                        const pid = execFileSync(
+                            'docker', ['inspect', '--format', '{{.State.Pid}}', orphan.name],
                             { encoding: 'utf-8', timeout: 5000 }
                         ).trim();
 
                         // Kill the PID directly if it's running (PID > 0)
-                        if (pid && parseInt(pid) > 0) {
-                            execSync(`kill -9 ${pid} 2>/dev/null || true`, { timeout: 5000 });
+                        const pidNum = parseInt(pid, 10);
+                        if (pidNum > 0) {
+                            execFileSync('kill', ['-9', pidNum.toString()], { timeout: 5000, stdio: 'ignore' });
                         }
 
                         // Now docker rm will work since the process is dead
-                        execSync(`docker rm -f ${orphan.name} 2>/dev/null || true`, { timeout: 10_000 });
+                        execFileSync('docker', ['rm', '-f', orphan.name], { timeout: 10_000, stdio: 'ignore' });
                         killed++;
                         totalKilled++;
                     } catch {
@@ -336,8 +342,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                         '/root/apps/webtop/browser/assets:/assets:ro',
                     ],
                     // tmpfs from @browser spec
+                    // SECURITY #15: nosuid prevents SUID escalation, nodev prevents device files
                     Tmpfs: {
-                        '/tmp': 'size=2G,mode=1777',
+                        '/tmp': 'size=2G,mode=1777,nosuid,nodev',
                     },
                     // GPU device from @browser spec
                     Devices: [

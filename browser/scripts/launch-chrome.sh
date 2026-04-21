@@ -12,12 +12,17 @@ ZOOM="${2:-}"
 # Chrome uses a logarithmic scale: zoom_level = log(zoom_percent/100) / log(1.2)
 if [[ "$ZOOM" == --zoom=* ]]; then
     ZOOM_PCT="${ZOOM#--zoom=}"
+    # SECURITY #16: Validate zoom is a safe integer (50-300) to prevent code injection
+    if ! [[ "$ZOOM_PCT" =~ ^[0-9]+$ ]] || [ "$ZOOM_PCT" -lt 50 ] || [ "$ZOOM_PCT" -gt 300 ]; then
+        echo "Invalid zoom value: $ZOOM_PCT (must be 50-300)" >&2
+        ZOOM_PCT=""
+    fi
     PREFS_DIR="$HOME/.config/google-chrome/Default"
     PREFS_FILE="$PREFS_DIR/Preferences"
     mkdir -p "$PREFS_DIR"
     
-    # Calculate Chrome's internal zoom level value
-    ZOOM_LEVEL=$(python3 -c "import math; print(math.log(${ZOOM_PCT}/100) / math.log(1.2))" 2>/dev/null)
+    # Calculate Chrome's internal zoom level value (safe: passed via sys.argv, not interpolated)
+    ZOOM_LEVEL=$(python3 -c "import math,sys; print(math.log(int(sys.argv[1])/100)/math.log(1.2))" "$ZOOM_PCT" 2>/dev/null)
     
     if [ -n "$ZOOM_LEVEL" ]; then
         if [ -f "$PREFS_FILE" ]; then
