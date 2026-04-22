@@ -41,6 +41,11 @@ services:
       - ./backend/dist:/app/dist
       - ../browser/seccomp-chrome.json:/app/seccomp-chrome.json:ro
       - /proc:/host_proc:ro
+    # SECURITY #18: Harden backend container
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - redis
 
