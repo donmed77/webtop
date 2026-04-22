@@ -1606,7 +1606,7 @@ export default function SessionPage() {
             )}
 
             {/* Browser iframe — loads when port and auth token are available */}
-            {port && sessionToken && (
+            {port && (isViewer || sessionToken) && (
                 <iframe
                     ref={iframeRef}
                     src={isViewer ? `/browser/${port}/#shared` : `/browser/${port}/?token=${sessionToken}`}
