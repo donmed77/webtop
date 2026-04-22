@@ -120,6 +120,18 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             return;
         }
 
+        // SECURITY #2: For non-viewers, verify IP matches session creator
+        if (!data.viewer) {
+            const clientIp = (client.handshake.headers['x-real-ip'] as string)
+                || (client.handshake.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+                || client.handshake.address;
+            if (session.clientIp && clientIp !== session.clientIp) {
+                this.logger.warn(`Session join rejected: IP mismatch for ${data.sessionId} (expected=${session.clientIp}, got=${clientIp})`);
+                client.emit('session:error', { error: 'Session not found or ended' });
+                return;
+            }
+        }
+
         this.clientSessions.set(client.id, data.sessionId);
         if (!this.sessionClients.has(data.sessionId)) {
             this.sessionClients.set(data.sessionId, new Set());
