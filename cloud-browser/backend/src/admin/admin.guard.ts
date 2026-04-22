@@ -15,7 +15,15 @@ export class AdminGuard implements CanActivate {
 
     constructor(private configService: ConfigService) {
         this.username = this.configService.get<string>('ADMIN_USER', 'admin');
-        this.password = this.configService.get<string>('ADMIN_PASSWORD', 'changeme');
+        this.password = this.configService.get<string>('ADMIN_PASSWORD', '');
+
+        // SECURITY #8: Fail-fast on weak or default credentials
+        const BANNED = ['changeme', 'admin', 'password', 'admin123', ''];
+        if (BANNED.includes(this.password) || this.password.length < 12) {
+            const msg = `FATAL: ADMIN_PASSWORD is missing, banned, or too short (${this.password.length} chars, min 12). Set a strong password in .env`;
+            this.logger.error(msg);
+            throw new Error(msg);
+        }
     }
 
     canActivate(context: ExecutionContext): boolean {
