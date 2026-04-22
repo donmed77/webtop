@@ -594,21 +594,10 @@
       }
     },
     {
+      "comment": "SECURITY #4: SYS_ADMIN restricted — only clone/clone3 allowed for process forking",
       "names": [
         "clone",
-        "clone3",
-        "fsconfig",
-        "fsmount",
-        "fsopen",
-        "fspick",
-        "mount",
-        "mount_setattr",
-        "move_mount",
-        "open_tree",
-        "setns",
-        "umount",
-        "umount2",
-        "unshare"
+        "clone3"
       ],
       "action": "SCMP_ACT_ALLOW",
       "includes": {
@@ -616,6 +605,26 @@
           "CAP_SYS_ADMIN"
         ]
       }
+    },
+    {
+      "comment": "SECURITY #4: Block mount/namespace syscalls — prevents container escape even with SYS_ADMIN",
+      "names": [
+        "mount",
+        "mount_setattr",
+        "move_mount",
+        "umount",
+        "umount2",
+        "unshare",
+        "setns",
+        "pivot_root",
+        "fsconfig",
+        "fsmount",
+        "fsopen",
+        "fspick",
+        "open_tree"
+      ],
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 1
     },
     {
       "names": [
