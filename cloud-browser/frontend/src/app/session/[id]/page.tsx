@@ -563,7 +563,11 @@ export default function SessionPage() {
         hasNavigated.current = true;
         localStorage.removeItem(`session_${sessionId}`);
         // Fire and forget — don't block on container teardown
-        fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => { });
+        fetch(`${apiUrl}/api/session/${sessionId}`, {
+            method: "DELETE",
+            headers: sessionToken ? { "x-session-token": sessionToken } : {},
+            keepalive: true,
+        }).catch(() => { });
         // If recording is active, stop it and show ended UI with download option
         const wasRecording = stopRecorderGracefully();
         if (wasRecording) {
