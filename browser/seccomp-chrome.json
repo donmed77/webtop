@@ -413,12 +413,14 @@
       "action": "SCMP_ACT_ALLOW"
     },
     {
+      "comment": "SECURITY #5: ptrace, process_vm_readv, process_vm_writev DENIED — removed to prevent cross-process memory access",
       "names": [
         "process_vm_readv",
         "process_vm_writev",
         "ptrace"
       ],
-      "action": "SCMP_ACT_ALLOW",
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 1,
       "includes": {
         "minKernel": "4.8"
       }
