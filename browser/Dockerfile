@@ -1,7 +1,8 @@
 # Hardened KDE Ubuntu Session Image
 # Testing: Dockerfile hardening only (no setup script changes)
 
-FROM lscr.io/linuxserver/webtop:ubuntu-kde
+# Pinned to build 94914aee-ls143 (2026-03-03) — update digest intentionally after testing
+FROM lscr.io/linuxserver/webtop:ubuntu-kde@sha256:c476cdc357c969163eb76b8774da81edd91af4309d0f8f517eea15191178bbbd
 
 # =============================================================================
 # HARDENING GROUP 1: Remove unnecessary programs
