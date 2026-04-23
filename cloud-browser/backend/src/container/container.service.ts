@@ -325,7 +325,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 ExposedPorts: { '3000/tcp': {}, '3001/tcp': {} },
                 HostConfig: {
                     PortBindings: {
-                        '3000/tcp': [{ HostPort: port.toString() }],
+                        '3000/tcp': [{ HostIp: '127.0.0.1', HostPort: port.toString() }],
                     },
                     ShmSize: 12 * 1024 * 1024 * 1024, // 12GB
                     SecurityOpt: [`seccomp=${this.seccompProfile}`, 'no-new-privileges:true'],
@@ -454,20 +454,15 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 }
 
                 if (!httpReady) {
-                    // Phase 1: Check Selkies HTTP
-                    const req = http.get(`http://${this.dockerBridgeIp}:${port}/`, (res) => {
-                        res.resume();
-                        httpReady = true;
-                        // Immediately start phase 2
-                        setTimeout(check, 500);
-                    });
-
-                    req.on('error', () => {
-                        setTimeout(check, intervalMs);
-                    });
-
-                    req.setTimeout(3000, () => {
-                        req.destroy();
+                    // Phase 1: Check Selkies HTTP via docker exec (ports bound to 127.0.0.1, not reachable from container network)
+                    this.checkHttpViaExec(port).then(ready => {
+                        if (ready) {
+                            httpReady = true;
+                            setTimeout(check, 500);
+                        } else {
+                            setTimeout(check, intervalMs);
+                        }
+                    }).catch(() => {
                         setTimeout(check, intervalMs);
                     });
                 } else {
@@ -486,6 +481,43 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
             check();
         });
+    }
+
+    /**
+     * Check if Selkies HTTP is responding inside the container via docker exec.
+     * SECURITY W-02: Ports are bound to 127.0.0.1, so we can't reach them from Docker network.
+     */
+    private async checkHttpViaExec(port: number): Promise<boolean> {
+        for (const container of this.pool.values()) {
+            if (container.port === port) {
+                try {
+                    const dc = this.docker.getContainer(container.containerId);
+                    const exec = await dc.exec({
+                        Cmd: ['wget', '-q', '-O', '/dev/null', '--timeout=2', 'http://localhost:3000/'],
+                        AttachStdout: true,
+                        AttachStderr: true,
+                    });
+                    const stream = await exec.start({});
+                    return new Promise<boolean>((resolve) => {
+                        const timeout = setTimeout(() => resolve(false), 5000);
+                        stream.on('end', async () => {
+                            clearTimeout(timeout);
+                            try {
+                                const inspectData = await exec.inspect();
+                                resolve(inspectData.ExitCode === 0);
+                            } catch {
+                                resolve(false);
+                            }
+                        });
+                        stream.on('error', () => { clearTimeout(timeout); resolve(false); });
+                        stream.resume();
+                    });
+                } catch {
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     /**

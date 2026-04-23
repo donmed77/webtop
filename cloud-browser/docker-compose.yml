@@ -44,6 +44,8 @@ services:
     # SECURITY #18: Harden backend container
     cap_drop:
       - ALL
+    cap_add:
+      - KILL
     security_opt:
       - no-new-privileges:true
     depends_on:
