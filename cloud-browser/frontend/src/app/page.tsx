@@ -10,6 +10,7 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,6 +19,7 @@ export default function Home() {
 
     setLoading(true);
     setError("");
+    setActiveSessionId(null);
 
     try {
       // Add https:// if no protocol
@@ -39,6 +41,9 @@ export default function Home() {
         if (data.rateLimited) {
           router.push("/rate-limited");
           return;
+        }
+        if (data.concurrent && data.activeSessionId) {
+          setActiveSessionId(data.activeSessionId);
         }
         setError(data.message || "Failed to start session");
         setLoading(false);
@@ -84,7 +89,20 @@ export default function Home() {
             </Button>
 
             {error && (
-              <p className="text-destructive text-sm text-center">{error}</p>
+              <div className="text-center space-y-2">
+                <p className="text-destructive text-sm">{error}</p>
+                {activeSessionId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/session/${activeSessionId}`)}
+                  >
+                    Go to Active Session
+                  </Button>
+                )}
+              </div>
             )}
           </form>
         </CardContent>

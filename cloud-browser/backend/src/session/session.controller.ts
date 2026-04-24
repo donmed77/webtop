@@ -54,10 +54,14 @@ export class SessionController {
         }
 
         // SECURITY #13: Concurrent session limit — 1 active session per IP
-        const hasActive = this.sessionService.getActiveSessions().some(s => s.clientIp === clientIp);
-        if (hasActive) {
+        const activeSession = this.sessionService.getActiveSessions().find(s => s.clientIp === clientIp);
+        if (activeSession) {
             throw new HttpException(
-                { message: 'You already have an active session. Please end it before starting a new one.', concurrent: true },
+                {
+                    message: 'You already have an active session. Please end it before starting a new one.',
+                    concurrent: true,
+                    activeSessionId: activeSession.id,
+                },
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }

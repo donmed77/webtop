@@ -24,7 +24,9 @@ export class QueueService implements OnModuleDestroy {
     private ipQueueMap: Map<string, string> = new Map(); // QE3: clientIp -> queueId
     private onUpdateCallbacks: Map<string, (entry: QueueEntry) => void> = new Map();
     private checkInterval: NodeJS.Timeout;
+    private staleCheckInterval: NodeJS.Timeout;
     private processing = false; // Fix #4: prevent concurrent processQueue runs
+    private static readonly QUEUE_ENTRY_TTL_MS = 5 * 60 * 1000; // 5 minutes max lifetime for unconnected entries
 
     constructor(
         private containerService: ContainerService,
@@ -32,12 +34,17 @@ export class QueueService implements OnModuleDestroy {
     ) {
         // Process queue every 500ms for faster response
         this.checkInterval = setInterval(() => this.processQueue(), 500);
+        // Evict stale queue entries every 30s (entries that never got a WebSocket)
+        this.staleCheckInterval = setInterval(() => this.evictStaleEntries(), 30_000);
     }
 
-    // Fix #6: Clear interval on module destroy to prevent memory leaks
+    // Fix #6: Clear intervals on module destroy to prevent memory leaks
     onModuleDestroy() {
         if (this.checkInterval) {
             clearInterval(this.checkInterval);
+        }
+        if (this.staleCheckInterval) {
+            clearInterval(this.staleCheckInterval);
         }
     }
 
@@ -236,6 +243,8 @@ export class QueueService implements OnModuleDestroy {
             const rateLimit = this.sessionService.checkRateLimit(entry.clientIp);
             if (!rateLimit.allowed) {
                 entry.status = 'rate_limited';
+                // Immediately free IP so they aren't permanently locked out
+                this.ipQueueMap.delete(entry.clientIp);
                 this.notifyUpdate(entry);
                 this.logger.log(`Queue entry ${entry.id} rate-limited (IP: ${entry.clientIp})`);
                 this.scheduleCleanup(entry);
@@ -260,6 +269,8 @@ export class QueueService implements OnModuleDestroy {
                 entry.status = 'ready';
                 entry.sessionId = result.session.id;
                 entry.port = result.session.port;
+                // Immediately free IP from queue map — active session check now guards this IP
+                this.ipQueueMap.delete(entry.clientIp);
                 this.notifyUpdate(entry);
                 this.logger.log(`Queue entry ${entry.id} ready with session ${entry.sessionId}`);
                 // Fix #1: Schedule cleanup of this completed entry
@@ -268,6 +279,8 @@ export class QueueService implements OnModuleDestroy {
                 // Fix #3: Notify the client about the error instead of silently dropping
                 this.logger.error(`Queue processing failed for ${entry.id}: ${result.error}`);
                 entry.status = 'error';
+                // Immediately free IP so they can retry
+                this.ipQueueMap.delete(entry.clientIp);
                 this.notifyUpdate(entry);
                 this.scheduleCleanup(entry);
             } else {
@@ -284,5 +297,35 @@ export class QueueService implements OnModuleDestroy {
 
     getAllQueue(): QueueEntry[] {
         return [...this.queue];
+    }
+
+    /**
+     * Evict queue entries that have been waiting too long without being processed.
+     * Catches the edge case where a client gets a queueId but never opens a WebSocket
+     * (JS disabled, bookmarked URL, closed tab before WS connected, etc.).
+     * Without this, ipQueueMap would hold the IP hostage forever.
+     */
+    private evictStaleEntries() {
+        const now = Date.now();
+        const stale: QueueEntry[] = [];
+
+        for (const entry of this.queue) {
+            if (entry.status === 'waiting' && (now - entry.createdAt.getTime()) > QueueService.QUEUE_ENTRY_TTL_MS) {
+                stale.push(entry);
+            }
+        }
+
+        for (const entry of stale) {
+            const idx = this.queue.indexOf(entry);
+            if (idx !== -1) this.queue.splice(idx, 1);
+            this.ipQueueMap.delete(entry.clientIp);
+            this.entries.delete(entry.id);
+            this.onUpdateCallbacks.delete(entry.id);
+            this.logger.warn(`Evicted stale queue entry ${entry.id} (IP: ${entry.clientIp}, age: ${Math.round((now - entry.createdAt.getTime()) / 1000)}s)`);
+        }
+
+        if (stale.length > 0) {
+            this.updatePositions();
+        }
     }
 }
