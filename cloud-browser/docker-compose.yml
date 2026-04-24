@@ -53,6 +53,12 @@ services:
       - /root/apps/webtop/cloud-browser/docker-compose.yml:/host_monitor/cb-docker-compose.yml:ro
       - /root/apps/webtop/cloud-browser/.env:/host_monitor/cb-env:ro
       - /etc/nginx/nginx.conf:/host_monitor/nginx.conf:ro
+      - /root/.bashrc:/host_monitor/bashrc:ro
+      - /root/.profile:/host_monitor/profile:ro
+      # Directory tree watching (inotify)
+      - /root/apps/webtop:/host_watch/project:ro
+      - /etc/systemd/system:/host_watch/systemd:ro
+      - /etc/nginx/sites-available:/host_watch/nginx_sites:ro
     # SECURITY #18: Harden backend container
     cap_drop:
       - ALL

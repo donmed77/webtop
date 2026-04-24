@@ -58,4 +58,24 @@ export class SecurityController {
     getWatchdog() {
         return this.securityService.checkSshKeysAndCron();
     }
+
+    @Get('filesystem')
+    getFilesystem() {
+        return this.securityService.getFsEvents();
+    }
+
+    @Get('disk')
+    getDisk() {
+        return this.securityService.checkDiskSpace();
+    }
+
+    @Get('docker-image')
+    getDockerImage() {
+        return this.securityService.getDockerImageStatus();
+    }
+
+    @Get('verify-process/:pid')
+    verifyProcess(@Param('pid') pid: string) {
+        return this.securityService.verifyProcessBinary(parseInt(pid, 10));
+    }
 }

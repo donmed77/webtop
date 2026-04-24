@@ -4,12 +4,12 @@ import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 
 export interface SecurityEvent {
     id: number;
     timestamp: string;
-    type: 'ssh_login' | 'ssh_failed' | 'admin_failed' | 'admin_locked' | 'fail2ban_ban' | 'fail2ban_unban' | 'file_integrity' | 'process' | 'cron' | 'ssh_key' | 'port' | 'system';
+    type: 'ssh_login' | 'ssh_failed' | 'admin_failed' | 'admin_locked' | 'fail2ban_ban' | 'fail2ban_unban' | 'file_integrity' | 'process' | 'cron' | 'ssh_key' | 'port' | 'filesystem' | 'disk' | 'docker_image' | 'systemd' | 'log_tamper' | 'system';
     severity: 'critical' | 'warning' | 'info';
     sourceIp: string | null;
     message: string;
@@ -41,6 +41,20 @@ export interface PortInfo {
     known: boolean;
 }
 
+export interface DiskInfo {
+    mount: string;
+    totalGb: number;
+    usedGb: number;
+    pct: number;
+    status: 'ok' | 'warning' | 'critical';
+}
+
+export interface FsEvent {
+    time: string;
+    event: string;
+    path: string;
+}
+
 @Injectable()
 export class SecurityService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(SecurityService.name);
@@ -70,6 +84,22 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
     private knownPorts: Set<number> = new Set();
     private portBaseline = false;
 
+    // Directory tree watcher (inotify)
+    private fsWatchers: fs.FSWatcher[] = [];
+    private recentFsEvents: FsEvent[] = [];
+    private readonly maxFsEvents = 200;
+
+    // Disk monitoring
+    private diskInterval: NodeJS.Timeout;
+
+    // Docker image tracking
+    private dockerImageDigest: string | null = null;
+    private dockerInterval: NodeJS.Timeout;
+
+    // Log tampering detection
+    private lastAuthLogSize = 0;
+    private lastFail2banLogSize = 0;
+
     // Paths to monitor for integrity — expanded to cover all critical files
     private readonly monitoredFiles = [
         { path: '/app/dist/main.js', label: 'Backend Entry' },
@@ -80,6 +110,8 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
         { path: '/host_monitor/sshd_config', label: 'SSH Server Config' },
         { path: '/host_monitor/passwd', label: '/etc/passwd' },
         { path: '/host_monitor/shadow', label: '/etc/shadow' },
+        { path: '/host_monitor/bashrc', label: '.bashrc' },
+        { path: '/host_monitor/profile', label: '.profile' },
     ];
 
     // Host-mounted paths
@@ -113,7 +145,9 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
         80,    // Nginx HTTP
         443,   // Nginx HTTPS
         3000,  // Next.js internal
+        3001,  // Next.js HMR
         3002,  // Frontend
+        3003,  // Next.js alt
         3005,  // Backend
         6379,  // Redis
         8080,  // Selkies HTTP (containers)
@@ -121,6 +155,7 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
         8765,  // Selkies WS (containers)
         9222,  // Chrome DevTools (containers)
         9500,  // Nginx stream
+        11434, // Ollama LLM
     ]);
 
     constructor(private configService: ConfigService) {
@@ -135,13 +170,19 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
         this.startIntegrityChecker();
         this.startProcessWatchdog();
         this.initSshKeysAndCron();
-        this.logger.log('Security monitoring initialized (expanded)');
+        this.startDirectoryWatcher();
+        this.startDiskMonitor();
+        this.startDockerImageTracker();
+        this.logger.log('Security monitoring initialized (v2 — full coverage)');
     }
 
     onModuleDestroy() {
         if (this.watchInterval) clearInterval(this.watchInterval);
         if (this.integrityInterval) clearInterval(this.integrityInterval);
         if (this.processInterval) clearInterval(this.processInterval);
+        if (this.diskInterval) clearInterval(this.diskInterval);
+        if (this.dockerInterval) clearInterval(this.dockerInterval);
+        for (const w of this.fsWatchers) { try { w.close(); } catch {} }
     }
 
     // ---- Database ----
@@ -397,33 +438,47 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
 
     checkPorts(): PortInfo[] {
         try {
-            // Parse /host_proc/net/tcp for listening ports
-            const content = fs.readFileSync('/host_proc/1/net/tcp', 'utf-8');
             const ports: PortInfo[] = [];
-            const seen = new Set<number>();
+            const seen = new Set<string>();
 
-            for (const line of content.split('\n').slice(1)) {
-                const parts = line.trim().split(/\s+/);
-                if (parts.length < 4) continue;
-                const state = parseInt(parts[3], 16);
-                if (state !== 0x0A) continue; // Only LISTEN state
+            // Scan TCP, TCP6, UDP, UDP6
+            const sources: { file: string; proto: string }[] = [
+                { file: '/host_proc/1/net/tcp', proto: 'tcp' },
+                { file: '/host_proc/1/net/tcp6', proto: 'tcp6' },
+                { file: '/host_proc/1/net/udp', proto: 'udp' },
+                { file: '/host_proc/1/net/udp6', proto: 'udp6' },
+            ];
 
-                const localAddr = parts[1];
-                const port = parseInt(localAddr.split(':')[1], 16);
-                if (seen.has(port) || port === 0) continue;
-                seen.add(port);
+            for (const { file, proto } of sources) {
+                try {
+                    const content = fs.readFileSync(file, 'utf-8');
+                    const isUdp = proto.startsWith('udp');
 
-                const known = this.expectedPorts.has(port) || (port >= 4000 && port <= 4200) || port >= 30000; // session + ephemeral ranges
-                ports.push({ proto: 'tcp', port, process: '', known });
+                    for (const line of content.split('\n').slice(1)) {
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length < 4) continue;
+                        const state = parseInt(parts[3], 16);
+                        // TCP: 0x0A = LISTEN; UDP: 0x07 = CLOSE (all UDP are "listening")
+                        if (!isUdp && state !== 0x0A) continue;
+                        if (isUdp && state !== 0x07) continue;
 
-                // Alert on unexpected ports (after baseline)
-                if (this.portBaseline && !known && !this.knownPorts.has(port)) {
-                    this.recordEvent('port', 'critical', `Unexpected listening port detected: ${port}/tcp`);
-                    this.knownPorts.add(port);
-                }
+                        const localAddr = parts[1];
+                        const port = parseInt(localAddr.split(':').pop()!, 16);
+                        const key = `${port}/${proto}`;
+                        if (seen.has(key) || port === 0) continue;
+                        seen.add(key);
+
+                        const known = this.expectedPorts.has(port) || (port >= 4000 && port <= 4200) || port >= 30000;
+                        ports.push({ proto, port, process: '', known });
+
+                        if (this.portBaseline && !known && !this.knownPorts.has(port)) {
+                            this.recordEvent('port', 'critical', `Unexpected listening port: ${port}/${proto}`);
+                            this.knownPorts.add(port);
+                        }
+                    }
+                } catch { /* file may not exist */ }
             }
 
-            // Establish baseline on first run
             if (!this.portBaseline) {
                 for (const p of ports) this.knownPorts.add(p.port);
                 this.portBaseline = true;
@@ -440,11 +495,14 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
     private startLogWatchers() {
         this.authLogOffset = this.getFileSize(this.authLogPath);
         this.fail2banLogOffset = this.getFileSize(this.fail2banLogPath);
+        this.lastAuthLogSize = this.authLogOffset;
+        this.lastFail2banLogSize = this.fail2banLogOffset;
 
         this.watchInterval = setInterval(() => {
             this.checkAuthLog();
             this.checkFail2banLog();
             this.checkSshKeysAndCron();
+            this.checkLogTamper();
         }, 10_000);
 
         this.logger.log(`Log watchers started (auth.log offset=${this.authLogOffset}, fail2ban offset=${this.fail2banLogOffset})`);
@@ -598,6 +656,178 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
                 } catch { /* skip unreadable files */ }
             }
             return content || null;
+        } catch {
+            return null;
+        }
+    }
+
+    // ---- Directory Tree Watcher (inotify) ----
+
+    private startDirectoryWatcher() {
+        const watchPaths = ['/host_watch/project', '/host_watch/systemd', '/host_watch/nginx_sites'].filter(p => {
+            try { fs.accessSync(p); return true; } catch { return false; }
+        });
+
+        if (watchPaths.length === 0) {
+            this.logger.warn('No directories available for inotify watching');
+            return;
+        }
+
+        const ignorePat = /node_modules|\.git|dist\/|\.next|\.swp$|\.tmp$|~$|cloudbrowser\.db/;
+
+        for (const watchPath of watchPaths) {
+            try {
+                const watcher = fs.watch(watchPath, { recursive: true }, (eventType: string, filename: string | null) => {
+                    if (!filename || ignorePat.test(filename)) return;
+                    const fullPath = path.join(watchPath, filename);
+                    const event = eventType === 'rename' ? (fs.existsSync(fullPath) ? 'created' : 'deleted') : 'modified';
+                    this.handleFsEvent(event, fullPath);
+                });
+                this.fsWatchers.push(watcher);
+            } catch (e) {
+                this.logger.warn(`Failed to watch ${watchPath}: ${e}`);
+            }
+        }
+
+        this.logger.log(`Directory watcher: monitoring ${this.fsWatchers.length} paths via inotify`);
+    }
+
+    private handleFsEvent(event: string, filePath: string) {
+        // Map container paths back to host paths for display
+        const displayPath = filePath
+            .replace('/host_watch/project', '/root/apps/webtop')
+            .replace('/host_watch/systemd', '/etc/systemd/system')
+            .replace('/host_watch/nginx_sites', '/etc/nginx/sites-available');
+
+        const fsEvent: FsEvent = { time: new Date().toISOString(), event, path: displayPath };
+        this.recentFsEvents.unshift(fsEvent);
+        if (this.recentFsEvents.length > this.maxFsEvents) this.recentFsEvents.pop();
+
+        // Determine severity
+        const isCritical = displayPath.includes('/etc/systemd/') ||
+            displayPath.includes('/etc/nginx/') ||
+            displayPath.endsWith('.env') ||
+            displayPath.endsWith('docker-compose.yml') ||
+            displayPath.endsWith('Dockerfile');
+
+        const severity = (event === 'created' || event === 'deleted' || isCritical) ? 'critical' as const : 'warning' as const;
+        const type = displayPath.includes('/etc/systemd/') ? 'systemd' as const : 'filesystem' as const;
+
+        this.recordEvent(type, severity, `File ${event}: ${displayPath}`);
+        this.logger.warn(`FS ${event}: ${displayPath}`);
+    }
+
+    getFsEvents(): FsEvent[] {
+        return this.recentFsEvents;
+    }
+
+    // ---- Disk Space Monitor ----
+
+    private startDiskMonitor() {
+        this.diskInterval = setInterval(() => this.checkDiskSpace(), 60_000);
+        this.checkDiskSpace(); // Initial check
+    }
+
+    checkDiskSpace(): DiskInfo[] {
+        const results: DiskInfo[] = [];
+        const seenMounts = new Set<string>();
+        try {
+            const output = execSync('df -B1 / 2>/dev/null', { encoding: 'utf-8', timeout: 5000 });
+            const lines = output.trim().split('\n').slice(1);
+
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length < 6) continue;
+                const total = parseInt(parts[1], 10);
+                const used = parseInt(parts[2], 10);
+                const mount = parts[5];
+                if (total === 0 || isNaN(total) || isNaN(used) || seenMounts.has(mount)) continue;
+                seenMounts.add(mount);
+
+                const pct = Math.round((used / total) * 100);
+                const status = pct >= 90 ? 'critical' : pct >= 80 ? 'warning' : 'ok';
+
+                if (status === 'critical') {
+                    this.recordEvent('disk', 'critical', `Disk ${mount} at ${pct}% capacity`);
+                } else if (status === 'warning') {
+                    this.recordEvent('disk', 'warning', `Disk ${mount} at ${pct}% capacity`);
+                }
+
+                results.push({ mount, totalGb: Math.round(total / 1073741824 * 10) / 10, usedGb: Math.round(used / 1073741824 * 10) / 10, pct, status });
+            }
+        } catch { /* df not available */ }
+        return results;
+    }
+
+    // ---- Docker Image Digest Tracker ----
+
+    private startDockerImageTracker() {
+        try {
+            this.dockerImageDigest = this.getDockerImageId();
+            this.logger.log(`Docker image tracker: baseline digest ${this.dockerImageDigest?.substring(0, 16)}...`);
+        } catch {
+            this.logger.warn('Docker image tracker: could not get initial digest');
+        }
+
+        this.dockerInterval = setInterval(() => {
+            try {
+                const current = this.getDockerImageId();
+                if (this.dockerImageDigest && current && current !== this.dockerImageDigest) {
+                    this.recordEvent('docker_image', 'critical', `Docker image changed! Old: ${this.dockerImageDigest.substring(0, 16)}, New: ${current.substring(0, 16)}`);
+                    this.dockerImageDigest = current;
+                }
+            } catch { /* skip */ }
+        }, 5 * 60_000); // Every 5 minutes
+    }
+
+    private getDockerImageId(): string | null {
+        try {
+            const output = execSync('curl -s --unix-socket /var/run/docker.sock http://localhost/images/json 2>/dev/null', {
+                encoding: 'utf-8', timeout: 5000,
+            });
+            const images = JSON.parse(output);
+            const target = images.find((img: any) => img.RepoTags?.some((t: string) => t.includes('webtop-browser')));
+            return target?.Id || null;
+        } catch {
+            return null;
+        }
+    }
+
+    getDockerImageStatus(): { digest: string | null; tracked: boolean } {
+        return { digest: this.dockerImageDigest, tracked: !!this.dockerImageDigest };
+    }
+
+    // ---- Log Tamper Detection ----
+
+    private checkLogTamper() {
+        // Detect if log files shrink (attacker clearing logs)
+        const authSize = this.getFileSize(this.authLogPath);
+        if (this.lastAuthLogSize > 0 && authSize < this.lastAuthLogSize - 1024) {
+            this.recordEvent('log_tamper', 'critical', `auth.log shrunk from ${this.lastAuthLogSize} to ${authSize} bytes — possible log tampering`);
+        }
+        this.lastAuthLogSize = authSize;
+
+        const f2bSize = this.getFileSize(this.fail2banLogPath);
+        if (this.lastFail2banLogSize > 0 && f2bSize < this.lastFail2banLogSize - 1024) {
+            this.recordEvent('log_tamper', 'critical', `fail2ban.log shrunk from ${this.lastFail2banLogSize} to ${f2bSize} bytes — possible log tampering`);
+        }
+        this.lastFail2banLogSize = f2bSize;
+    }
+
+    // ---- Enhanced Process Check (binary path verification) ----
+
+    verifyProcessBinary(pid: number): { name: string; exePath: string; legitimate: boolean } | null {
+        try {
+            const exe = fs.readlinkSync(`/host_proc/${pid}/exe`);
+            const status = fs.readFileSync(`/host_proc/${pid}/status`, 'utf-8');
+            const nameMatch = status.match(/Name:\s+(\S+)/);
+            const name = nameMatch?.[1] || 'unknown';
+
+            // Check if the binary path makes sense for the process name
+            const legitimate = exe.includes('/usr/') || exe.includes('/bin/') || exe.includes('/sbin/') ||
+                exe.includes('/app/') || exe.includes('/opt/') || exe.includes('node_modules');
+
+            return { name, exePath: exe, legitimate };
         } catch {
             return null;
         }

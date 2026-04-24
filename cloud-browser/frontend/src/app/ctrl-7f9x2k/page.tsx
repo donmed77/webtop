@@ -259,6 +259,13 @@ interface PortInfo {
 interface WatchdogStatus {
     sshKeys: string; cron: string; etcCrontab: string;
 }
+interface DiskInfo {
+    mount: string; totalGb: number; usedGb: number; pct: number;
+    status: 'ok' | 'warning' | 'critical';
+}
+interface FsEvent {
+    time: string; event: string; path: string;
+}
 
 export default function AdminPage() {
     const [authenticated, setAuthenticated] = useState(false);
@@ -314,6 +321,9 @@ export default function AdminPage() {
     const [procTotal, setProcTotal] = useState(0);
     const [openPorts, setOpenPorts] = useState<PortInfo[]>([]);
     const [watchdog, setWatchdog] = useState<WatchdogStatus | null>(null);
+    const [diskInfo, setDiskInfo] = useState<DiskInfo[]>([]);
+    const [fsEvents, setFsEvents] = useState<FsEvent[]>([]);
+    const [dockerImage, setDockerImage] = useState<{ digest: string | null; tracked: boolean }>({ digest: null, tracked: false });
 
     // Config form state — track which sliders the user has touched
     const [newPoolSize, setNewPoolSize] = useState("");
@@ -587,13 +597,16 @@ export default function AdminPage() {
         try {
             const params = new URLSearchParams({ limit: '50' });
             if (securityFilter) params.set('severity', securityFilter);
-            const [eventsRes, statsRes, integrityRes, procsRes, portsRes, watchdogRes] = await Promise.all([
+            const [eventsRes, statsRes, integrityRes, procsRes, portsRes, watchdogRes, diskRes, fsRes, dockerRes] = await Promise.all([
                 fetch(`${apiUrl}/api/admin/security/events?${params}`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/security/stats`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/security/integrity`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/security/processes`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/security/ports`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/security/watchdog`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/disk`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/filesystem`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/docker-image`, { headers: getAuthHeaders() }),
             ]);
             if (eventsRes.ok) { const d = await eventsRes.json(); setSecurityEvents(d.events); setSecurityTotal(d.total); }
             if (statsRes.ok) setSecurityStats(await statsRes.json());
@@ -601,6 +614,9 @@ export default function AdminPage() {
             if (procsRes.ok) { const d = await procsRes.json(); setSuspiciousProcs(d.suspicious); setProcTotal(d.total); }
             if (portsRes.ok) setOpenPorts(await portsRes.json());
             if (watchdogRes.ok) setWatchdog(await watchdogRes.json());
+            if (diskRes.ok) setDiskInfo(await diskRes.json());
+            if (fsRes.ok) setFsEvents(await fsRes.json());
+            if (dockerRes.ok) setDockerImage(await dockerRes.json());
         } catch { }
     };
 
@@ -1506,6 +1522,78 @@ export default function AdminPage() {
                                                     <span className="text-orange-400 shrink-0 ml-1">{p.reason}</span>
                                                 </div>
                                                 <div className="text-muted-foreground mt-0.5">PID {p.pid} · {p.user} · CPU {p.cpu}% · MEM {p.mem}%</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Disk + Docker + FS Events row */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Disk Space */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">Disk Space</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {diskInfo.map((d) => (
+                                            <div key={d.mount}>
+                                                <div className="flex justify-between text-xs mb-1">
+                                                    <span className="font-mono">{d.mount}</span>
+                                                    <span className={d.status === 'ok' ? 'text-green-400' : d.status === 'warning' ? 'text-yellow-400' : 'text-red-400'}>
+                                                        {d.usedGb}GB / {d.totalGb}GB ({d.pct}%)
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-muted rounded-full h-2">
+                                                    <div className={`h-2 rounded-full ${d.pct >= 90 ? 'bg-red-500' : d.pct >= 80 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${d.pct}%` }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {diskInfo.length === 0 && <div className="text-center text-muted-foreground text-xs py-2">No data</div>}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Docker Image */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">Docker Image</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2">
+                                            <span className="text-sm">webtop-browser:latest</span>
+                                            <span className={`text-xs font-semibold ${dockerImage.tracked ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                {dockerImage.tracked ? 'TRACKED' : 'UNTRACKED'}
+                                            </span>
+                                        </div>
+                                        {dockerImage.digest && (
+                                            <div className="text-xs text-muted-foreground font-mono break-all px-1">
+                                                {dockerImage.digest.substring(0, 32)}...
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* File System Activity */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">File System Activity ({fsEvents.length})</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                                        {fsEvents.length === 0 ? (
+                                            <div className="text-center text-green-400 py-4 text-xs">✓ No filesystem changes detected</div>
+                                        ) : fsEvents.slice(0, 20).map((e, i) => (
+                                            <div key={i} className={`px-2 py-1 rounded text-xs ${e.event === 'created' || e.event === 'deleted' ? 'bg-red-500/10 border-l-2 border-red-500' : 'bg-yellow-500/10 border-l-2 border-yellow-500'}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-mono truncate max-w-[180px]">{e.path.split('/').pop()}</span>
+                                                    <span className={`shrink-0 ml-1 font-semibold ${e.event === 'created' ? 'text-red-400' : e.event === 'deleted' ? 'text-red-400' : 'text-yellow-400'}`}>{e.event}</span>
+                                                </div>
+                                                <div className="text-muted-foreground mt-0.5 truncate">{e.path}</div>
                                             </div>
                                         ))}
                                     </div>
