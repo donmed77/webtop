@@ -229,7 +229,36 @@ interface ServerHealth {
     containers: Array<{ name: string; cpu: number; memMb: number; netRx: string; netTx: string }>;
 }
 
-type Tab = "overview" | "history" | "ratelimits" | "controls" | "feedback" | "surveys";
+type Tab = "overview" | "history" | "ratelimits" | "controls" | "feedback" | "surveys" | "security";
+
+interface SecurityEvent {
+    id: number;
+    timestamp: string;
+    type: string;
+    severity: 'critical' | 'warning' | 'info';
+    sourceIp: string | null;
+    message: string;
+    acknowledged: boolean;
+}
+interface SecurityStats {
+    todayCritical: number; todayWarning: number; todayInfo: number;
+    fail2banBans: number; lastSshLogin: string | null;
+    unacknowledged: number;
+}
+interface FileIntegrity {
+    path: string; label: string; hash: string | null;
+    lastChecked: string | null; status: 'ok' | 'changed' | 'missing' | 'unchecked';
+}
+interface ProcessInfo {
+    pid: number; user: string; cpu: number; mem: number;
+    command: string; suspicious: boolean; reason?: string;
+}
+interface PortInfo {
+    proto: string; port: number; process: string; known: boolean;
+}
+interface WatchdogStatus {
+    sshKeys: string; cron: string; etcCrontab: string;
+}
 
 export default function AdminPage() {
     const [authenticated, setAuthenticated] = useState(false);
@@ -274,6 +303,17 @@ export default function AdminPage() {
 
     // Server health state
     const [serverHealth, setServerHealth] = useState<ServerHealth | null>(null);
+
+    // Security state
+    const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
+    const [securityStats, setSecurityStats] = useState<SecurityStats | null>(null);
+    const [securityTotal, setSecurityTotal] = useState(0);
+    const [fileIntegrity, setFileIntegrity] = useState<FileIntegrity[]>([]);
+    const [securityFilter, setSecurityFilter] = useState<string>("");
+    const [suspiciousProcs, setSuspiciousProcs] = useState<ProcessInfo[]>([]);
+    const [procTotal, setProcTotal] = useState(0);
+    const [openPorts, setOpenPorts] = useState<PortInfo[]>([]);
+    const [watchdog, setWatchdog] = useState<WatchdogStatus | null>(null);
 
     // Config form state — track which sliders the user has touched
     const [newPoolSize, setNewPoolSize] = useState("");
@@ -531,8 +571,38 @@ export default function AdminPage() {
             fetchFeedback();
         } else if (activeTab === "surveys") {
             fetchSurveys();
+        } else if (activeTab === "security") {
+            fetchSecurity();
         }
     }, [activeTab, authenticated, feedbackFilter]);
+
+    // Auto-refresh security events
+    useEffect(() => {
+        if (!authenticated || activeTab !== "security") return;
+        const interval = setInterval(() => fetchSecurity(), 5000);
+        return () => clearInterval(interval);
+    }, [authenticated, activeTab, securityFilter]);
+
+    const fetchSecurity = async () => {
+        try {
+            const params = new URLSearchParams({ limit: '50' });
+            if (securityFilter) params.set('severity', securityFilter);
+            const [eventsRes, statsRes, integrityRes, procsRes, portsRes, watchdogRes] = await Promise.all([
+                fetch(`${apiUrl}/api/admin/security/events?${params}`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/stats`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/integrity`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/processes`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/ports`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/security/watchdog`, { headers: getAuthHeaders() }),
+            ]);
+            if (eventsRes.ok) { const d = await eventsRes.json(); setSecurityEvents(d.events); setSecurityTotal(d.total); }
+            if (statsRes.ok) setSecurityStats(await statsRes.json());
+            if (integrityRes.ok) setFileIntegrity(await integrityRes.json());
+            if (procsRes.ok) { const d = await procsRes.json(); setSuspiciousProcs(d.suspicious); setProcTotal(d.total); }
+            if (portsRes.ok) setOpenPorts(await portsRes.json());
+            if (watchdogRes.ok) setWatchdog(await watchdogRes.json());
+        } catch { }
+    };
 
     // Auto-refresh feedback list when tab is active
     useEffect(() => {
@@ -682,7 +752,7 @@ export default function AdminPage() {
 
                 {/* Tabs */}
                 <div className="flex gap-2 border-b pb-2">
-                    {(["overview", "history", "ratelimits", "feedback", "surveys", "controls"] as Tab[]).map((tab) => (
+                    {(["overview", "history", "ratelimits", "feedback", "surveys", "security", "controls"] as Tab[]).map((tab) => (
                         <Button
                             key={tab}
                             variant={activeTab === tab ? "default" : "ghost"}
@@ -693,6 +763,11 @@ export default function AdminPage() {
                             {tab === "feedback" && feedbackStats && feedbackStats.open > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                                     {feedbackStats.open}
+                                </span>
+                            )}
+                            {tab === "security" && securityStats && securityStats.unacknowledged > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                                    {securityStats.unacknowledged > 9 ? '9+' : securityStats.unacknowledged}
                                 </span>
                             )}
                         </Button>
@@ -1296,6 +1371,227 @@ export default function AdminPage() {
                                         </table>
                                     </div>
                                 )}
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+                {/* ===== SECURITY TAB ===== */}
+                {activeTab === "security" && (
+                    <>
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            <Card>
+                                <CardContent className="pt-4 pb-3 text-center">
+                                    <div className="text-2xl font-bold text-red-400">{securityStats?.todayCritical ?? 0}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Critical (24h)</div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-4 pb-3 text-center">
+                                    <div className="text-2xl font-bold text-orange-400">{securityStats?.todayWarning ?? 0}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Warnings (24h)</div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-4 pb-3 text-center">
+                                    <div className="text-2xl font-bold text-blue-400">{securityStats?.todayInfo ?? 0}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Info (24h)</div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-4 pb-3 text-center">
+                                    <div className="text-2xl font-bold text-yellow-400">{securityStats?.fail2banBans ?? 0}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Fail2ban Bans (24h)</div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-4 pb-3 text-center">
+                                    <div className="text-xs text-muted-foreground mb-1">Last SSH Login</div>
+                                    <div className="text-sm font-mono text-green-400">
+                                        {securityStats?.lastSshLogin
+                                            ? new Date(securityStats.lastSshLogin + 'Z').toLocaleString()
+                                            : 'None detected'}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* File Integrity */}
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm">File Integrity</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {fileIntegrity.map((f) => (
+                                        <div key={f.path} className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${f.status === 'ok' ? 'bg-green-500' : f.status === 'changed' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'}`} />
+                                                <span className="text-sm font-medium">{f.label}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-semibold uppercase ${f.status === 'ok' ? 'text-green-400' : f.status === 'changed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                                                    {f.status}
+                                                </span>
+                                                {f.lastChecked && (
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {new Date(f.lastChecked).toLocaleTimeString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Watchdog: SSH Keys, Cron, Ports */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* SSH Keys + Cron */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">Watchdog</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {[
+                                            { label: 'SSH authorized_keys', status: watchdog?.sshKeys || 'ok' },
+                                            { label: 'User Crontabs', status: watchdog?.cron || 'ok' },
+                                            { label: '/etc/crontab', status: watchdog?.etcCrontab || 'ok' },
+                                        ].map((w) => (
+                                            <div key={w.label} className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-2 h-2 rounded-full ${w.status === 'ok' ? 'bg-green-500' : w.status === 'changed' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'}`} />
+                                                    <span className="text-sm">{w.label}</span>
+                                                </div>
+                                                <span className={`text-xs font-semibold uppercase ${w.status === 'ok' ? 'text-green-400' : 'text-red-400'}`}>{w.status}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Open Ports */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">Listening Ports ({openPorts.length})</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                                        {openPorts.map((p) => (
+                                            <div key={p.port} className={`flex items-center justify-between px-2 py-1 rounded text-xs ${p.known ? '' : 'bg-red-500/10 border-l-2 border-red-500'}`}>
+                                                <span className="font-mono">{p.port}/{p.proto}</span>
+                                                <span className={`font-semibold ${p.known ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {p.known ? 'expected' : 'UNKNOWN'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Suspicious Processes */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">Processes ({procTotal} total, {suspiciousProcs.length} flagged)</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                                        {suspiciousProcs.length === 0 ? (
+                                            <div className="text-center text-green-400 py-4 text-xs">✓ No suspicious processes</div>
+                                        ) : suspiciousProcs.map((p) => (
+                                            <div key={p.pid} className="bg-orange-500/10 border-l-2 border-orange-500 px-2 py-1 rounded text-xs">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-mono truncate max-w-[180px]">{p.command.substring(0, 50)}</span>
+                                                    <span className="text-orange-400 shrink-0 ml-1">{p.reason}</span>
+                                                </div>
+                                                <div className="text-muted-foreground mt-0.5">PID {p.pid} · {p.user} · CPU {p.cpu}% · MEM {p.mem}%</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Event Log */}
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm">Security Events ({securityTotal})</CardTitle>
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={securityFilter}
+                                            onChange={(e) => setSecurityFilter(e.target.value)}
+                                            className="text-xs bg-muted border border-border rounded px-2 py-1"
+                                        >
+                                            <option value="">All</option>
+                                            <option value="critical">Critical</option>
+                                            <option value="warning">Warning</option>
+                                            <option value="info">Info</option>
+                                        </select>
+                                        <Button
+                                            variant="outline"
+                                            className="text-xs h-7 cursor-pointer"
+                                            onClick={async () => {
+                                                await fetch(`${apiUrl}/api/admin/security/acknowledge-all`, {
+                                                    method: 'POST', headers: getAuthHeaders(),
+                                                });
+                                                fetchSecurity();
+                                            }}
+                                        >
+                                            ✓ Ack All
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-1 max-h-[500px] overflow-y-auto">
+                                    {securityEvents.length === 0 ? (
+                                        <div className="text-center text-muted-foreground py-8 text-sm">No security events</div>
+                                    ) : securityEvents.map((evt) => (
+                                        <div
+                                            key={evt.id}
+                                            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm ${
+                                                evt.acknowledged ? 'opacity-50' : ''
+                                            } ${
+                                                evt.severity === 'critical' ? 'bg-red-500/10 border-l-2 border-red-500' :
+                                                evt.severity === 'warning' ? 'bg-orange-500/10 border-l-2 border-orange-500' :
+                                                'bg-blue-500/5 border-l-2 border-blue-500/30'
+                                            }`}
+                                        >
+                                            <span className={`text-xs font-bold uppercase w-16 shrink-0 ${
+                                                evt.severity === 'critical' ? 'text-red-400' :
+                                                evt.severity === 'warning' ? 'text-orange-400' : 'text-blue-400'
+                                            }`}>
+                                                {evt.severity}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground w-14 shrink-0">
+                                                {evt.type.replace(/_/g, ' ').replace('fail2ban ', 'f2b ')}
+                                            </span>
+                                            <span className="flex-1 truncate">{evt.message}</span>
+                                            {evt.sourceIp && (
+                                                <span className="text-xs font-mono text-muted-foreground shrink-0">{evt.sourceIp}</span>
+                                            )}
+                                            <span className="text-[10px] text-muted-foreground shrink-0 w-16 text-right">
+                                                {new Date(evt.timestamp + 'Z').toLocaleTimeString()}
+                                            </span>
+                                            {!evt.acknowledged && (
+                                                <button
+                                                    className="text-xs text-muted-foreground hover:text-white cursor-pointer shrink-0"
+                                                    title="Acknowledge"
+                                                    onClick={async () => {
+                                                        await fetch(`${apiUrl}/api/admin/security/acknowledge/${evt.id}`, {
+                                                            method: 'POST', headers: getAuthHeaders(),
+                                                        });
+                                                        fetchSecurity();
+                                                    }}
+                                                >
+                                                    ✓
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </CardContent>
                         </Card>
                     </>

@@ -127,8 +127,6 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         let totalFound = 0;
         let totalKilled = 0;
         try {
-            // SECURITY #11: Use execFileSync (no shell) to prevent command injection
-            const { execFileSync } = require('child_process');
             const deadline = Date.now() + 120_000; // 2 min hard timeout
             let attempt = 0;
 
@@ -138,22 +136,21 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             while (Date.now() < deadline) {
                 attempt++;
 
-                // List all session containers via CLI
-                let lines: string[];
+                // List all session containers via Docker API
+                let containers: any[];
                 try {
-                    const output = execFileSync(
-                        'docker', ['ps', '-a', '--filter', 'name=session-', '--format', '{{.Names}} {{.ID}}'],
-                        { encoding: 'utf-8', timeout: 10_000 }
-                    ).trim();
-                    lines = output ? output.split('\n').filter(Boolean) : [];
+                    containers = await this.docker.listContainers({
+                        all: true,
+                        filters: { name: ['session-'] },
+                    });
                 } catch {
-                    lines = [];
+                    containers = [];
                 }
 
                 // Build orphan list (excluding skip containers)
-                const orphans = lines
-                    .map(l => { const [name, id] = l.split(' '); return { name, id }; })
-                    .filter(c => c.name?.startsWith('session-') && validName(c.name) && !skipContainerNames.has(c.name));
+                const orphans = containers
+                    .map(c => ({ name: c.Names?.[0]?.replace(/^\//, '') || '', id: c.Id }))
+                    .filter(c => c.name.startsWith('session-') && validName(c.name) && !skipContainerNames.has(c.name));
 
                 if (orphans.length === 0) {
                     this.logger.log(`Orphan cleanup verified clean (attempt ${attempt})`);
@@ -164,25 +161,13 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
                 this.logger.log(`Orphan cleanup attempt ${attempt}: removing ${orphans.length} containers...`);
 
-                // For each orphan: get PID, kill -9 PID, then docker rm
-                // docker rm -f alone fails silently on KDE/Selkies containers
+                // Use Docker API: kill (SIGKILL) then remove — works across namespaces
                 let killed = 0;
                 for (const orphan of orphans) {
                     try {
-                        // Get container PID
-                        const pid = execFileSync(
-                            'docker', ['inspect', '--format', '{{.State.Pid}}', orphan.name],
-                            { encoding: 'utf-8', timeout: 5000 }
-                        ).trim();
-
-                        // Kill the PID directly if it's running (PID > 0)
-                        const pidNum = parseInt(pid, 10);
-                        if (pidNum > 0) {
-                            execFileSync('kill', ['-9', pidNum.toString()], { timeout: 5000, stdio: 'ignore' });
-                        }
-
-                        // Now docker rm will work since the process is dead
-                        execFileSync('docker', ['rm', '-f', orphan.name], { timeout: 10_000, stdio: 'ignore' });
+                        const container = this.docker.getContainer(orphan.id);
+                        try { await container.kill({ signal: 'SIGKILL' }); } catch { /* already stopped */ }
+                        await container.remove({ force: true });
                         killed++;
                         totalKilled++;
                     } catch {

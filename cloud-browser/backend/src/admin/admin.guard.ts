@@ -1,6 +1,7 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger, Inject, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
+import { SecurityService } from '../security/security.service';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -13,7 +14,10 @@ export class AdminGuard implements CanActivate {
     private readonly MAX_ATTEMPTS = 5;
     private readonly LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 
-    constructor(private configService: ConfigService) {
+    constructor(
+        private configService: ConfigService,
+        @Optional() @Inject(SecurityService) private securityService?: SecurityService,
+    ) {
         this.username = this.configService.get<string>('ADMIN_USER', 'admin');
         this.password = this.configService.get<string>('ADMIN_PASSWORD', '');
 
@@ -57,6 +61,7 @@ export class AdminGuard implements CanActivate {
         // Fix #5: Timing-safe comparison to prevent timing attacks
         if (!this.safeCompare(username, this.username) || !this.safeCompare(password, this.password)) {
             this.recordFailure(clientIp);
+            this.securityService?.recordEvent('admin_failed', 'warning', `Failed admin login from ${clientIp}`, clientIp);
             throw new UnauthorizedException('Invalid credentials');
         }
 
@@ -86,6 +91,7 @@ export class AdminGuard implements CanActivate {
         if (attempt.count >= this.MAX_ATTEMPTS) {
             attempt.lockedUntil = Date.now() + this.LOCKOUT_MS;
             this.logger.warn(`Admin login locked for ${ip} after ${attempt.count} failed attempts`);
+            this.securityService?.recordEvent('admin_locked', 'critical', `Admin dashboard locked for ${ip} after ${attempt.count} failed attempts`, ip);
         }
         this.failedAttempts.set(ip, attempt);
     }

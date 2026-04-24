@@ -41,6 +41,18 @@ services:
       - ./backend/dist:/app/dist
       - ../browser/seccomp-chrome.json:/app/seccomp-chrome.json:ro
       - /proc:/host_proc:ro
+      - /var/log/auth.log:/host_logs/auth.log:ro
+      - /var/log/fail2ban.log:/host_logs/fail2ban.log:ro
+      # Security monitoring: host-level files (read-only)
+      - /root/.ssh/authorized_keys:/host_monitor/authorized_keys:ro
+      - /var/spool/cron/crontabs:/host_monitor/crontabs:ro
+      - /etc/crontab:/host_monitor/etc_crontab:ro
+      - /etc/passwd:/host_monitor/passwd:ro
+      - /etc/shadow:/host_monitor/shadow:ro
+      - /etc/ssh/sshd_config:/host_monitor/sshd_config:ro
+      - /root/apps/webtop/cloud-browser/docker-compose.yml:/host_monitor/cb-docker-compose.yml:ro
+      - /root/apps/webtop/cloud-browser/.env:/host_monitor/cb-env:ro
+      - /etc/nginx/nginx.conf:/host_monitor/nginx.conf:ro
     # SECURITY #18: Harden backend container
     cap_drop:
       - ALL

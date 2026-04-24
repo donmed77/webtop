@@ -9,6 +9,7 @@ import { LoggingModule } from './logging/logging.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { SurveyModule } from './survey/survey.module';
+import { SecurityModule } from './security/security.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SurveyModule } from './survey/survey.module';
     MetricsModule,
     FeedbackModule,
     SurveyModule,
+    SecurityModule,
   ],
 })
 export class AppModule { }
