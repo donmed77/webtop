@@ -53,25 +53,27 @@ export class SessionController {
             );
         }
 
-        // SECURITY #13: Concurrent session limit — 1 active session per IP
-        const activeSession = this.sessionService.getActiveSessions().find(s => s.clientIp === clientIp);
-        if (activeSession) {
-            throw new HttpException(
-                {
-                    message: 'You already have an active session. Please end it before starting a new one.',
-                    concurrent: true,
-                    activeSessionId: activeSession.id,
-                },
-                HttpStatus.TOO_MANY_REQUESTS,
-            );
-        }
+        // SECURITY #13: Concurrent session limit — 1 active session per IP (togglable)
+        if (this.sessionService.isConcurrentLimitEnabled()) {
+            const activeSession = this.sessionService.getActiveSessions().find(s => s.clientIp === clientIp);
+            if (activeSession) {
+                throw new HttpException(
+                    {
+                        message: 'You already have an active session. Please end it before starting a new one.',
+                        concurrent: true,
+                        activeSessionId: activeSession.id,
+                    },
+                    HttpStatus.TOO_MANY_REQUESTS,
+                );
+            }
 
-        // Also check if IP already has a pending queue entry
-        if (this.queueService.hasEntryForIp(clientIp)) {
-            throw new HttpException(
-                { message: 'You already have a pending session request.', concurrent: true },
-                HttpStatus.TOO_MANY_REQUESTS,
-            );
+            // Also check if IP already has a pending queue entry
+            if (this.queueService.hasEntryForIp(clientIp)) {
+                throw new HttpException(
+                    { message: 'You already have a pending session request.', concurrent: true },
+                    HttpStatus.TOO_MANY_REQUESTS,
+                );
+            }
         }
 
         const queueEntry = this.queueService.addToQueue(dto.url, clientIp);

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw, Search } from "lucide-react";
+import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw, Search, Eye, X, Check, ShieldBan, ShieldCheck, Eraser, LogOut, Users } from "lucide-react";
 
 // Loads attachment media with auth headers (img/video src can't send auth)
 function AuthAttachment({ att, feedbackId, apiUrl, getAuthHeaders }: {
@@ -156,6 +156,7 @@ interface Stats {
     initialWarm: number;
     poolStatus: PoolStatus;
     paused: boolean;
+    concurrentLimitEnabled: boolean;
     rateLimitPerDay: number;
 }
 
@@ -293,8 +294,10 @@ export default function AdminPage() {
     const [actionMsg, setActionMsg] = useState("");
     const [showResetModal, setShowResetModal] = useState(false);
     const [viewerOverlay, setViewerOverlay] = useState<{ port: string | number; ip: string } | null>(null);
+    const [killingSessionId, setKillingSessionId] = useState<string | null>(null);
+    const [savingConfig, setSavingConfig] = useState(false);
     const [resetCategories, setResetCategories] = useState<Record<string, boolean>>({
-        overview: false, history: false, rateLimits: false, feedback: false, surveys: false,
+        overview: false, history: false, rateLimits: false, feedback: false, surveys: false, security: false,
     });
 
     // Feedback state
@@ -511,6 +514,8 @@ export default function AdminPage() {
     };
 
     const killSession = async (sessionId: string) => {
+        if (killingSessionId) return; // Prevent double-click
+        setKillingSessionId(sessionId);
         try {
             await fetch(`${apiUrl}/api/admin/sessions/${sessionId}`, {
                 method: "DELETE",
@@ -519,6 +524,8 @@ export default function AdminPage() {
             fetchAll();
         } catch (err) {
             console.error("Failed to kill session:", err);
+        } finally {
+            setKillingSessionId(null);
         }
     };
 
@@ -650,6 +657,7 @@ export default function AdminPage() {
 
     const handleConfigSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (savingConfig) return;
         const config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
         if (dirtyFields.has('maxSessions') && newPoolSize) {
             config.maxSessions = parseInt(newPoolSize, 10);
@@ -661,6 +669,7 @@ export default function AdminPage() {
             config.rateLimitPerDay = parseInt(newRateLimit, 10);
         }
         if (Object.keys(config).length > 0) {
+            setSavingConfig(true);
             try {
                 const res = await fetch(`${apiUrl}/api/admin/config`, {
                     method: "POST",
@@ -670,17 +679,19 @@ export default function AdminPage() {
                 if (res.ok) {
                     const data = await res.json();
                     showAction(`config: ${JSON.stringify(data.changes || data)}`);
-                    // Fetch fresh values BEFORE clearing dirty state
-                    // so sliders transition directly from dirty→new server value
-                    await fetchAll();
-                    setNewPoolSize("");
-                    setNewDuration("");
-                    setNewRateLimit("");
-                    setDirtyFields(new Set());
                 }
             } catch (err) {
                 console.error("Failed to apply config", err);
             }
+            // Reset loading state immediately so button is usable
+            setSavingConfig(false);
+            // Fetch fresh server values BEFORE clearing dirty state
+            // so sliders transition directly from dirty→new server value (no flicker)
+            await fetchAll();
+            setNewPoolSize("");
+            setNewDuration("");
+            setNewRateLimit("");
+            setDirtyFields(new Set());
         }
     };
 
@@ -754,7 +765,8 @@ export default function AdminPage() {
                             </span>
                         )}
                     </div>
-                    <Button variant="outline" onClick={() => { sessionStorage.removeItem("admin_creds"); setAuthenticated(false); }} className="cursor-pointer">
+                    <Button variant="outline" onClick={() => { sessionStorage.removeItem("admin_creds"); setAuthenticated(false); }} className="cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60">
+                        <LogOut className="h-3.5 w-3.5 mr-1" />
                         Logout
                     </Button>
                 </div>
@@ -1072,18 +1084,30 @@ export default function AdminPage() {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() => setViewerOverlay({ port: session.port, ip: session.clientIp })}
-                                                                    className="cursor-pointer"
+                                                                    className="cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60"
                                                                     title="Stealth view-only (owner won't know)"
                                                                 >
+                                                                    <Eye className="h-3.5 w-3.5 mr-1" />
                                                                     View
                                                                 </Button>
                                                                 <Button
                                                                     variant="destructive"
                                                                     size="sm"
                                                                     onClick={() => killSession(session.id)}
-                                                                    className="cursor-pointer"
+                                                                    disabled={killingSessionId === session.id}
+                                                                    className="cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
-                                                                    Kill
+                                                                    {killingSessionId === session.id ? (
+                                                                        <span className="flex items-center gap-1">
+                                                                            <span className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+                                                                            Killing…
+                                                                        </span>
+                                                                    ) : (
+                                                                        <>
+                                                                            <X className="h-3.5 w-3.5 mr-1" />
+                                                                            Kill
+                                                                        </>
+                                                                    )}
                                                                 </Button>
                                                             </div>
                                                         </td>
@@ -1222,7 +1246,7 @@ export default function AdminPage() {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="flex-1 px-3 py-2 border rounded-md bg-background"
                                 />
-                                <Button type="submit" className="cursor-pointer">Search</Button>
+                                <Button type="submit" className="cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60"><Search className="h-3.5 w-3.5 mr-1" />Search</Button>
                             </form>
 
                             {history.length === 0 ? (
@@ -1343,7 +1367,7 @@ export default function AdminPage() {
                                         className="flex-1 px-3 py-2 border rounded-md bg-background"
                                     />
                                     {rateLimitSearch && (
-                                        <Button variant="outline" onClick={() => setRateLimitSearch("")} className="cursor-pointer">Clear</Button>
+                                        <Button variant="outline" onClick={() => setRateLimitSearch("")} className="cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60"><Eraser className="h-3.5 w-3.5 mr-1" />Clear</Button>
                                     )}
                                 </div>
                                 {(rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits).length === 0 ? (
@@ -1376,9 +1400,9 @@ export default function AdminPage() {
                                                         </td>
                                                         <td className="p-2">
                                                             <div className="flex gap-1">
-                                                                <Button size="sm" variant="outline" onClick={() => ipAction("block", stat.ip)} className="cursor-pointer text-xs">Block</Button>
-                                                                <Button size="sm" variant="outline" onClick={() => ipAction("whitelist", stat.ip)} className="cursor-pointer text-xs">Whitelist</Button>
-                                                                <Button size="sm" variant="outline" onClick={() => ipAction("clear-limit", stat.ip)} className="cursor-pointer text-xs">Clear</Button>
+                                                                <Button size="sm" variant="outline" onClick={() => ipAction("block", stat.ip)} className="cursor-pointer text-xs bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300 active:bg-red-500/30 transition-colors duration-150"><ShieldBan className="h-3 w-3 mr-1" />Block</Button>
+                                                                <Button size="sm" variant="outline" onClick={() => ipAction("whitelist", stat.ip)} className="cursor-pointer text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:text-emerald-300 active:bg-emerald-500/30 transition-colors duration-150"><ShieldCheck className="h-3 w-3 mr-1" />Whitelist</Button>
+                                                                <Button size="sm" variant="outline" onClick={() => ipAction("clear-limit", stat.ip)} className="cursor-pointer text-xs bg-zinc-500/10 text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/20 hover:text-zinc-300 active:bg-zinc-500/30 transition-colors duration-150"><Eraser className="h-3 w-3 mr-1" />Clear</Button>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1619,7 +1643,7 @@ export default function AdminPage() {
                                         </select>
                                         <Button
                                             variant="outline"
-                                            className="text-xs h-7 cursor-pointer"
+                                            className="text-xs h-7 cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60"
                                             onClick={async () => {
                                                 await fetch(`${apiUrl}/api/admin/security/acknowledge-all`, {
                                                     method: 'POST', headers: getAuthHeaders(),
@@ -1627,7 +1651,7 @@ export default function AdminPage() {
                                                 fetchSecurity();
                                             }}
                                         >
-                                            ✓ Ack All
+                                            <Check className="h-3 w-3 mr-1" /> Ack All
                                         </Button>
                                     </div>
                                 </div>
@@ -1720,6 +1744,35 @@ export default function AdminPage() {
                                             <div>
                                                 <div className="font-medium text-yellow-400">Pause Sessions</div>
                                                 <div className="text-xs text-muted-foreground">Stop accepting new requests</div>
+                                            </div>
+                                        </button>
+                                    )}
+
+                                    {/* Concurrent Session Limit Toggle */}
+                                    {stats?.concurrentLimitEnabled ? (
+                                        <button
+                                            onClick={() => systemAction("concurrent-limit/disable")}
+                                            className="flex items-center gap-3 p-4 rounded-lg border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-colors cursor-pointer text-left"
+                                        >
+                                            <div className="p-2 rounded-md bg-green-500/20">
+                                                <Users className="w-5 h-5 text-green-400" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-green-400">IP Limit: ON</div>
+                                                <div className="text-xs text-muted-foreground">1 session per IP enforced</div>
+                                            </div>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => systemAction("concurrent-limit/enable")}
+                                            className="flex items-center gap-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer text-left"
+                                        >
+                                            <div className="p-2 rounded-md bg-amber-500/20">
+                                                <Users className="w-5 h-5 text-amber-400" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-amber-400">IP Limit: OFF</div>
+                                                <div className="text-xs text-muted-foreground">Multiple sessions per IP allowed</div>
                                             </div>
                                         </button>
                                     )}
@@ -1822,7 +1875,7 @@ export default function AdminPage() {
                                     {/* Reset Dashboard — opens modal */}
                                     <button
                                         onClick={() => {
-                                            setResetCategories({ overview: false, history: false, rateLimits: false, feedback: false, surveys: false });
+                                            setResetCategories({ overview: false, history: false, rateLimits: false, feedback: false, surveys: false, security: false });
                                             setShowResetModal(true);
                                         }}
                                         className="flex items-center gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer text-left"
@@ -1858,6 +1911,7 @@ export default function AdminPage() {
                                             { key: "rateLimits", label: "Rate Limits", desc: "All IP rate limit counters" },
                                             { key: "feedback", label: "Feedback", desc: "All feedback entries and attachments" },
                                             { key: "surveys", label: "Surveys", desc: "All survey responses and ratings" },
+                                            { key: "security", label: "Security", desc: "All security events and alerts" },
                                         ].map(({ key, label, desc }) => (
                                             <label key={key} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 cursor-pointer transition-colors">
                                                 <input
@@ -1917,6 +1971,7 @@ export default function AdminPage() {
                                                         if (data.rateLimitsCleared) parts.push(`${data.rateLimitsCleared} rate limit(s)`);
                                                         if (data.feedbackCleared) parts.push(`${data.feedbackCleared} feedback`);
                                                         if (data.surveysCleared) parts.push(`${data.surveysCleared} survey(s)`);
+                                                        if (data.securityCleared) parts.push(`${data.securityCleared} security event(s)`);
                                                         showAction(`Reset complete: ${parts.join(", ") || "nothing to clear"}`);
                                                         fetchAll();
                                                     }
@@ -2008,8 +2063,15 @@ export default function AdminPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <Button type="submit" className="cursor-pointer">
-                                        Apply Changes
+                                    <Button type="submit" disabled={savingConfig} className="cursor-pointer transition-opacity duration-150 hover:opacity-80 active:opacity-60 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        {savingConfig ? (
+                                            <span className="flex items-center gap-1">
+                                                <span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full" />
+                                                Saving…
+                                            </span>
+                                        ) : (
+                                            "Apply Changes"
+                                        )}
                                     </Button>
                                 </form>
                             </CardContent>

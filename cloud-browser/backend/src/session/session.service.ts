@@ -29,6 +29,7 @@ export class SessionService implements OnModuleInit {
 
     // DT3: System controls
     private paused: boolean = false;
+    private concurrentLimitEnabled: boolean = true;
 
     // DT2: IP management
     private blockedIps: Set<string> = new Set();
@@ -401,6 +402,15 @@ export class SessionService implements OnModuleInit {
     setPaused(paused: boolean): void {
         this.paused = paused;
         this.logger.log(`Session creation ${paused ? 'PAUSED' : 'RESUMED'}`);
+    }
+
+    isConcurrentLimitEnabled(): boolean {
+        return this.concurrentLimitEnabled;
+    }
+
+    setConcurrentLimitEnabled(enabled: boolean): void {
+        this.concurrentLimitEnabled = enabled;
+        this.logger.log(`Concurrent session limit ${enabled ? 'ENABLED' : 'DISABLED'}`);
     }
 
     setSessionDuration(duration: number): void {

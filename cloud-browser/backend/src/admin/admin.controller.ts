@@ -6,6 +6,7 @@ import { ContainerService } from '../container/container.service';
 import { LoggingService } from '../logging/logging.service';
 import { FeedbackService } from '../feedback/feedback.service';
 import { SurveyService } from '../survey/survey.service';
+import { SecurityService } from '../security/security.service';
 import { AdminGuard } from './admin.guard';
 import * as os from 'os';
 import { execSync } from 'child_process';
@@ -26,6 +27,7 @@ export class AdminController {
         private loggingService: LoggingService,
         private feedbackService: FeedbackService,
         private surveyService: SurveyService,
+        private securityService: SecurityService,
     ) { }
 
     // ---- D2: Active Sessions ----
@@ -101,6 +103,7 @@ export class AdminController {
             maxSessions: this.containerService.getMaxSessions(),
             initialWarm: this.containerService.getInitialWarm(),
             paused: this.sessionService.isPaused(),
+            concurrentLimitEnabled: this.sessionService.isConcurrentLimitEnabled(),
             rateLimitPerDay: this.sessionService.getRateLimit(),
         };
     }
@@ -194,6 +197,18 @@ export class AdminController {
         return { success: true, paused: false };
     }
 
+    @Post('concurrent-limit/enable')
+    enableConcurrentLimit() {
+        this.sessionService.setConcurrentLimitEnabled(true);
+        return { success: true, concurrentLimitEnabled: true };
+    }
+
+    @Post('concurrent-limit/disable')
+    disableConcurrentLimit() {
+        this.sessionService.setConcurrentLimitEnabled(false);
+        return { success: true, concurrentLimitEnabled: false };
+    }
+
     @Post('drain-queue')
     drainQueue() {
         const count = this.queueService.drainQueue();
@@ -255,6 +270,9 @@ export class AdminController {
         }
         if (categories.includes('surveys')) {
             result.surveysCleared = this.surveyService.resetAllData();
+        }
+        if (categories.includes('security')) {
+            result.securityCleared = this.securityService.resetData();
         }
 
         return { success: true, categories, ...result };
