@@ -13,6 +13,7 @@ interface PooledContainer {
     status: 'booting' | 'warm' | 'active' | 'destroying';
     sessionId?: string;
     createdAt: Date;
+    resources: { cpuCores: number; memoryGB: number; shmGB: number };
 }
 
 @Injectable()
@@ -34,6 +35,11 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private healthCheckRunning = false;
     private cleanupInProgress = false;
     private shuttingDown = false;
+
+    // Runtime-adjustable container resources (affect new containers only)
+    private cpuCores: number = 6;
+    private memoryGB: number = 12;
+    private shmGB: number = 12;
 
     // Metrics
     private metrics = {
@@ -195,6 +201,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             status: 'active',
             sessionId,
             createdAt: new Date(),
+            resources: { cpuCores: this.cpuCores, memoryGB: this.memoryGB, shmGB: this.shmGB },
         });
         this.logger.log(`Registered restored container ${poolId} (port ${port}) for session ${sessionId}`);
     }
@@ -312,12 +319,12 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     PortBindings: {
                         '3000/tcp': [{ HostIp: '127.0.0.1', HostPort: port.toString() }],
                     },
-                    ShmSize: 12 * 1024 * 1024 * 1024, // 12GB
+                    ShmSize: this.shmGB * 1024 * 1024 * 1024,
                     SecurityOpt: [`seccomp=${this.seccompProfile}`, 'no-new-privileges:true'],
                     CapDrop: ['ALL'],
                     CapAdd: ['SYS_ADMIN', 'NET_BIND_SERVICE', 'CHOWN', 'SETUID', 'SETGID', 'DAC_OVERRIDE'],
-                    Memory: 12 * 1024 * 1024 * 1024, // 12GB
-                    NanoCpus: 6 * 1e9, // 6 CPUs
+                    Memory: this.memoryGB * 1024 * 1024 * 1024,
+                    NanoCpus: this.cpuCores * 1e9,
                     RestartPolicy: { Name: 'no' },
                     NetworkMode: this.networkName, // #3: Isolated network
                     // Volume mounts from @browser spec
@@ -402,6 +409,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             port,
             status: 'booting',
             createdAt: new Date(),
+            resources: { cpuCores: this.cpuCores, memoryGB: this.memoryGB, shmGB: this.shmGB },
         };
 
         this.pool.set(id, pooledContainer);
@@ -699,6 +707,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             port: c.port,
             status: c.status,
             sessionId: c.sessionId,
+            resources: c.resources,
         }));
         const warm = containers.filter(c => c.status === 'warm').length;
         const active = containers.filter(c => c.status === 'active').length;
@@ -879,5 +888,26 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.metrics.acquireFailures = 0;
         this.metrics.bootTimes = [];
         this.logger.log('Admin reset container metrics (acquires, bootTimes)');
+    }
+
+    // ---- Container Resource Configuration ----
+
+    getCpuCores(): number { return this.cpuCores; }
+    getMemoryGB(): number { return this.memoryGB; }
+    getShmGB(): number { return this.shmGB; }
+
+    setCpuCores(cores: number): void {
+        this.cpuCores = Math.max(1, Math.min(10, cores));
+        this.logger.log(`CPU cores changed to ${this.cpuCores} (new containers only)`);
+    }
+
+    setMemoryGB(gb: number): void {
+        this.memoryGB = Math.max(1, Math.min(20, gb));
+        this.logger.log(`Memory changed to ${this.memoryGB}GB (new containers only)`);
+    }
+
+    setShmGB(gb: number): void {
+        this.shmGB = Math.max(1, Math.min(20, gb));
+        this.logger.log(`Shared memory changed to ${this.shmGB}GB (new containers only)`);
     }
 }

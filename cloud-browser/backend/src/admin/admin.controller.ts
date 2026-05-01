@@ -105,6 +105,9 @@ export class AdminController {
             paused: this.sessionService.isPaused(),
             concurrentLimitEnabled: this.sessionService.isConcurrentLimitEnabled(),
             rateLimitPerDay: this.sessionService.getRateLimit(),
+            cpuCores: this.containerService.getCpuCores(),
+            memoryGB: this.containerService.getMemoryGB(),
+            shmGB: this.containerService.getShmGB(),
         };
     }
 
@@ -279,7 +282,7 @@ export class AdminController {
     }
 
     @Post('config')
-    async updateConfig(@Body() config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number }) {
+    async updateConfig(@Body() config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number; cpuCores?: number; memoryGB?: number; shmGB?: number }) {
         const changes: string[] = [];
 
         if (config.maxSessions && config.maxSessions >= 1 && config.maxSessions <= 50) {
@@ -295,6 +298,21 @@ export class AdminController {
         if (config.rateLimitPerDay && config.rateLimitPerDay >= 1 && config.rateLimitPerDay <= 100) {
             this.sessionService.setRateLimit(config.rateLimitPerDay);
             changes.push(`Rate limit → ${config.rateLimitPerDay}/day`);
+        }
+
+        if (config.cpuCores && config.cpuCores >= 1 && config.cpuCores <= 10) {
+            this.containerService.setCpuCores(config.cpuCores);
+            changes.push(`CPU cores → ${config.cpuCores}`);
+        }
+
+        if (config.memoryGB && config.memoryGB >= 1 && config.memoryGB <= 20) {
+            this.containerService.setMemoryGB(config.memoryGB);
+            changes.push(`Memory → ${config.memoryGB}GB`);
+        }
+
+        if (config.shmGB && config.shmGB >= 1 && config.shmGB <= 20) {
+            this.containerService.setShmGB(config.shmGB);
+            changes.push(`Shared memory → ${config.shmGB}GB`);
         }
 
         return { success: true, changes };

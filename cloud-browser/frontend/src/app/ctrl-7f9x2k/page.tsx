@@ -130,7 +130,7 @@ interface PoolStatus {
     total: number;
     warm: number;
     active: number;
-    containers: Array<{ id: string; port: number; status: string; disconnectedAt: number | null }>;
+    containers: Array<{ id: string; port: number; status: string; disconnectedAt: number | null; resources?: { cpuCores: number; memoryGB: number; shmGB: number } }>;
     metrics?: {
         totalAcquires: number;
         acquireFailures: number;
@@ -158,6 +158,9 @@ interface Stats {
     paused: boolean;
     concurrentLimitEnabled: boolean;
     rateLimitPerDay: number;
+    cpuCores: number;
+    memoryGB: number;
+    shmGB: number;
 }
 
 interface SessionLog {
@@ -332,6 +335,9 @@ export default function AdminPage() {
     const [newPoolSize, setNewPoolSize] = useState("");
     const [newDuration, setNewDuration] = useState("");
     const [newRateLimit, setNewRateLimit] = useState("");
+    const [newCpuCores, setNewCpuCores] = useState("");
+    const [newMemoryGB, setNewMemoryGB] = useState("");
+    const [newShmGB, setNewShmGB] = useState("");
     const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
 
     const markDirty = (field: string) => {
@@ -658,7 +664,7 @@ export default function AdminPage() {
     const handleConfigSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (savingConfig) return;
-        const config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number } = {};
+        const config: { maxSessions?: number; sessionDuration?: number; rateLimitPerDay?: number; cpuCores?: number; memoryGB?: number; shmGB?: number } = {};
         if (dirtyFields.has('maxSessions') && newPoolSize) {
             config.maxSessions = parseInt(newPoolSize, 10);
         }
@@ -667,6 +673,15 @@ export default function AdminPage() {
         }
         if (dirtyFields.has('rateLimit') && newRateLimit) {
             config.rateLimitPerDay = parseInt(newRateLimit, 10);
+        }
+        if (dirtyFields.has('cpuCores') && newCpuCores) {
+            config.cpuCores = parseInt(newCpuCores, 10);
+        }
+        if (dirtyFields.has('memoryGB') && newMemoryGB) {
+            config.memoryGB = parseInt(newMemoryGB, 10);
+        }
+        if (dirtyFields.has('shmGB') && newShmGB) {
+            config.shmGB = parseInt(newShmGB, 10);
         }
         if (Object.keys(config).length > 0) {
             setSavingConfig(true);
@@ -678,19 +693,26 @@ export default function AdminPage() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    showAction(`config: ${JSON.stringify(data.changes || data)}`);
+                    const changes = data.changes as string[] | undefined;
+                    if (changes && changes.length > 0) {
+                        showAction(`Applied: ${changes.join(", ")}`);
+                    } else {
+                        showAction("Configuration updated successfully");
+                    }
                 }
             } catch (err) {
                 console.error("Failed to apply config", err);
             }
-            // Reset loading state immediately so button is usable
-            setSavingConfig(false);
             // Fetch fresh server values BEFORE clearing dirty state
             // so sliders transition directly from dirty→new server value (no flicker)
             await fetchAll();
+            setSavingConfig(false);
             setNewPoolSize("");
             setNewDuration("");
             setNewRateLimit("");
+            setNewCpuCores("");
+            setNewMemoryGB("");
+            setNewShmGB("");
             setDirtyFields(new Set());
         }
     };
@@ -1216,6 +1238,18 @@ export default function AdminPage() {
                                                         </span>
                                                     </div>
                                                 )}
+                                                {/* Allocated resources */}
+                                                <div className="mt-2 pt-2 border-t border-border/50 flex flex-wrap gap-1.5">
+                                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                                        {container.resources?.cpuCores ?? stats?.cpuCores ?? 6} vCPU
+                                                    </span>
+                                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                                        {container.resources?.memoryGB ?? stats?.memoryGB ?? 12}G RAM
+                                                    </span>
+                                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                                        {container.resources?.shmGB ?? stats?.shmGB ?? 12}G SHM
+                                                    </span>
+                                                </div>
                                             </div>
                                             );
                                         })}
@@ -2060,6 +2094,81 @@ export default function AdminPage() {
                                                 <span>1</span>
                                                 <span className="text-muted-foreground/60">Current: {stats?.rateLimitPerDay || "?"} /day</span>
                                                 <span>100</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Container Resources sub-section */}
+                                    <div className="border-t border-border pt-5 mt-2">
+                                        <p className="text-xs text-muted-foreground mb-4">Container Resources <span className="text-muted-foreground/60">— applies to new containers only</span></p>
+                                        <div className="space-y-5">
+                                            {/* CPU Cores Slider */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="text-sm font-medium">CPU Cores</label>
+                                                    <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
+                                                        {dirtyFields.has('cpuCores') ? newCpuCores : (stats?.cpuCores || 6)}
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="10"
+                                                    value={dirtyFields.has('cpuCores') ? newCpuCores : (stats?.cpuCores || 6)}
+                                                    onChange={(e) => { setNewCpuCores(e.target.value); markDirty('cpuCores'); }}
+                                                    className="w-full"
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                    <span>1</span>
+                                                    <span className="text-muted-foreground/60">Current: {stats?.cpuCores || "?"}</span>
+                                                    <span>10</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Memory Slider */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="text-sm font-medium">RAM (GB)</label>
+                                                    <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
+                                                        {dirtyFields.has('memoryGB') ? newMemoryGB : (stats?.memoryGB || 12)} GB
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="20"
+                                                    value={dirtyFields.has('memoryGB') ? newMemoryGB : (stats?.memoryGB || 12)}
+                                                    onChange={(e) => { setNewMemoryGB(e.target.value); markDirty('memoryGB'); }}
+                                                    className="w-full"
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                    <span>1 GB</span>
+                                                    <span className="text-muted-foreground/60">Current: {stats?.memoryGB || "?"} GB</span>
+                                                    <span>20 GB</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Shared Memory Slider */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="text-sm font-medium">Shared Memory (GB)</label>
+                                                    <span className="text-sm font-mono px-2 py-0.5 rounded bg-muted">
+                                                        {dirtyFields.has('shmGB') ? newShmGB : (stats?.shmGB || 12)} GB
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="20"
+                                                    value={dirtyFields.has('shmGB') ? newShmGB : (stats?.shmGB || 12)}
+                                                    onChange={(e) => { setNewShmGB(e.target.value); markDirty('shmGB'); }}
+                                                    className="w-full"
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                    <span>1 GB</span>
+                                                    <span className="text-muted-foreground/60">Current: {stats?.shmGB || "?"} GB</span>
+                                                    <span>20 GB</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
