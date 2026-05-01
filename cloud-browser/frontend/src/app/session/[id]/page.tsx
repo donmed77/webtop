@@ -101,6 +101,8 @@ export default function SessionPage() {
 
     // Mobile toolbar overflow menu
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [mobileEndConfirm, setMobileEndConfirm] = useState(false);
+    const mobileEndTimer = useRef<NodeJS.Timeout | null>(null);
 
     // Audio state
     const [audioMuted, setAudioMuted] = useState(true);
@@ -1384,7 +1386,16 @@ export default function SessionPage() {
                         {/* === MOBILE: overflow menu === */}
                         <div className="lg:hidden relative">
                             <button
-                                onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setClipboardOpen(false); setFeedbackOpen(false); }}
+                                onClick={() => {
+                                    const willOpen = !mobileMenuOpen;
+                                    setMobileMenuOpen(willOpen);
+                                    setClipboardOpen(false);
+                                    setFeedbackOpen(false);
+                                    if (!willOpen) {
+                                        setMobileEndConfirm(false);
+                                        if (mobileEndTimer.current) { clearTimeout(mobileEndTimer.current); mobileEndTimer.current = null; }
+                                    }
+                                }}
                                 className={`flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer focus:outline-none ${mobileMenuOpen ? "text-white bg-white/10" : "text-white/60 hover:text-white"}`}
                                 title="More options"
                             >
@@ -1425,21 +1436,47 @@ export default function SessionPage() {
                                         <span className="text-xs">Share{viewerCount > 0 ? ` (${viewerCount})` : ""}</span>
                                     </button>
 
+                                    {/* End Session — separated, 2-tap confirm */}
+                                    <div className="border-t border-white/10 mt-1" />
+                                    <button
+                                        onClick={() => {
+                                            if (mobileEndConfirm) {
+                                                setMobileMenuOpen(false);
+                                                setMobileEndConfirm(false);
+                                                if (mobileEndTimer.current) { clearTimeout(mobileEndTimer.current); mobileEndTimer.current = null; }
+                                                handleEndSession();
+                                            } else {
+                                                setMobileEndConfirm(true);
+                                                if (mobileEndTimer.current) clearTimeout(mobileEndTimer.current);
+                                                mobileEndTimer.current = setTimeout(() => { setMobileEndConfirm(false); mobileEndTimer.current = null; }, 3000);
+                                            }
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer focus:outline-none ${
+                                            mobileEndConfirm
+                                                ? "text-red-400 bg-red-500/15"
+                                                : "text-red-400/70 hover:text-red-400 hover:bg-red-500/10"
+                                        }`}
+                                    >
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                        </svg>
+                                        <span className="text-xs">{mobileEndConfirm ? "Tap to confirm" : "End Session"}</span>
+                                    </button>
+
                                 </div>
                             )}
                         </div>
 
                         <div className="w-px h-5 bg-white/20" />
 
-                        {/* End Session Button */}
+                        {/* End Session Button — desktop only */}
                         <Button
                             variant="destructive"
                             size="sm"
-                            className="h-7 px-2 lg:px-3 text-xs lg:text-sm rounded-full cursor-pointer"
+                            className="hidden lg:flex h-7 px-3 text-sm rounded-full cursor-pointer"
                             onClick={handleEndSession}
                         >
-                            <span className="lg:hidden">End</span>
-                            <span className="hidden lg:inline">End Session</span>
+                            End Session
                         </Button>
 
                         <button
@@ -1457,7 +1494,7 @@ export default function SessionPage() {
 
             {/* Click-outside backdrop for clipboard/feedback/mobile menu */}
             {streamReady && !isToolbarMinimized && !isViewer && (clipboardOpen || feedbackOpen || mobileMenuOpen) && (
-                <div className="fixed inset-0 z-40" onClick={() => { setClipboardOpen(false); setFeedbackOpen(false); setMobileMenuOpen(false); }} />
+                <div className="fixed inset-0 z-40" onClick={() => { setClipboardOpen(false); setFeedbackOpen(false); setMobileMenuOpen(false); setMobileEndConfirm(false); if (mobileEndTimer.current) { clearTimeout(mobileEndTimer.current); mobileEndTimer.current = null; } }} />
             )}
             {/* Mobile clipboard panel */}
             {streamReady && !isToolbarMinimized && !isViewer && clipboardOpen && (
@@ -1550,7 +1587,7 @@ export default function SessionPage() {
             {streamReady && isToolbarMinimized && (
                 /* Minimized: small draggable icon */
                 <button
-                    className={`fixed z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg cursor-pointer select-none ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite] will-change-[color]" : ""}`}
+                    className={`fixed z-50 bg-black/40 backdrop-blur-md border border-white/10 rounded-full w-12 h-12 flex items-center justify-center shadow-lg select-none ${toolbarMinDragging ? "cursor-grabbing" : "cursor-grab"} ${getTimerColor()} ${isFlashing ? "animate-[flash_0.5s_ease-in-out_infinite] will-change-[color]" : ""}`}
                     style={{
                         right: `${toolbarMinPos.right}px`,
                         top: `${toolbarMinPos.top}px`,
