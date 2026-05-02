@@ -17,6 +17,7 @@ export default function QueuePage() {
     const [position, setPosition] = useState(0);
     const [totalInQueue, setTotalInQueue] = useState(0);
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const [joined, setJoined] = useState(false);
 
     useEffect(() => {
         const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -35,6 +36,7 @@ export default function QueuePage() {
             setStatus(data.status || "waiting");
             setPosition(data.position);
             setTotalInQueue(data.totalInQueue);
+            setJoined(true);
         });
 
         socket.on("queue:status", (data) => {
@@ -168,8 +170,8 @@ export default function QueuePage() {
                         {getStatusText()}
                     </p>
 
-                    {/* Queue message (only when waiting) */}
-                    {status === "waiting" && (
+                    {/* Queue message (only when waiting AND server data received) */}
+                    {status === "waiting" && joined && (
                         <p className="text-center text-muted-foreground text-sm mb-6">
                             {getQueueMessage()}
                         </p>
