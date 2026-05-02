@@ -52,7 +52,7 @@ export default function RateLimitedPage() {
                         </p>
 
                         {/* Progress bar */}
-                        <div className="w-full rounded-full h-2 mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+                        <div className="w-full h-2 mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
                             <div
                                 className="h-2 rounded-full transition-all"
                                 style={{
@@ -72,7 +72,7 @@ export default function RateLimitedPage() {
                     <Button
                         variant="contained"
                         fullWidth
-                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-xl !py-2.5 !text-sm !normal-case !font-medium !mb-3"
+                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !py-2.5 !text-sm !normal-case !font-medium !mb-3"
                         style={{ boxShadow: "none" }}
                     >
                         Get More Sessions
@@ -84,7 +84,7 @@ export default function RateLimitedPage() {
                     onClick={() => router.push("/")}
                     variant="outlined"
                     fullWidth
-                    className="dark:!text-white/60 !text-gray-500 dark:!border-white/10 !border-gray-200 !rounded-xl !py-2.5 !text-sm !normal-case !font-medium"
+                    className="dark:!text-white/60 !text-gray-500 dark:!border-white/10 !border-gray-200 !rounded-none !py-2.5 !text-sm !normal-case !font-medium"
                     style={{ boxShadow: "none" }}
                 >
                     Back to Home

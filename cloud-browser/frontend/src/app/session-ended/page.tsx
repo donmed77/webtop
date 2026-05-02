@@ -88,7 +88,7 @@ function SessionEndedContent() {
                     </p>
 
                     {/* Progress bar */}
-                    <div className="w-full rounded-full h-2 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+                    <div className="w-full h-2 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
                         <div
                             className="h-2 rounded-full transition-all"
                             style={{
@@ -120,7 +120,7 @@ function SessionEndedContent() {
                 variant="contained"
                 fullWidth
                 disabled={isLimited}
-                className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-xl !py-2.5 !text-sm !normal-case !font-medium !mb-3 disabled:!opacity-40"
+                className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !py-2.5 !text-sm !normal-case !font-medium !mb-3 disabled:!opacity-40"
                 style={{ boxShadow: "none" }}
             >
                 Start New Session

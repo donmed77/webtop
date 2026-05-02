@@ -19,7 +19,7 @@ export default function BrandedPageLayout({
     <main
       className="min-h-screen flex flex-col items-center justify-center p-4"
       style={{
-        backgroundColor: isDark ? "#0c0a1d" : "#faf9fe",
+        backgroundColor: isDark ? "#1d1e21" : "#faf9fe",
         fontFamily: "'Poppins', sans-serif",
       }}
     >
@@ -36,13 +36,12 @@ export default function BrandedPageLayout({
 
       {/* Content card */}
       <div
-        className={`w-full ${maxWidth} rounded-2xl p-8`}
+        className={`w-full ${maxWidth} p-8`}
         style={{
           backgroundColor: isDark
             ? "rgba(255,255,255,0.04)"
             : "rgba(255,255,255,0.9)",
           border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
-          backdropFilter: "blur(12px)",
         }}
       >
         {children}

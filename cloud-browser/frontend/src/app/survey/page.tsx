@@ -174,7 +174,7 @@ function SurveyContent() {
                             <button
                                 key={tag.id}
                                 onClick={() => toggleTag(tag.id)}
-                                className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer border ${selectedTags.includes(tag.id)
+                                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium transition-all duration-150 cursor-pointer border ${selectedTags.includes(tag.id)
                                     ? "border-[var(--color-primary-purple)] bg-[rgba(132,55,254,0.15)] dark:text-[var(--color-primary-purple-light)] text-[var(--color-primary-purple)]"
                                     : "dark:bg-white/[0.03] bg-gray-50 dark:text-white/40 text-gray-400 dark:border-white/5 border-gray-200 dark:hover:bg-white/[0.06] hover:bg-gray-100 dark:hover:text-white/60 hover:text-gray-600"
                                     }`}
@@ -190,7 +190,7 @@ function SurveyContent() {
                         value={comment}
                         onChange={(e) => setComment(e.target.value.slice(0, 200))}
                         placeholder="Anything else? (optional)"
-                        className="w-full dark:bg-white/[0.03] bg-gray-50 border dark:border-white/10 border-gray-200 rounded-xl px-4 py-3 text-sm dark:text-white text-gray-900 dark:placeholder-white/20 placeholder-gray-400 focus:outline-none dark:focus:border-white/20 focus:border-gray-300 resize-none mb-1"
+                        className="w-full dark:bg-white/[0.03] bg-gray-50 border dark:border-white/10 border-gray-200 rounded-none px-4 py-3 text-sm dark:text-white text-gray-900 dark:placeholder-white/20 placeholder-gray-400 focus:outline-none dark:focus:border-white/20 focus:border-gray-300 resize-none mb-1"
                         rows={2}
                     />
                     <div className="flex justify-end mb-5">
@@ -206,7 +206,7 @@ function SurveyContent() {
                 <button
                     onClick={handleSubmit}
                     disabled={rating === 0 || submitting}
-                    className={`w-full py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border ${rating > 0
+                    className={`w-full py-3 rounded-none text-sm font-medium transition-all duration-200 cursor-pointer border ${rating > 0
                         ? "bg-[rgba(132,55,254,0.15)] dark:text-[var(--color-primary-purple-light)] text-[var(--color-primary-purple)] border-[var(--color-primary-purple)] hover:bg-[rgba(132,55,254,0.25)]"
                         : "dark:bg-white/5 bg-gray-50 dark:text-white/20 text-gray-300 dark:border-white/5 border-gray-200 cursor-default"
                         }`}

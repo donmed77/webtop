@@ -109,7 +109,7 @@ export default function QueuePage() {
                     <Button
                         onClick={() => router.push("/")}
                         variant="contained"
-                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-xl !px-8 !py-2.5 !text-sm !normal-case !font-medium"
+                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !px-8 !py-2.5 !text-sm !normal-case !font-medium"
                         style={{ boxShadow: "none" }}
                     >
                         Back to Home
@@ -137,7 +137,7 @@ export default function QueuePage() {
                     <Button
                         onClick={() => router.push("/")}
                         variant="contained"
-                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-xl !px-8 !py-2.5 !text-sm !normal-case !font-medium"
+                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !px-8 !py-2.5 !text-sm !normal-case !font-medium"
                         style={{ boxShadow: "none" }}
                     >
                         Try Again
