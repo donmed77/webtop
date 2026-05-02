@@ -47,29 +47,32 @@ const Toast = ({
     onClose();
   };
 
-  const action = (
-    <div className="flex items-center gap-1">
+  const closeAction = showCloseAction ? (
+    <ToggleButton
+      className="!rounded-none !text-white !border-none"
+      aria-label="close"
+      value="close"
+      onClick={() => onClose()}
+    >
+      <CloseIcon />
+    </ToggleButton>
+  ) : undefined;
+
+  const messageContent = (
+    <span>
+      {message}
       {actionLabel && onAction && (
-        <ToggleButton
-          className="!rounded-none !text-white !border-none !text-xs !font-bold !underline !px-2"
-          aria-label={actionLabel}
-          value={actionLabel}
-          onClick={() => onAction()}
-        >
-          {actionLabel}
-        </ToggleButton>
+        <>
+          {" "}
+          <span
+            onClick={() => onAction()}
+            className="underline font-bold cursor-pointer"
+          >
+            {actionLabel}
+          </span>
+        </>
       )}
-      {showCloseAction && (
-        <ToggleButton
-          className="!rounded-none !text-white !border-none"
-          aria-label="close"
-          value="close"
-          onClick={() => onClose()}
-        >
-          <CloseIcon />
-        </ToggleButton>
-      )}
-    </div>
+    </span>
   );
 
   return (
@@ -93,8 +96,8 @@ const Toast = ({
           borderRadius: 0,
           zIndex: 999,
         }}
-        action={action}
-        message={<span id={message}>{message}</span>}
+        action={closeAction}
+        message={messageContent}
       />
     </Snackbar>
   );
