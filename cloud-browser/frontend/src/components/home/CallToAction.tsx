@@ -44,7 +44,10 @@ const CallToAction = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    if (!url.trim()) {
+      showToast("URL is required");
+      return;
+    }
 
     setLoading(true);
     setToastOpen(false);
@@ -135,7 +138,7 @@ const CallToAction = ({
           style={{ borderRadius: 0, boxShadow: "unset" }}
           variant="contained"
           color="primary"
-          disabled={loading || !url.trim()}
+          disabled={loading}
         >
           {loading ? "Starting..." : t("expand-url")}
         </Button>
