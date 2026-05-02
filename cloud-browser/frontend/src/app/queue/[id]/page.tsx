@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,22 +16,8 @@ export default function QueuePage() {
     const [status, setStatus] = useState<QueueStatus>("waiting");
     const [position, setPosition] = useState(0);
     const [totalInQueue, setTotalInQueue] = useState(0);
-    const [estimatedWait, setEstimatedWait] = useState(0);
+    const [warmCount, setWarmCount] = useState(0);
     const [sessionId, setSessionId] = useState<string | null>(null);
-    const countdownRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Local countdown: decrement estimatedWait every second between server pushes
-    useEffect(() => {
-        if (countdownRef.current) clearInterval(countdownRef.current);
-        if (status === "waiting" && estimatedWait > 0) {
-            countdownRef.current = setInterval(() => {
-                setEstimatedWait(prev => Math.max(0, prev - 1));
-            }, 1000);
-        }
-        return () => {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-        };
-    }, [status, estimatedWait > 0]); // Only restart when status changes or countdown starts/stops
 
     useEffect(() => {
         const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -50,14 +36,14 @@ export default function QueuePage() {
             setStatus(data.status || "waiting");
             setPosition(data.position);
             setTotalInQueue(data.totalInQueue);
-            setEstimatedWait(data.estimatedWaitSeconds || 0);
+            setWarmCount(data.warmCount || 0);
         });
 
         socket.on("queue:status", (data) => {
             setStatus(data.status);
             setPosition(data.position);
             setTotalInQueue(data.totalInQueue);
-            setEstimatedWait(data.estimatedWaitSeconds || 0);
+            setWarmCount(data.warmCount || 0);
         });
 
         socket.on("queue:ready", (data) => {
@@ -95,15 +81,19 @@ export default function QueuePage() {
         }
     };
 
-    const formatWaitTime = (seconds: number): string => {
-        if (seconds <= 0) return "Starting soon";
-        if (seconds < 60) return `~${seconds}s`;
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `~${mins}:${secs.toString().padStart(2, '0')}`;
+    // Queue wait message based on position and warm container availability
+    const getQueueMessage = (): string => {
+        if (position <= warmCount) {
+            return "Starting now...";
+        }
+        if (position === 1) {
+            return "You\u2019re next \u2014 a browser will free up shortly";
+        }
+        if (position <= 3) {
+            return "Almost there \u2014 a few people ahead of you";
+        }
+        return `There are ${position - 1} people ahead of you`;
     };
-
-    // Error state — queue:error redirects to home
 
     // E4: Rate limit reached — shown after queue processing
     if (status === "rate_limited") {
@@ -151,9 +141,9 @@ export default function QueuePage() {
             case "waiting":
                 return "Waiting for available browser...";
             case "preparing":
-                return "Preparing your environment...";
+                return "Preparing your browser...";
             case "connecting":
-                return "Connecting to browser...";
+                return "Connecting...";
             case "ready":
                 return "Ready! Redirecting...";
             default:
@@ -180,18 +170,15 @@ export default function QueuePage() {
                     </div>
 
                     {/* Status text */}
-                    <p className="text-center text-foreground mb-4">
+                    <p className="text-center text-foreground mb-2">
                         {getStatusText()}
                     </p>
 
-                    {/* Q2: Position and estimated wait (only when waiting) */}
+                    {/* Queue message (only when waiting) */}
                     {status === "waiting" && (
-                        <div className="text-center text-muted-foreground text-sm space-y-1 mb-6">
-                            {/* Position in queue */}
-                            <p>You are #{position} of {totalInQueue}</p>
-                            {/* Estimated wait time */}
-                            <p>{formatWaitTime(estimatedWait)}</p>
-                        </div>
+                        <p className="text-center text-muted-foreground text-sm mb-6">
+                            {getQueueMessage()}
+                        </p>
                     )}
 
                     {/* Cancel button — visible in all non-ready states */}
