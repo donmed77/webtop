@@ -16,7 +16,6 @@ export default function QueuePage() {
     const [status, setStatus] = useState<QueueStatus>("waiting");
     const [position, setPosition] = useState(0);
     const [totalInQueue, setTotalInQueue] = useState(0);
-    const [warmCount, setWarmCount] = useState(0);
     const [sessionId, setSessionId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -36,14 +35,12 @@ export default function QueuePage() {
             setStatus(data.status || "waiting");
             setPosition(data.position);
             setTotalInQueue(data.totalInQueue);
-            setWarmCount(data.warmCount || 0);
         });
 
         socket.on("queue:status", (data) => {
             setStatus(data.status);
             setPosition(data.position);
             setTotalInQueue(data.totalInQueue);
-            setWarmCount(data.warmCount || 0);
         });
 
         socket.on("queue:ready", (data) => {
@@ -83,10 +80,7 @@ export default function QueuePage() {
 
     // Queue wait message based on position and warm container availability
     const getQueueMessage = (): string => {
-        if (position <= warmCount) {
-            return "Starting now...";
-        }
-        if (position === 1) {
+        if (position <= 1) {
             return "You\u2019re next \u2014 a browser will free up shortly";
         }
         if (position <= 3) {
