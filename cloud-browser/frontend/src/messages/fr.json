@@ -1,0 +1,80 @@
+{
+    "meta":{
+        "title": "Vérificateur de lien - Test de redirection",
+        "description": "Raccourcissez les liens et naviguez en toute sécurité. Optez pour un vérificateur de liens avant de cliquer sur le lien à ouvrir. Étendez les URL et obtenez le lien original. Bien plus qu'un simple test de redirection de lien."
+    },
+    "shared":{
+        "about": "À propos",
+        "contact": "Contact",
+        "sponsor": "Sponsor",
+        "status": "Statut",
+        "new": "NOUVEAU",
+        "footer-description": "Étendre L’URL, effectuez des tests de redirection, obtenez le lien original et naviguez en toute sécurité. Ne cliquez plus sur une URL inconnue - Bien plus qu'un simple test de redirection.",
+        "partner": "Partenaire",
+        "privacy": "Confidentialité",
+        "terms": "Conditions"
+    },
+    "home":{
+        "hero":{
+            "wheregoes": "Vérificateur de lien",
+            "title": "Découvrez ce qui se passe avant de cliquer sur ouvrir",
+            "description": "Étendre L’URL, effectuez des tests de redirection, obtenez le lien original et naviguez en toute sécurité. Ne cliquez plus sur une URL inconnue - Bien plus qu'un simple test de redirection.",
+            "enter-a-short-link": "Saisissez un lien raccourci",
+            "expand-url": "Étendre L’URL",
+            "try-these": "Essayez ceci"
+        },
+        "features": {
+            "title": "Nous protégeons votre vie numérique contre l'hameçonnage et les URL malveillantes",
+            "wheregoes": "Unshorten URL",
+            "wheregoes-description": "Ne vous laissez plus surprendre et découvrez où vous mèneront les URL raccourcies avant de cliquer dessus",
+            "phishing-detection": "Identification d'hameçonnage",
+            "phishing-detection-description": "Protégez-vous des liens malveillants et identifiez les tentatives d'hameçonnage",
+            "privacy-guard": "Protection de la vie privée",
+            "privacy-guard-description": "Préservez la confidentialité de vos activités en ligne et protégez-les contre le suivi par des tiers",
+            "integrations-api": "Intégrations et API",
+            "integrations-api-description": "Intégrez en toute fluidité vos outils préférés et automatisez facilement vos tâches grâce à notre API",
+            "borwser-extension": "Extension du navigateur",
+            "borwser-extension-description": "Optimisez votre expérience de navigation grâce à notre extension de navigateur pratique",
+            "live-preview": "Aperçu en direct",
+            "live-preview-description": "Profitez d'un aperçu du lien en capture d'écran avant de cliquer dessus. Dites adieu aux surprises",
+            "coming-soon": "PROCHAINEMENT",
+            "new-release": "NOUVELLE VERSION"
+        },
+        "stats": {
+            "title":"Plus de 45,000+ clients nous font confiance, bien plus qu'un simple outils d'extension d'URL",
+            "unshortened-url":"URL non raccourcie par jour",
+            "active-users":"Utilisateurs actifs mensuels",
+            "malicious-url":"URL malveillantes uniques bloquées",
+            "apps-supported":"Applications de raccourcissement d'URL compatibles"
+        },
+        "sponsors": {
+            "title": "Nos sponsors et partenaires"
+        },
+        "testimonials": {
+            "title": "Voici pourquoi nos clients nous préfèrent "
+        },
+        "faq": {
+            "title": "Foire aux questions",
+            "question-1": "Qu'est-ce qu'un Vérificateur de lien?",
+            "answer-1": "Un vérificateur de lien est un outil de vérification de redirection d'URL qui vous aide à retracer le chemin d'une URL raccourcie ou redirigée, en vous apportant des renseignements détaillés sur chaque étape que cette URL franchit avant d'arriver à sa destination finale. Avec un vérificateur de lien, vous pouvez facilement étendre les URL pour révéler leurs véritables destinations, ce qui vous permet de déterminer clairement où mène un lien et d'éviter les sites malveillants. Cet outil est essentiel pour tous ceux qui utilisent régulièrement des liens raccourcis et qui souhaitent consulter l'URL complète avant de cliquer. Véritable alternative à des outils similaires tels que wheregoes.com, unshorten.it et expandurl.net, ce vérificateur de lien simplifie le processus de suivi des redirections tout en renforçant la sécurité en ligne grâce à son outil test de redirection complet.",
+            "question-2": "Qu'est-ce qu'un test de redirection?",
+            "answer-2": "Une test de redirection est un processus permettant de suivre le chemin d'une URL depuis son lien raccourci original jusqu'à sa destination finale. Le vérificateur de lien effectue un test de redirection en analysant chaque étape du lien, offrant ainsi une vision complète de toutes les redirections effectuées. Ce processus est très important pour comprendre le fonctionnement des URLs et s'assurer d'atteindre la destination finale exacte. En utilisant ce vérificateur de lien pour étendre les URL, vous pourrez identifier les éventuels points faibles des liens, tels que les redirections malveillantes et les liens brisés. Ce type de service est communément désigné par les termes \"Étendre URL\", \"Réducteur d'URL\", \"Vérificateur de redirection\", \"Vérificateur de lien\", \"Décodeur d'URL\", \"Test de redirection\" et bien d'autres encore.",
+            "question-3": "Comment fonctionne un vérificateur de lien et comment puis-je étendre une URL?",
+            "answer-3": "Un vérificateur de liens est un outil facile à utiliser et à comprendre. Il vous suffit de saisir l'URL que vous souhaitez suivre dans le champ de saisie et de cliquer sur le bouton \"Étendre l'URL\". En quelques instants, vous verrez apparaître une fenêtre contextuelle détaillée affichant le chemin de redirection complet, y compris la destination finale, les codes d'état HTTP, les en-têtes de réponse, le titre et la description de la page, le nombre de redirections et même une capture d'écran du lien. Ce processus simple vous permet d'étendre rapidement les URL et d'obtenir des informations sur leurs véritables points d'arrivée, sans le moindre désagrément.",
+            "question-4": "Est-ce qu'un vérificateur de liens est gratuit et existe-t-il des limites à l'extension d'URLs?",
+            "answer-4": "Oui, utiliser un vérificateur de liens est entièrement gratuit. Le nombre d'URL que vous pouvez étendre est illimité. Vous pouvez participer au financement du service en effectuant un don via le bouton \"Buy Me a Coffee\", afin d'assurer le bon fonctionnement de l'outil. Profitez d'un accès illimité à l'extension d'URL et aux tests de redirection gratuitement.",
+            "question-5": "Quels sont les codes d'état HTTP que le vérificateur de liens peut identifier?",
+            "answer-5": "Le vérificateur de liens permet de reconnaître et d'interpréter un grand nombre de codes d'état HTTP associés à des redirections d'URL. En effectuant un test de redirection, notre outil identifie les codes 301 (Retiré définitivement), 302 (Retrouvé), 307 (Redirection temporaire) et 308 (Redirection permanente), afin de mieux comprendre la nature de chaque redirection. De plus, ce vérificateur de liens identifie les codes d'état 404 (Non retrouvé) et 500 (Erreur du serveur), offrant ainsi des informations précieuses sur les éventuels points faibles de l'URL. Le vérificateur reconnaît tous les codes d'état HTTP existants, garantissant ainsi une analyse complète du comportement de chaque lien. Cette couverture étendue vous permet de comprendre et de résoudre efficacement les problèmes de redirection lors d'extensions d'URL.",
+            "question-6": "Pourquoi devrais-je utiliser un vérificateur de liens pour étendre les URL?",
+            "answer-6": "Utiliser un vérificateur de liens pour étendre les URL est indispensable pour assurer votre sécurité en ligne. Les liens raccourcis cachent souvent leur destination, renvoyant potentiellement à des sites malveillants ou à un contenu indésirable. Un vérificateur de liens effectue un test de redirection complet pour révéler la véritable destination des URL, offrant ainsi une transparence importante pour vous protéger contre les attaques de phishing et les logiciels malveillants. De plus, un vérificateur de liens vous propose un aperçu visuel du lien avant que vous ne cliquiez dessus. Cette fonctionnalité supplémentaire vous permet de vérifier le contenu du lien et de vous assurer la légitimité de votre visite. En utilisant  le vérificateur de liens, vous pouvez naviguer sur le Web en toute sécurité et prendre des décisions rassurées concernant les liens sur lesquels vous cliquez.",
+            "question-7": "Quels types de redirections sont possibles avec un vérificateur de liens?",
+            "answer-7": "Un vérificateur de liens prend en charge un grand nombre de types de liens de redirection, y compris les URL raccourcis, les liens d'affiliation, les URL de suivi, les URL dynamiques et les liens web normaux. Notre outil peut étendre les URLs des services de raccourcissement les plus populaires comme Bitly, Tinyurl, Cuttly, Rebrandly, Buffer, Short.io, et plus de 250 autres applications de raccourcissement d'URLs. De plus, le vérificateur de liens traite tous les types de redirections, y compris les redirections HTTP, les redirections PHP, les redirections .htaccess, les redirections NGINX, les redirections JavaScript et les méta-refreshes. Cet outil vous permet ainsi d'atteindre la destination finale de n'importe quel lien, indépendamment de son format ou de sa complexité. En identifiant clairement chaque chemin de redirection, un vérificateur de liens vous offre une solution complète pour analyser et développer les URLs en toute sécurité, indépendamment de la complexité du processus de redirection.",
+            "question-8": "Quelles sont les informations apportées par un vérificateur de liens lors de l'extension d'une URL?",
+            "answer-8": "Lors de l'extension d'une URL, un vérificateur de liens fournit des informations complètes grâce à un test de redirection détaillé. Celle-ci inclut chaque URL de la chaîne de redirection, les codes d'état HTTP, les en-têtes de réponse, l'URL de destination finale, le titre et la description de la page, le nombre de redirections, et même une capture d'écran du lien. De plus, un vérificateur de liens analyse les liens à l'aide d'outils de sécurité reconnus tels que Google Safe Browsing, Norton Safe Web, McAfee WebAdvisor, Sucuri, Link Shield, Web of Trust, et URL Void. Ces données sont très précieuses pour les développeurs web, les spécialistes du marketing et les experts en sécurité désireux d'obtenir des informations détaillées sur la structure et le comportement des liens. En utilisant un vérificateur de liens, vous pourrez étendre les URL et accéder à toutes les données dont vous aurez besoin pour prendre des décisions rassurées.",
+            "question-9": "Est-il sécurisé d'utiliser un vérificateur de lien pour l'extension d'URL?",
+            "answer-9": "Oui, utiliser un vérificateur de liens pour l'extension d'URL est totalement sécurisé. Notre outil analyse les liens sans les ouvrir dans votre navigateur, vous protége ainsi des sites potentiellement dangereux. Un vérificateur de lien effectue un test de redirection complet pour étendre les URL, vous donne ainsi un aperçu clair de la destination d'un lien. De plus, un vérificateur de liens analyse les liens à l'aide d'outils de sécurité reconnus tels que Google Safe Browsing, Norton Safe Web, McAfee WebAdvisor, Sucuri, Link Shield, Web of Trust, et URL Void. Vous obtenez ainsi un aperçu complet de la sécurité d'un lien avant de l'ouvrir. En utilisant vérificateur de liens, vous pourrez consulter des URL en toute confiance, avec l'assurance que cet outil privilégie votre sécurité lors de l'extension et la redirection des liens.",
+            "question-10": "Est-ce qu'un vérificateur de liens conserve les données de mes liens?",
+            "answer-10": "Non, un vérificateur de liens ne conserve aucune donnée sur vos liens. Notre outil effectue des tests de redirection de liens pour étendre les chemins d'URL sans conserver d'informations. Nous accordons une grande importance au respect de la confidentialité des utilisateurs et nous nous assurons que toutes vos vérifications de liens restent sécurisées et confidentielles. Notre vérificateur de lien garantit une expérience de navigation transparente et sécurisée sans pour autant compromettre la confidentialité de vos données. Soyez assuré que vos données ne sont jamais conservées ou partagées, vous permettant ainsi d'utiliser notre service en toute confiance et quiétude."
+        }
+    }
+}

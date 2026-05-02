@@ -1,0 +1,36 @@
+{
+    "name": "Unshorten URL - Expand URL | Link Redirect Trace",
+    "short_name": "UnshortLink",
+    "description": "Unshorten Link and browse safely. Know Unshorten URL your link before you click open. Expand URL And get the original Link. More than a Link redirect trace.",
+    "start_url": "/",
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
+    "icons": [
+      {
+        "src": "/favicon.ico",
+        "sizes": "any",
+        "type": "image/x-icon"
+      },
+      {
+        "src": "/x16.png",
+        "sizes": "16x16",
+        "type": "image/png"
+      },
+      {
+        "src": "/x32.png",
+        "sizes": "32x32",
+        "type": "image/png"
+      },
+      {
+        "src": "/x48.png",
+        "sizes": "48x48",
+        "type": "image/png"
+      },
+      {
+        "src": "/apple-touch-icon.png",
+        "sizes": "180x180",
+        "type": "image/png"
+      }
+    ]
+  }
+  

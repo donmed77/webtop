@@ -1,0 +1,80 @@
+{
+    "meta":{
+        "title": "Unshorten URL - Expand URL | Link Redirect Trace",
+        "description": "Unshorten Link and browse safely. Know Unshorten URL your link before you click open. Expand URL And get the original Link. More than a Link redirect trace."
+    },
+    "shared": {
+        "about": "About",
+        "contact": "Contact",
+        "sponsor": "Sponsor",
+        "status": "Status",
+        "new": "NEW",
+        "footer-description": "Expand URL, Trace redirect, Get the original Link and browse safely. No more clicking unknown URL — More than a Link redirect trace.",
+        "partner": "Partner",
+        "privacy": "Privacy",
+        "terms": "Terms"
+    },
+    "home":{
+        "hero":{
+            "wheregoes": "Unshorten URL",
+            "title": "Know what happens before you click open",
+            "description": "Expand URL, Trace redirect, Get the original Link and browse safely. No more clicking unknown URL — More than a Link redirect trace.",
+            "enter-a-short-link": "Enter a short link",
+            "expand-url": "Expand URL",
+            "try-these": "Try these"
+        },
+        "features": {
+            "title": "We Protect your Digital Life from Phishing & Malicious URL",
+            "wheregoes": "Unshorten URL",
+            "wheregoes-description": "Stop guessing and  know where shortened URLs lead before clicking on them",
+            "phishing-detection": "Phishing Detection",
+            "phishing-detection-description": "Stay protected from malicious links and detect phishing attempts",
+            "privacy-guard": "Privacy Guard",
+            "privacy-guard-description": "Keep your online activities confidential and protected from third-party tracking",
+            "integrations-api": "Integrations & API",
+            "integrations-api-description": "Seamlessly integrate with your favorite tools and easily automate tasks with our API",
+            "borwser-extension": "Browser Extension",
+            "borwser-extension-description": "Enhance your browsing experience with our convenient browser extension",
+            "live-preview": "Live Preview",
+            "live-preview-description": "Get a screenshot preview of the link before clicking. No more surprises",
+            "coming-soon": "COMING SOON",
+            "new-release": "NEW RELEASE"
+        },
+        "stats": {
+            "title":"Trusted by over 45,000+ customers More than a URL Expander",
+            "unshortened-url":"Unshortened URL every day",
+            "active-users":"Monthly active users",
+            "malicious-url":"Unique malicious URLs blocked",
+            "apps-supported":"URL Shortener apps supported"
+        },
+        "sponsors": {
+            "title": "Our Sponsors & Partners"
+        }, 
+        "testimonials": {
+            "title": "Here’s Why Our Customers Love Us"
+        },
+        "faq": {
+            "title": "Frequently Asked Questions",
+            "question-1": "What is Unshorten URL?",
+            "answer-1": "Unshorten URL is a URL redirect checker that helps you trace the path of a shortened or redirected URL, providing detailed insights into each step a URL takes before reaching its final destination. With Unshorten URL, you can easily expand URLs to uncover their true endpoints, enabling a clear understanding of where a link leads and helping to avoid malicious sites. This tool is essential for anyone who frequently encounters shortened links and wants to know the full URL before clicking. Serving as a robust alternative to similar tools like Unshorten URL.com, unshorten.it, and expandurl.net, Unshorten URL simplifies the process of following redirects while enhancing online security through its comprehensive Link Redirect Trace.",
+            "question-2": "What is a Link Redirect Trace?",
+            "answer-2": "A Link Redirect Trace is a process used to follow the path of a URL from its original short link to its final destination. Unshorten URL performs a Link Redirect Trace by analyzing each step the link takes, providing a clear view of all redirects involved. This process is crucial for understanding how URLs behave and ensuring you reach the final destination accurately. By using Unshorten URL to Expand URLs, you gain insights into potential issues with links, such as malicious redirects and broken links. This type of service is commonly known as \"Expand URL\", \"URL Unshortener\", \"Redirect Checker\", \"Link Checker\", \"URL decoder\", \"Redirect Trace\" and more.",
+            "question-3": "How does Unshorten URL work, and how can I expand a URL?",
+            "answer-3": "Unshorten URL is user-friendly and straightforward. Simply enter the URL you want to trace into the input field and click the \"Expand URL\" button. Within moments, you'll see a detailed popup displaying the full redirect path, including the final destination, HTTP status codes, response headers, The page title and description, the number of redirects, and even a screenshot of the link. This easy process allows you to expand URLs quickly and gain insights into their true endpoints without any hassle.",
+            "question-4": "Is Unshorten URL free to use, and are there any limits on expanding URLs?",
+            "answer-4": "Yes, Unshorten URL is completely free to use. There are no limits on the number of URLs you can expand. You can support the service by making a donation via the \"Buy Me a Coffee\" button, which helps keep the tool running smoothly. Enjoy unlimited access to expanding URLs and tracing their redirect paths at no cost.",
+            "question-5": "Which HTTP status codes can Unshorten URL identify?",
+            "answer-5": "Unshorten URL is designed to recognize and interpret a broad range of HTTP status codes associated with URL redirections. By performing a Link Redirect Trace, our tool identifies codes such as 301 (Moved Permanently), 302 (Found), 307 (Temporary Redirect), and 308 (Permanent Redirect), providing insight into each redirect’s nature. Additionally, Unshorten URL detects 404 (Not Found) and 500 (Server Error) status codes, offering valuable information on potential URL issues. Importantly, Unshorten URL supports all existing HTTP status codes, ensuring a comprehensive analysis of any link’s behavior. This extensive coverage allows you to understand and address any redirection issues effectively when expanding URLs.",
+            "question-6": "Why should I use Unshorten URL to Expand URLs?",
+            "answer-6": "Using Unshorten URL to Expand URLs is essential for ensuring your online safety. Shortened links often obscure their destination, potentially leading to malicious sites or unwanted content. Unshorten URL performs a comprehensive link redirect trace to reveal the true destination of URLs, offering transparency that helps protect against phishing attacks and malware. Additionally, Unshorten URL provides a screenshot of the link, giving you a visual overview before you click. This added feature helps you gauge the content of the link and further ensures you are visiting legitimate sites. By using Unshorten URL, you can navigate the web more safely and make informed decisions about the links you click.",
+            "question-7": "What types of redirects does Unshorten URL support?",
+            "answer-7": "Unshorten URL supports a wide range of redirected link types, including shortened URLs, affiliate links, tracking URLs, Dynamic URLs and regular web links. Our tool can Expand URLs from popular shortening services like Bitly, Tinyurl, Cuttly, Rebrandly, Buffer, Short.io, and over 250 other URL shortener apps. Additionally, Unshorten URL handles all types of redirects, including HTTP Redirects, PHP redirects, .htaccess redirects, NGINX redirects, JavaScript redirects, and meta-refreshes. The tool ensures you reach the final destination of any link, regardless of its format or complexity. By seamlessly tracing each redirect path, Unshorten URL provides a comprehensive solution for analyzing and expanding URLs safely, no matter how intricate the redirect process may be.",
+            "question-8": "What information does Unshorten URL provide when expanding a URL?",
+            "answer-8": "When a URL expands, Unshorten URL provides comprehensive information through a detailed Link Redirect Trace. This includes each URL in the redirect chain, HTTP status codes, response headers, the final destination URL, the page title and description, the number of redirects, and even a screenshot of the link. Additionally, Unshorten URL checks links using leading security tools like Google Safe Browsing, Norton Safe Web, McAfee WebAdvisor, Sucuri, Link Shield, Web of Trust, and URL Void. This rich data is invaluable for web developers, marketers, and security professionals who need detailed insights into link structures and behaviors. By using Unshorten URL, you can Expand URLs and access all the data you need for informed decision-making.",
+            "question-9": "Is it safe to use Unshorten URL for URL expansion?",
+            "answer-9": "Yes, using Unshorten URL for URL expansion is completely safe. Our tool analyzes links without opening them in your browser, ensuring you are protected from potentially harmful sites. Unshorten URL performs a comprehensive Link Redirect Trace to Expand URLs, giving you a clear view of a link's destination. In addition to this, Unshorten URL checks links against leading security tools like Google Safe Browsing, Norton Safe Web, McAfee WebAdvisor, Sucuri, Link Shield, Web of Trust, and URL Void. This provides a comprehensive overview of a link's safety before you open it. By using Unshorten URL, you can explore URLs confidently, knowing that the tool prioritizes your security while expanding and tracing links.",
+            "question-10": "Does Unshorten URL store my link data?",
+            "answer-10": "No, Unshorten URL does not store any link data. Our tool performs Link Redirect Trace operations to Expand URL paths without retaining any information. We prioritize user privacy, ensuring that all your link checks remain secure and confidential. Unshorten URL is dedicated to providing a transparent and safe browsing experience without compromising your privacy. You can trust that your data is never stored or shared, allowing you to use our service with confidence and peace of mind."
+        }
+    }
+}
