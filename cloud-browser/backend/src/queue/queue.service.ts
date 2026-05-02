@@ -166,13 +166,20 @@ export class QueueService implements OnModuleDestroy {
         }
     }
 
-    private updatePositions() {
+    /**
+     * Recalculate positions and optionally notify clients.
+     * @param notify - if true, fire onUpdate callbacks (default: true).
+     *   Use notify=false when the position change is temporary (e.g. during processEntry
+     *   splice before knowing whether the entry will be put back).
+     */
+    private updatePositions(notify = true) {
         this.queue.forEach((entry, index) => {
             entry.position = index + 1;
-            // Notify the client's WebSocket about the new position
-            const callback = this.onUpdateCallbacks.get(entry.id);
-            if (callback) {
-                callback(entry);
+            if (notify) {
+                const callback = this.onUpdateCallbacks.get(entry.id);
+                if (callback) {
+                    callback(entry);
+                }
             }
         });
     }
@@ -271,11 +278,11 @@ export class QueueService implements OnModuleDestroy {
      * Process a single queue entry: rate-check, acquire container, create session.
      */
     private async processEntry(entry: QueueEntry): Promise<void> {
-        // Remove from waiting queue
+        // Remove from waiting queue (silent — don't notify yet, entry might be put back)
         const queueIndex = this.queue.indexOf(entry);
         if (queueIndex !== -1) {
             this.queue.splice(queueIndex, 1);
-            this.updatePositions();
+            this.updatePositions(false);
         }
 
         this.logger.log(`Processing queue entry ${entry.id}`);
@@ -286,6 +293,7 @@ export class QueueService implements OnModuleDestroy {
             entry.status = 'rate_limited';
             // Immediately free IP so they aren't permanently locked out
             this.ipQueueMap.delete(entry.clientIp);
+            this.updatePositions(); // Entry is permanently gone, notify remaining clients
             this.notifyUpdate(entry);
             this.logger.log(`Queue entry ${entry.id} rate-limited (IP: ${entry.clientIp})`);
             this.scheduleCleanup(entry);
@@ -305,6 +313,7 @@ export class QueueService implements OnModuleDestroy {
             this.ipQueueMap.delete(entry.clientIp);
             this.entries.delete(entry.id);
             this.onUpdateCallbacks.delete(entry.id);
+            this.updatePositions(); // Entry is permanently gone, notify remaining clients
             return;
         }
 
@@ -328,10 +337,11 @@ export class QueueService implements OnModuleDestroy {
                 return;
             }
 
-            // Step 3: Ready
+            // Step 3: Ready — entry stays out of queue, notify remaining clients
             entry.status = 'ready';
             // Immediately free IP from queue map — active session check now guards this IP
             this.ipQueueMap.delete(entry.clientIp);
+            this.updatePositions(); // Now permanently notify remaining clients of their new positions
             this.notifyUpdate(entry);
             this.logger.log(`Queue entry ${entry.id} ready with session ${entry.sessionId}`);
             // Fix #1: Schedule cleanup of this completed entry
@@ -342,13 +352,14 @@ export class QueueService implements OnModuleDestroy {
             entry.status = 'error';
             // Immediately free IP so they can retry
             this.ipQueueMap.delete(entry.clientIp);
+            this.updatePositions(); // Now permanently notify remaining clients of their new positions
             this.notifyUpdate(entry);
             this.scheduleCleanup(entry);
         } else {
-            // Put back in queue if no containers
+            // Put back in queue — positions revert, no flicker since we used silent splice
             entry.status = 'waiting';
             this.queue.unshift(entry);
-            this.updatePositions();
+            this.updatePositions(false); // Silent — positions are back to where they were
             this.notifyUpdate(entry);
         }
     }
