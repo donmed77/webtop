@@ -50,8 +50,13 @@ export default function Home() {
         return;
       }
 
-      // Always navigate to queue page - unified flow
-      // Don't reset loading — keep button disabled until page transitions
+      // Instant assignment — go directly to session (no queue page)
+      if (data.sessionId) {
+        router.push(`/session/${data.sessionId}`);
+        return;
+      }
+
+      // Fall back to queue page
       router.push(`/queue/${data.queueId}`);
     } catch (err) {
       setError("Failed to connect to server");

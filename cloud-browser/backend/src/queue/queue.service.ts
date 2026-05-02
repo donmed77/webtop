@@ -49,6 +49,38 @@ export class QueueService implements OnModuleDestroy {
         }
     }
 
+    /**
+     * Try to assign a session instantly without going through the queue.
+     * Only succeeds if: warm containers available, under max sessions, not paused, rate limit ok.
+     * Returns the session if successful, null if should fall back to queue.
+     */
+    async tryInstantAssign(url: string, clientIp: string): Promise<{ sessionId: string; port: number } | null> {
+        // Guard: service must be running
+        if (this.sessionService.isPaused()) return null;
+
+        // Guard: warm containers must be available
+        if (this.containerService.getWarmCount() === 0) return null;
+
+        // Guard: must be under max concurrent sessions
+        const activeCount = this.sessionService.getActiveCount();
+        const maxSessions = this.containerService.getMaxSessions();
+        if (activeCount >= maxSessions) return null;
+
+        // Guard: rate limit must be ok
+        const rateLimit = this.sessionService.checkRateLimit(clientIp);
+        if (!rateLimit.allowed) return null;
+
+        // All conditions met — create session directly
+        const result = await this.sessionService.createSession(url, clientIp);
+        if (result.session) {
+            this.logger.log(`Instant assignment: session ${result.session.id} for IP ${clientIp}`);
+            return { sessionId: result.session.id, port: result.session.port };
+        }
+
+        // Session creation failed — fall back to queue
+        return null;
+    }
+
     addToQueue(url: string, clientIp: string): QueueEntry {
         // QE3: If this IP already has a waiting queue entry, reuse it
         const existingId = this.ipQueueMap.get(clientIp);

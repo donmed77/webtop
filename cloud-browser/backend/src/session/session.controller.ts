@@ -76,6 +76,16 @@ export class SessionController {
             }
         }
 
+        // Try instant assignment — skip queue if a container is ready
+        const instant = await this.queueService.tryInstantAssign(dto.url, clientIp);
+        if (instant) {
+            return {
+                sessionId: instant.sessionId,
+                port: instant.port,
+            };
+        }
+
+        // Fall back to queue
         const queueEntry = this.queueService.addToQueue(dto.url, clientIp);
 
         return {
