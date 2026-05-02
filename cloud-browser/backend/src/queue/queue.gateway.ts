@@ -43,12 +43,13 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
                             // Still waiting in queue — safe to just remove
                             this.queueService.removeFromQueue(queueId);
                             this.logger.log(`Queue entry ${queueId} removed after grace period (was waiting)`);
-                        } else {
-                            // Entry is preparing/connecting/ready — mark abandoned
-                            // markAbandoned handles both in-flight and completed sessions
+                        } else if (entry.status === 'preparing' || entry.status === 'connecting') {
+                            // Entry is mid-processing — client left before session was delivered
                             this.queueService.markAbandoned(queueId);
                             this.logger.log(`Queue entry ${queueId} marked abandoned after grace period (was ${entry.status})`);
                         }
+                        // 'ready' status = session was delivered, disconnect is expected
+                        // (user navigated from /queue to /session). Do NOT end the session.
                     }
                 }
             }, 10000);
