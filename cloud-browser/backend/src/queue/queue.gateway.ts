@@ -37,8 +37,19 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
             setTimeout(() => {
                 const hasReconnected = [...this.clientQueues.values()].includes(queueId);
                 if (!hasReconnected) {
-                    this.queueService.removeFromQueue(queueId);
-                    this.logger.log(`Queue entry ${queueId} removed after grace period (no reconnect)`);
+                    const entry = this.queueService.getQueueEntry(queueId);
+                    if (entry) {
+                        if (entry.status === 'waiting') {
+                            // Still waiting in queue — safe to just remove
+                            this.queueService.removeFromQueue(queueId);
+                            this.logger.log(`Queue entry ${queueId} removed after grace period (was waiting)`);
+                        } else {
+                            // Entry is preparing/connecting/ready — mark abandoned
+                            // markAbandoned handles both in-flight and completed sessions
+                            this.queueService.markAbandoned(queueId);
+                            this.logger.log(`Queue entry ${queueId} marked abandoned after grace period (was ${entry.status})`);
+                        }
+                    }
                 }
             }, 10000);
             this.logger.log(`Client ${client.id} disconnected from queue ${queueId}, 10s grace period started`);

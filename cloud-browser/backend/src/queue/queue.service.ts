@@ -14,6 +14,7 @@ export interface QueueEntry {
     sessionId?: string;
     port?: number;
     createdAt: Date;
+    abandoned?: boolean; // Set when client disconnects during preparing/connecting
 }
 
 @Injectable()
@@ -105,6 +106,32 @@ export class QueueService implements OnModuleDestroy {
         this.entries.delete(queueId);
         this.onUpdateCallbacks.delete(queueId);
         return true;
+    }
+
+    /**
+     * Mark a queue entry as abandoned (client disconnected during processing).
+     * If the entry already has a session, end it immediately.
+     * If it's still being processed, the abandoned flag will be checked
+     * after session creation in processQueue().
+     */
+    markAbandoned(queueId: string): void {
+        const entry = this.entries.get(queueId);
+        if (!entry) return;
+
+        entry.abandoned = true;
+
+        if (entry.sessionId) {
+            // Session was already created — end it now
+            this.logger.warn(`Cleaning up orphaned session ${entry.sessionId} (client disconnected during ${entry.status})`);
+            this.sessionService.endSession(entry.sessionId, 'queue_disconnect').catch(err => {
+                this.logger.error(`Failed to end orphaned session ${entry.sessionId}: ${err.message}`);
+            });
+            this.ipQueueMap.delete(entry.clientIp);
+            this.entries.delete(queueId);
+            this.onUpdateCallbacks.delete(queueId);
+        } else {
+            this.logger.warn(`Marked queue entry ${queueId} as abandoned (status: ${entry.status}) — will clean up after processing`);
+        }
     }
 
     private updatePositions() {
@@ -215,83 +242,111 @@ export class QueueService implements OnModuleDestroy {
         // Fix #5: Skip processing when service is paused
         if (this.sessionService.isPaused()) return;
 
-        const warmCount = this.containerService.getWarmCount();
-        if (warmCount === 0) return;
-
-        // Don't dequeue if we're already at max concurrent sessions
-        const activeCount = this.sessionService.getActiveCount();
-        const maxSessions = this.containerService.getMaxSessions();
-        if (activeCount >= maxSessions) return;
-
-        // Process next waiting entry
-        const entry = this.queue.find(e => e.status === 'waiting');
-        if (!entry) return;
-
         this.processing = true;
 
         try {
-            // Remove from waiting queue
-            const queueIndex = this.queue.indexOf(entry);
-            if (queueIndex !== -1) {
-                this.queue.splice(queueIndex, 1);
-                this.updatePositions();
-            }
+            // Batch dequeue: process all eligible entries in one tick
+            while (this.queue.length > 0) {
+                const warmCount = this.containerService.getWarmCount();
+                if (warmCount === 0) break;
 
-            this.logger.log(`Processing queue entry ${entry.id}`);
+                const activeCount = this.sessionService.getActiveCount();
+                const maxSessions = this.containerService.getMaxSessions();
+                if (activeCount >= maxSessions) break;
 
-            // E4: Check rate limit during processing (user has already seen queue page)
-            const rateLimit = this.sessionService.checkRateLimit(entry.clientIp);
-            if (!rateLimit.allowed) {
-                entry.status = 'rate_limited';
-                // Immediately free IP so they aren't permanently locked out
-                this.ipQueueMap.delete(entry.clientIp);
-                this.notifyUpdate(entry);
-                this.logger.log(`Queue entry ${entry.id} rate-limited (IP: ${entry.clientIp})`);
-                this.scheduleCleanup(entry);
-                return;
-            }
+                const entry = this.queue.find(e => e.status === 'waiting');
+                if (!entry) break;
 
-            // Step 1: Preparing
-            entry.status = 'preparing';
-            this.notifyUpdate(entry);
-
-            // Small delay for UX (shows preparing step)
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Step 2: Connecting
-            entry.status = 'connecting';
-            this.notifyUpdate(entry);
-
-            const result = await this.sessionService.createSession(entry.url, entry.clientIp);
-
-            if (result.session) {
-                // Step 3: Ready
-                entry.status = 'ready';
-                entry.sessionId = result.session.id;
-                entry.port = result.session.port;
-                // Immediately free IP from queue map — active session check now guards this IP
-                this.ipQueueMap.delete(entry.clientIp);
-                this.notifyUpdate(entry);
-                this.logger.log(`Queue entry ${entry.id} ready with session ${entry.sessionId}`);
-                // Fix #1: Schedule cleanup of this completed entry
-                this.scheduleCleanup(entry);
-            } else if (result.error) {
-                // Fix #3: Notify the client about the error instead of silently dropping
-                this.logger.error(`Queue processing failed for ${entry.id}: ${result.error}`);
-                entry.status = 'error';
-                // Immediately free IP so they can retry
-                this.ipQueueMap.delete(entry.clientIp);
-                this.notifyUpdate(entry);
-                this.scheduleCleanup(entry);
-            } else {
-                // Put back in queue if no containers
-                entry.status = 'waiting';
-                this.queue.unshift(entry);
-                this.updatePositions();
-                this.notifyUpdate(entry);
+                await this.processEntry(entry);
             }
         } finally {
             this.processing = false;
+        }
+    }
+
+    /**
+     * Process a single queue entry: rate-check, acquire container, create session.
+     */
+    private async processEntry(entry: QueueEntry): Promise<void> {
+        // Remove from waiting queue
+        const queueIndex = this.queue.indexOf(entry);
+        if (queueIndex !== -1) {
+            this.queue.splice(queueIndex, 1);
+            this.updatePositions();
+        }
+
+        this.logger.log(`Processing queue entry ${entry.id}`);
+
+        // E4: Check rate limit during processing (user has already seen queue page)
+        const rateLimit = this.sessionService.checkRateLimit(entry.clientIp);
+        if (!rateLimit.allowed) {
+            entry.status = 'rate_limited';
+            // Immediately free IP so they aren't permanently locked out
+            this.ipQueueMap.delete(entry.clientIp);
+            this.notifyUpdate(entry);
+            this.logger.log(`Queue entry ${entry.id} rate-limited (IP: ${entry.clientIp})`);
+            this.scheduleCleanup(entry);
+            return;
+        }
+
+        // Step 1: Preparing
+        entry.status = 'preparing';
+        this.notifyUpdate(entry);
+
+        // Small delay for UX (shows preparing step)
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Check if client abandoned during preparing
+        if (entry.abandoned) {
+            this.logger.warn(`Queue entry ${entry.id} abandoned during preparing — skipping session creation`);
+            this.ipQueueMap.delete(entry.clientIp);
+            this.entries.delete(entry.id);
+            this.onUpdateCallbacks.delete(entry.id);
+            return;
+        }
+
+        // Step 2: Connecting
+        entry.status = 'connecting';
+        this.notifyUpdate(entry);
+
+        const result = await this.sessionService.createSession(entry.url, entry.clientIp);
+
+        if (result.session) {
+            entry.sessionId = result.session.id;
+            entry.port = result.session.port;
+
+            // Check if client abandoned during session creation
+            if (entry.abandoned) {
+                this.logger.warn(`Queue entry ${entry.id} abandoned after session creation — ending orphaned session ${result.session.id}`);
+                await this.sessionService.endSession(result.session.id, 'queue_disconnect');
+                this.ipQueueMap.delete(entry.clientIp);
+                this.entries.delete(entry.id);
+                this.onUpdateCallbacks.delete(entry.id);
+                return;
+            }
+
+            // Step 3: Ready
+            entry.status = 'ready';
+            // Immediately free IP from queue map — active session check now guards this IP
+            this.ipQueueMap.delete(entry.clientIp);
+            this.notifyUpdate(entry);
+            this.logger.log(`Queue entry ${entry.id} ready with session ${entry.sessionId}`);
+            // Fix #1: Schedule cleanup of this completed entry
+            this.scheduleCleanup(entry);
+        } else if (result.error) {
+            // Fix #3: Notify the client about the error instead of silently dropping
+            this.logger.error(`Queue processing failed for ${entry.id}: ${result.error}`);
+            entry.status = 'error';
+            // Immediately free IP so they can retry
+            this.ipQueueMap.delete(entry.clientIp);
+            this.notifyUpdate(entry);
+            this.scheduleCleanup(entry);
+        } else {
+            // Put back in queue if no containers
+            entry.status = 'waiting';
+            this.queue.unshift(entry);
+            this.updatePositions();
+            this.notifyUpdate(entry);
         }
     }
 

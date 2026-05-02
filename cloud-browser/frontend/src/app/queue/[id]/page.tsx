@@ -17,6 +17,7 @@ export default function QueuePage() {
     const [position, setPosition] = useState(0);
     const [totalInQueue, setTotalInQueue] = useState(0);
     const [estimatedWait, setEstimatedWait] = useState(0);
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
     // Local countdown: decrement estimatedWait every second between server pushes
@@ -61,6 +62,7 @@ export default function QueuePage() {
 
         socket.on("queue:ready", (data) => {
             setStatus("ready");
+            setSessionId(data.sessionId);
             // Auto-start session immediately (Q8) — replace to prevent back-button issues
             setTimeout(() => {
                 router.replace(`/session/${data.sessionId}`);
@@ -68,7 +70,7 @@ export default function QueuePage() {
         });
 
         socket.on("queue:error", () => {
-            router.replace("/");
+            setStatus("error");
         });
 
         return () => {
@@ -79,6 +81,10 @@ export default function QueuePage() {
     const handleLeaveQueue = async () => {
         try {
             const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            // If a session was already created, end it too
+            if (sessionId) {
+                await fetch(`${apiUrl}/api/session/${sessionId}`, { method: "DELETE" }).catch(() => {});
+            }
             await fetch(`${apiUrl}/api/queue/${queueId}`, {
                 method: "DELETE",
             });
@@ -112,6 +118,26 @@ export default function QueuePage() {
                         </p>
                         <Button onClick={() => router.push("/")} className="cursor-pointer">
                             Back to Home
+                        </Button>
+                    </CardContent>
+                </Card>
+            </main>
+        );
+    }
+
+    // Error state — show message with retry option
+    if (status === "error") {
+        return (
+            <main className="min-h-screen bg-background flex items-center justify-center p-4">
+                <Card className="w-full max-w-md">
+                    <CardContent className="pt-6 text-center">
+                        <div className="text-4xl mb-4">⚠️</div>
+                        <h2 className="text-xl font-semibold mb-2">Something Went Wrong</h2>
+                        <p className="text-muted-foreground mb-6">
+                            We couldn&apos;t create your session. Please try again.
+                        </p>
+                        <Button onClick={() => router.push("/")} className="cursor-pointer">
+                            Try Again
                         </Button>
                     </CardContent>
                 </Card>
@@ -168,8 +194,8 @@ export default function QueuePage() {
                         </div>
                     )}
 
-                    {/* Q2: Cancel button (only when waiting) */}
-                    {status === "waiting" && (
+                    {/* Cancel button — visible in all non-ready states */}
+                    {status !== "ready" && (
                         <div className="text-center">
                             <Button
                                 variant="outline"
@@ -177,7 +203,7 @@ export default function QueuePage() {
                                 onClick={handleLeaveQueue}
                                 className="cursor-pointer"
                             >
-                                Leave Queue
+                                {status === "waiting" ? "Leave Queue" : "Cancel"}
                             </Button>
                         </div>
                     )}
