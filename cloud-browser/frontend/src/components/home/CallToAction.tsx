@@ -18,14 +18,27 @@ const CallToAction = ({
 
   const [url, setUrl] = useState(link ?? "");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("error");
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [toastAutoHide, setToastAutoHide] = useState<number | null>(6000);
+  const [toastActionLabel, setToastActionLabel] = useState<string | undefined>();
+  const [toastOnAction, setToastOnAction] = useState<(() => void) | undefined>();
 
-  const showToast = (message: string, type: "success" | "error" = "error") => {
-    setError(message);
-    setToastType(type);
+  const showToast = (
+    message: string,
+    opts?: {
+      type?: "success" | "error";
+      autoHide?: number | null;
+      actionLabel?: string;
+      onAction?: () => void;
+    },
+  ) => {
+    setToastMessage(message);
+    setToastType(opts?.type ?? "error");
+    setToastAutoHide(opts?.autoHide ?? 6000);
+    setToastActionLabel(opts?.actionLabel);
+    setToastOnAction(() => opts?.onAction);
     setToastOpen(true);
   };
 
@@ -34,9 +47,7 @@ const CallToAction = ({
     if (!url.trim()) return;
 
     setLoading(true);
-    setError("");
     setToastOpen(false);
-    setActiveSessionId(null);
 
     try {
       let finalUrl = url.trim();
@@ -44,7 +55,7 @@ const CallToAction = ({
         finalUrl = `https://${finalUrl}`;
       }
 
-      const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const apiUrl = typeof window !== "undefined" ? window.location.origin : "";
       const response = await fetch(`${apiUrl}/api/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -58,10 +69,31 @@ const CallToAction = ({
           router.push("/rate-limited");
           return;
         }
+
+        // Concurrent session — persistent toast with "Rejoin" action
         if (data.concurrent && data.activeSessionId) {
-          setActiveSessionId(data.activeSessionId);
+          showToast("You already have an active session.", {
+            type: "error",
+            autoHide: null,
+            actionLabel: "Rejoin",
+            onAction: () => router.push(`/session/${data.activeSessionId}`),
+          });
+          setLoading(false);
+          return;
         }
-        showToast(data.message || "Failed to start session", "error");
+
+        // Concurrent without activeSessionId (pending queue)
+        if (data.concurrent) {
+          showToast(data.message || "You already have a pending request.", {
+            type: "error",
+            autoHide: null,
+          });
+          setLoading(false);
+          return;
+        }
+
+        // All other errors — auto-hide toast
+        showToast(data.message || "Failed to start session");
         setLoading(false);
         return;
       }
@@ -73,7 +105,7 @@ const CallToAction = ({
 
       router.push(`/queue/${data.queueId}`);
     } catch (err) {
-      showToast("Failed to connect to server", "error");
+      showToast("Failed to connect to server");
       setLoading(false);
     }
   };
@@ -109,19 +141,6 @@ const CallToAction = ({
         </Button>
       </form>
 
-      {activeSessionId && (
-        <div className="flex mt-1">
-          <Button
-            className="!text-primary-purple dark:!text-primary-purple-light !text-sm !p-0 !min-w-fit"
-            style={{ borderRadius: 0, boxShadow: "unset" }}
-            variant="text"
-            onClick={() => router.push(`/session/${activeSessionId}`)}
-          >
-            Go to Active Session →
-          </Button>
-        </div>
-      )}
-
       <div className="lg:w-[91%] flex flex-col gap-[22px] mt-2">
         <div className="flex flex-wrap gap-1 text-[14px]">
           <p>{t("try-these")}:</p>
@@ -136,12 +155,14 @@ const CallToAction = ({
 
       <Toast
         open={toastOpen}
-        message={error}
+        message={toastMessage}
         type={toastType}
         vertical="top"
-        autoHideDuration={6000}
+        autoHideDuration={toastAutoHide}
         onClose={() => setToastOpen(false)}
         showCloseAction
+        actionLabel={toastActionLabel}
+        onAction={toastOnAction}
       />
     </div>
   );

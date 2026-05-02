@@ -12,9 +12,11 @@ interface ToastProps {
   message: string;
   type?: ToastType;
   vertical?: Vertical;
-  autoHideDuration?: number;
+  autoHideDuration?: number | null;
   onClose: () => void;
   showCloseAction?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 const Toast = ({
@@ -25,6 +27,8 @@ const Toast = ({
   autoHideDuration = 5000,
   onClose,
   showCloseAction = false,
+  actionLabel,
+  onAction,
 }: ToastProps) => {
   const { theme } = useThemeStore();
 
@@ -43,16 +47,30 @@ const Toast = ({
     onClose();
   };
 
-  const action = showCloseAction ? (
-    <ToggleButton
-      className="!rounded-none !text-white !border-none"
-      aria-label="close"
-      value="close"
-      onClick={() => onClose()}
-    >
-      <CloseIcon />
-    </ToggleButton>
-  ) : undefined;
+  const action = (
+    <div className="flex items-center gap-1">
+      {actionLabel && onAction && (
+        <ToggleButton
+          className="!rounded-none !text-white !border-none !text-xs !font-bold !underline !px-2"
+          aria-label={actionLabel}
+          value={actionLabel}
+          onClick={() => onAction()}
+        >
+          {actionLabel}
+        </ToggleButton>
+      )}
+      {showCloseAction && (
+        <ToggleButton
+          className="!rounded-none !text-white !border-none"
+          aria-label="close"
+          value="close"
+          onClick={() => onClose()}
+        >
+          <CloseIcon />
+        </ToggleButton>
+      )}
+    </div>
+  );
 
   return (
     <Snackbar
