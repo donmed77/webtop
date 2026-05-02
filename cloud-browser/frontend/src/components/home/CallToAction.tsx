@@ -4,6 +4,7 @@ import { Button, TextField } from "@mui/material";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import Toast from "@/components/shared/Toast";
 
 const CallToAction = ({
   link,
@@ -18,7 +19,15 @@ const CallToAction = ({
   const [url, setUrl] = useState(link ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastType, setToastType] = useState<"success" | "error">("error");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "error") => {
+    setError(message);
+    setToastType(type);
+    setToastOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +35,7 @@ const CallToAction = ({
 
     setLoading(true);
     setError("");
+    setToastOpen(false);
     setActiveSessionId(null);
 
     try {
@@ -51,7 +61,7 @@ const CallToAction = ({
         if (data.concurrent && data.activeSessionId) {
           setActiveSessionId(data.activeSessionId);
         }
-        setError(data.message || "Failed to start session");
+        showToast(data.message || "Failed to start session", "error");
         setLoading(false);
         return;
       }
@@ -63,7 +73,7 @@ const CallToAction = ({
 
       router.push(`/queue/${data.queueId}`);
     } catch (err) {
-      setError("Failed to connect to server");
+      showToast("Failed to connect to server", "error");
       setLoading(false);
     }
   };
@@ -99,19 +109,16 @@ const CallToAction = ({
         </Button>
       </form>
 
-      {error && (
-        <div className="flex flex-col gap-2 mt-1">
-          <p className="text-red-500 text-sm">{error}</p>
-          {activeSessionId && (
-            <Button
-              className="!text-primary-purple dark:!text-primary-purple-light !text-sm !p-0 !min-w-fit"
-              style={{ borderRadius: 0, boxShadow: "unset" }}
-              variant="text"
-              onClick={() => router.push(`/session/${activeSessionId}`)}
-            >
-              Go to Active Session →
-            </Button>
-          )}
+      {activeSessionId && (
+        <div className="flex mt-1">
+          <Button
+            className="!text-primary-purple dark:!text-primary-purple-light !text-sm !p-0 !min-w-fit"
+            style={{ borderRadius: 0, boxShadow: "unset" }}
+            variant="text"
+            onClick={() => router.push(`/session/${activeSessionId}`)}
+          >
+            Go to Active Session →
+          </Button>
         </div>
       )}
 
@@ -126,6 +133,16 @@ const CallToAction = ({
           </p>
         </div>
       </div>
+
+      <Toast
+        open={toastOpen}
+        message={error}
+        type={toastType}
+        vertical="top"
+        autoHideDuration={6000}
+        onClose={() => setToastOpen(false)}
+        showCloseAction
+      />
     </div>
   );
 };
