@@ -40,6 +40,9 @@ export class SessionService implements OnModuleInit {
     private peakConcurrent: number = 0;
     private lastResetDate: string = new Date().toDateString();
 
+    // Callback for queue service to process waiting entries when capacity frees up
+    private sessionEndCallback: (() => void) | null = null;
+
     constructor(
         private containerService: ContainerService,
         private configService: ConfigService,
@@ -304,6 +307,11 @@ export class SessionService implements OnModuleInit {
         // Fix #8: Remove from in-memory Map to prevent memory leak
         this.sessions.delete(sessionId);
 
+        // Notify queue that capacity freed up — process waiting entries immediately
+        if (this.sessionEndCallback) {
+            this.sessionEndCallback();
+        }
+
         return true;
     }
 
@@ -394,6 +402,11 @@ export class SessionService implements OnModuleInit {
     }
 
     // ---- DT3: System Controls ----
+
+    /** Register a callback to fire when any session ends (used by QueueService to process waiting entries) */
+    onSessionEnd(callback: () => void): void {
+        this.sessionEndCallback = callback;
+    }
 
     isPaused(): boolean {
         return this.paused;

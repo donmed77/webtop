@@ -37,6 +37,8 @@ export class QueueService implements OnModuleDestroy {
         this.checkInterval = setInterval(() => this.processQueue(), 500);
         // Evict stale queue entries every 30s (entries that never got a WebSocket)
         this.staleCheckInterval = setInterval(() => this.evictStaleEntries(), 30_000);
+        // Process queue immediately when a session ends (don't wait for next 500ms tick)
+        this.sessionService.onSessionEnd(() => this.triggerProcessQueue());
     }
 
     // Fix #6: Clear intervals on module destroy to prevent memory leaks
@@ -197,6 +199,13 @@ export class QueueService implements OnModuleDestroy {
         return this.ipQueueMap.has(clientIp);
     }
 
+    /** Trigger queue processing immediately (e.g. when a session ends and capacity frees up) */
+    triggerProcessQueue(): void {
+        if (this.queue.length > 0) {
+            setImmediate(() => this.processQueue());
+        }
+    }
+
 
     /**
      * DT3: Drain queue — remove all waiting entries
@@ -334,6 +343,7 @@ export class QueueService implements OnModuleDestroy {
                 this.ipQueueMap.delete(entry.clientIp);
                 this.entries.delete(entry.id);
                 this.onUpdateCallbacks.delete(entry.id);
+                this.updatePositions(); // Entry is permanently gone, notify remaining clients
                 return;
             }
 
