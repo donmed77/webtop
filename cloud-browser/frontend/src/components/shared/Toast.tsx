@@ -66,7 +66,7 @@ const Toast = ({
           {" "}
           <span
             onClick={() => onAction()}
-            className="underline font-bold cursor-pointer"
+            className="underline font-medium cursor-pointer"
           >
             {actionLabel}
           </span>
