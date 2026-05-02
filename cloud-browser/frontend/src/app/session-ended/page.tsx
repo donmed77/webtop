@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mui/material";
+import BrandedPageLayout from "@/components/shared/BrandedPageLayout";
 
 interface RateLimitInfo {
     used: number;
@@ -51,97 +51,108 @@ function SessionEndedContent() {
                         : "Your session time has expired."
                     : null;
 
+    const isWarning = isNotFound || isViewerLimit;
+
     return (
-        <Card className="w-full max-w-md">
-            <CardContent className="pt-8 pb-8 text-center">
-                {/* Icon */}
-                <div className="flex justify-center mb-4">
-                    <div className={`h-16 w-16 rounded-full flex items-center justify-center ${isNotFound || isViewerLimit ? "bg-yellow-500/10" : "bg-primary/10"}`}>
-                        {isNotFound || isViewerLimit ? (
-                            <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                            </svg>
-                        ) : (
-                            <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                        )}
-                    </div>
-                </div>
-
-                {/* Title */}
-                <h1 className="text-2xl font-bold mb-2">{title}</h1>
-                {subtitle && <p className="text-muted-foreground mb-4">{subtitle}</p>}
-
-                {/* Rate limit info — only for non-viewers */}
-                {!isViewerParam && rateLimit !== null ? (
-                    <div className="mb-6">
-                        <p className="text-muted-foreground mb-3">
-                            You&apos;ve used <span className="font-semibold text-foreground">{rateLimit.used}</span> of{" "}
-                            <span className="font-semibold text-foreground">{rateLimit.limit}</span> sessions today
-                        </p>
-
-                        {/* Progress bar */}
-                        <div className="w-full bg-muted rounded-full h-2 mb-2">
-                            <div
-                                className={`h-2 rounded-full transition-all ${isLimited ? "bg-red-500" : rateLimit.remaining <= 2 ? "bg-yellow-500" : "bg-primary"
-                                    }`}
-                                style={{ width: `${Math.min(100, (rateLimit.used / rateLimit.limit) * 100)}%` }}
-                            />
-                        </div>
-
-                        <p className="text-sm text-muted-foreground">
-                            {isLimited
-                                ? "You've reached your daily limit. Come back tomorrow!"
-                                : `${rateLimit.remaining} session${rateLimit.remaining !== 1 ? "s" : ""} remaining today`}
-                        </p>
-                    </div>
+        <div className="text-center">
+            {/* Icon */}
+            <div
+                className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-5"
+                style={{
+                    backgroundColor: isWarning
+                        ? "rgba(234,179,8,0.1)"
+                        : "rgba(132,55,254,0.1)",
+                }}
+            >
+                {isWarning ? (
+                    <svg className="w-8 h-8" style={{ color: "#eab308" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
                 ) : (
-                    <p className="text-muted-foreground mb-6">
-                        {isViewerParam ? "The host's session has ended." : "Thanks for using Cloud Browser!"}
-                    </p>
+                    <svg className="w-8 h-8" style={{ color: "var(--color-primary-purple-light)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                 )}
+            </div>
 
-                {/* Start New Session button */}
-                <Button
-                    onClick={() => router.push("/")}
-                    className="w-full mb-3 cursor-pointer"
-                    disabled={isLimited}
-                >
-                    Start New Session
-                </Button>
+            {/* Title */}
+            <h1 className="text-2xl font-bold mb-2 dark:text-white text-gray-900">{title}</h1>
+            {subtitle && <p className="dark:text-white/50 text-gray-500 mb-5 text-sm">{subtitle}</p>}
 
-                {/* Feedback link */}
-                <a
-                    href="mailto:feedback@unshortlink.com?subject=Session Feedback"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    Share feedback
-                </a>
-            </CardContent>
-        </Card>
+            {/* Rate limit info — only for non-viewers */}
+            {!isViewerParam && rateLimit !== null ? (
+                <div className="mb-6">
+                    <p className="dark:text-white/50 text-gray-500 mb-3 text-sm">
+                        You&apos;ve used <span className="font-semibold dark:text-white text-gray-900">{rateLimit.used}</span> of{" "}
+                        <span className="font-semibold dark:text-white text-gray-900">{rateLimit.limit}</span> sessions today
+                    </p>
+
+                    {/* Progress bar */}
+                    <div className="w-full rounded-full h-2 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+                        <div
+                            className="h-2 rounded-full transition-all"
+                            style={{
+                                width: `${Math.min(100, (rateLimit.used / rateLimit.limit) * 100)}%`,
+                                background: isLimited
+                                    ? "#ef4444"
+                                    : rateLimit.remaining <= 2
+                                        ? "#eab308"
+                                        : "linear-gradient(90deg, var(--color-primary-purple), var(--color-primary-purple-light))",
+                            }}
+                        />
+                    </div>
+
+                    <p className="text-sm dark:text-white/40 text-gray-400">
+                        {isLimited
+                            ? "You've reached your daily limit. Come back tomorrow!"
+                            : `${rateLimit.remaining} session${rateLimit.remaining !== 1 ? "s" : ""} remaining today`}
+                    </p>
+                </div>
+            ) : (
+                <p className="dark:text-white/50 text-gray-500 mb-6 text-sm">
+                    {isViewerParam ? "The host's session has ended." : "Thanks for using Cloud Browser!"}
+                </p>
+            )}
+
+            {/* Start New Session button */}
+            <Button
+                onClick={() => router.push("/")}
+                variant="contained"
+                fullWidth
+                disabled={isLimited}
+                className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-xl !py-2.5 !text-sm !normal-case !font-medium !mb-3 disabled:!opacity-40"
+                style={{ boxShadow: "none" }}
+            >
+                Start New Session
+            </Button>
+
+            {/* Feedback link */}
+            <a
+                href="mailto:feedback@unshortlink.com?subject=Session Feedback"
+                className="text-sm dark:text-white/30 text-gray-400 dark:hover:text-white/50 hover:text-gray-600 transition-colors"
+            >
+                Share feedback
+            </a>
+        </div>
     );
 }
 
 export default function SessionEndedPage() {
     return (
-        <main className="min-h-screen bg-background flex items-center justify-center p-4">
+        <BrandedPageLayout>
             <Suspense fallback={
-                <Card className="w-full max-w-md">
-                    <CardContent className="pt-8 pb-8 text-center">
-                        <div className="flex justify-center mb-4">
-                            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                                <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                            </div>
-                        </div>
-                        <h1 className="text-2xl font-bold mb-2">Session Ended</h1>
-                    </CardContent>
-                </Card>
+                <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-5"
+                        style={{ backgroundColor: "rgba(132,55,254,0.1)" }}>
+                        <svg className="w-8 h-8" style={{ color: "var(--color-primary-purple-light)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h1 className="text-2xl font-bold mb-2 dark:text-white text-gray-900">Session Ended</h1>
+                </div>
             }>
                 <SessionEndedContent />
             </Suspense>
-        </main>
+        </BrandedPageLayout>
     );
 }

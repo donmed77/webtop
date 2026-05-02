@@ -937,10 +937,14 @@ export default function SessionPage() {
         return (
             <main className="min-h-screen bg-background flex items-center justify-center p-4">
                 <div className="text-center">
-                    <div className="text-4xl mb-4">🔄</div>
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-5" style={{ backgroundColor: "rgba(132,55,254,0.1)" }}>
+                        <svg className="w-8 h-8" style={{ color: "var(--color-primary-purple-light, #a97dff)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </div>
                     <h2 className="text-xl font-semibold mb-2">Session Opened in Another Tab</h2>
                     <p className="text-muted-foreground mb-6">This session is active in another tab.</p>
-                    <Button onClick={handleResume} className="cursor-pointer">Resume Session Here</Button>
+                    <Button onClick={handleResume} className="cursor-pointer" style={{ backgroundColor: "var(--color-primary-purple, #8437fe)", color: "white" }}>Resume Session Here</Button>
                 </div>
             </main>
         );
@@ -966,6 +970,7 @@ export default function SessionPage() {
                             <Button
                                 onClick={downloadRecording}
                                 className="w-full mb-3 cursor-pointer"
+                                style={{ backgroundColor: "var(--color-primary-purple, #8437fe)", color: "white" }}
                             >
                                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -993,7 +998,7 @@ export default function SessionPage() {
             {showLoading && (
                 <div className="absolute inset-0 z-40 bg-background flex items-center justify-center">
                     <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "var(--color-primary-purple-light, #a97dff)" }} />
                         <p className="text-muted-foreground">Loading session...</p>
                     </div>
                 </div>
@@ -1844,17 +1849,17 @@ export default function SessionPage() {
                                 <circle cx="40" cy="40" r="36" fill="none" stroke="white" strokeOpacity="0.1" strokeWidth="4" />
                                 <circle
                                     cx="40" cy="40" r="36" fill="none"
-                                    stroke="#eab308" strokeWidth="4" strokeLinecap="round"
+                                    stroke="var(--color-primary-purple-light, #a97dff)" strokeWidth="4" strokeLinecap="round"
                                     strokeDasharray={`${SVG_CIRCUMFERENCE}`}
                                     strokeDashoffset={`${SVG_CIRCUMFERENCE * (1 - reconnectCountdown / RECONNECT_COUNTDOWN_SECONDS)}`}
                                     className="transition-[stroke-dashoffset] duration-1000 ease-linear"
                                 />
                             </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-yellow-500">
+                            <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold" style={{ color: "var(--color-primary-purple-light, #a97dff)" }}>
                                 {reconnectCountdown}
                             </span>
                         </div>
-                        <p className="text-yellow-500 font-medium mb-1">Connection lost</p>
+                        <p className="font-medium mb-1" style={{ color: "var(--color-primary-purple-light, #a97dff)" }}>Connection lost</p>
                         <p className="text-white/50 text-sm">Reconnecting...</p>
                     </div>
                 </div>

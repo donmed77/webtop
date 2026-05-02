@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import BrandedPageLayout from "@/components/shared/BrandedPageLayout";
 
 const TagIcon = ({ d, className = "" }: { d: string; className?: string }) => (
     <svg className={`w-3.5 h-3.5 mr-1.5 inline-block ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,10 +95,15 @@ function SurveyContent() {
     if (submitted) {
         return (
             <div className="text-center animate-in fade-in duration-500">
-                <div className="text-5xl mb-4">🎉</div>
-                <h2 className="text-xl font-semibold text-white mb-2">Thank you!</h2>
-                <p className="text-white/40 text-sm">Your feedback helps us improve.</p>
-                <p className="text-white/25 text-xs mt-4">Redirecting in {redirectCountdown}s...</p>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-5"
+                    style={{ backgroundColor: "rgba(132,55,254,0.1)" }}>
+                    <svg className="w-8 h-8" style={{ color: "var(--color-primary-purple-light)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h2 className="text-xl font-semibold dark:text-white text-gray-900 mb-2">Thank you!</h2>
+                <p className="dark:text-white/40 text-gray-500 text-sm">Your feedback helps us improve.</p>
+                <p className="dark:text-white/25 text-gray-300 text-xs mt-4">Redirecting in {redirectCountdown}s...</p>
             </div>
         );
     }
@@ -105,16 +111,20 @@ function SurveyContent() {
     const displayStars = hoveredStar || rating;
 
     return (
-        <div className="w-full max-w-md">
+        <div className="w-full">
             {/* Header */}
             <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-400/10 border border-amber-400/20 mb-4">
-                    <svg className="w-7 h-7 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl border mb-4"
+                    style={{
+                        backgroundColor: "rgba(132,55,254,0.08)",
+                        borderColor: "rgba(132,55,254,0.2)",
+                    }}>
+                    <svg className="w-7 h-7" style={{ color: "var(--color-primary-purple-light)" }} fill="currentColor" viewBox="0 0 24 24">
                         <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
                 </div>
-                <h1 className="text-2xl font-bold text-white mb-1">How was your session?</h1>
-                <p className="text-white/40 text-sm">Quick feedback to help us improve</p>
+                <h1 className="text-2xl font-bold dark:text-white text-gray-900 mb-1">How was your session?</h1>
+                <p className="dark:text-white/40 text-gray-500 text-sm">Quick feedback to help us improve</p>
             </div>
 
             {/* Stars */}
@@ -134,9 +144,10 @@ function SurveyContent() {
                     >
                         <svg
                             className={`w-10 h-10 block pointer-events-none transition-all duration-150 group-hover:scale-110 group-active:scale-95 ${star <= displayStars
-                                ? "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.4)]"
-                                : "text-white/10 group-hover:text-white/20"
+                                ? "drop-shadow-[0_0_8px_rgba(132,55,254,0.4)]"
+                                : "dark:text-white/10 text-gray-200 dark:group-hover:text-white/20 group-hover:text-gray-300"
                                 }`}
+                            style={star <= displayStars ? { color: "var(--color-primary-purple-light)" } : undefined}
                             fill={star <= displayStars ? "currentColor" : "none"}
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -148,14 +159,14 @@ function SurveyContent() {
             </div>
 
             {/* Rating label — always rendered to prevent layout shift */}
-            <p className={`text-center text-sm h-6 mb-4 transition-opacity duration-200 ${displayStars > 0 ? "text-white/50 opacity-100" : "opacity-0"}`}>
+            <p className={`text-center text-sm h-6 mb-4 transition-opacity duration-200 ${displayStars > 0 ? "dark:text-white/50 text-gray-500 opacity-100" : "opacity-0"}`}>
                 {displayStars > 0 ? ["", "Poor", "Fair", "Good", "Great", "Excellent"][displayStars] : "\u00A0"}
             </p>
 
             {/* Tags */}
             {rating > 0 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <p className="text-xs text-white/30 uppercase tracking-wider mb-2.5 text-center">
+                    <p className="text-xs dark:text-white/30 text-gray-400 uppercase tracking-wider mb-2.5 text-center">
                         {rating >= 3 ? "What did you like?" : "What could be better?"}
                     </p>
                     <div className="flex flex-wrap justify-center gap-2 mb-6">
@@ -164,8 +175,8 @@ function SurveyContent() {
                                 key={tag.id}
                                 onClick={() => toggleTag(tag.id)}
                                 className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer border ${selectedTags.includes(tag.id)
-                                    ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                    : "bg-white/[0.03] text-white/40 border-white/5 hover:bg-white/[0.06] hover:text-white/60"
+                                    ? "border-[var(--color-primary-purple)] bg-[rgba(132,55,254,0.15)] dark:text-[var(--color-primary-purple-light)] text-[var(--color-primary-purple)]"
+                                    : "dark:bg-white/[0.03] bg-gray-50 dark:text-white/40 text-gray-400 dark:border-white/5 border-gray-200 dark:hover:bg-white/[0.06] hover:bg-gray-100 dark:hover:text-white/60 hover:text-gray-600"
                                     }`}
                             >
                                 <TagIcon d={tag.icon} />
@@ -179,11 +190,11 @@ function SurveyContent() {
                         value={comment}
                         onChange={(e) => setComment(e.target.value.slice(0, 200))}
                         placeholder="Anything else? (optional)"
-                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none mb-1"
+                        className="w-full dark:bg-white/[0.03] bg-gray-50 border dark:border-white/10 border-gray-200 rounded-xl px-4 py-3 text-sm dark:text-white text-gray-900 dark:placeholder-white/20 placeholder-gray-400 focus:outline-none dark:focus:border-white/20 focus:border-gray-300 resize-none mb-1"
                         rows={2}
                     />
                     <div className="flex justify-end mb-5">
-                        <span className={`text-[10px] ${comment.length >= 180 ? "text-amber-400" : "text-white/15"}`}>
+                        <span className={`text-[10px] ${comment.length >= 180 ? "text-amber-400" : "dark:text-white/15 text-gray-300"}`}>
                             {comment.length}/200
                         </span>
                     </div>
@@ -195,16 +206,16 @@ function SurveyContent() {
                 <button
                     onClick={handleSubmit}
                     disabled={rating === 0 || submitting}
-                    className={`w-full py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${rating > 0
-                        ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
-                        : "bg-white/5 text-white/20 border border-white/5 cursor-default"
+                    className={`w-full py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border ${rating > 0
+                        ? "bg-[rgba(132,55,254,0.15)] dark:text-[var(--color-primary-purple-light)] text-[var(--color-primary-purple)] border-[var(--color-primary-purple)] hover:bg-[rgba(132,55,254,0.25)]"
+                        : "dark:bg-white/5 bg-gray-50 dark:text-white/20 text-gray-300 dark:border-white/5 border-gray-200 cursor-default"
                         }`}
                 >
                     {submitting ? "Submitting..." : "Submit"}
                 </button>
                 <button
                     onClick={handleSkip}
-                    className="w-full text-center text-sm text-white/25 hover:text-white/50 transition-colors cursor-pointer"
+                    className="w-full text-center text-sm dark:text-white/25 text-gray-400 dark:hover:text-white/50 hover:text-gray-600 transition-colors cursor-pointer"
                 >
                     Skip
                 </button>
@@ -215,12 +226,12 @@ function SurveyContent() {
 
 export default function SurveyPage() {
     return (
-        <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+        <BrandedPageLayout>
             <Suspense fallback={
-                <div className="text-white/30 text-sm">Loading...</div>
+                <div className="dark:text-white/30 text-gray-400 text-sm text-center">Loading...</div>
             }>
                 <SurveyContent />
             </Suspense>
-        </main>
+        </BrandedPageLayout>
     );
 }
