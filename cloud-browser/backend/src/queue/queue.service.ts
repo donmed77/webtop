@@ -169,6 +169,11 @@ export class QueueService implements OnModuleDestroy {
     private updatePositions() {
         this.queue.forEach((entry, index) => {
             entry.position = index + 1;
+            // Notify the client's WebSocket about the new position
+            const callback = this.onUpdateCallbacks.get(entry.id);
+            if (callback) {
+                callback(entry);
+            }
         });
     }
 
