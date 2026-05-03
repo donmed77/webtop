@@ -34,7 +34,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       - PORT_RANGE_END=4200
       - CONTAINER_IMAGE=webtop-browser:latest
-      - FRONTEND_URL=https://test.unshortlink.com
+      - FRONTEND_URL=https://unshortlink.com
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - backend_data:/app/data
