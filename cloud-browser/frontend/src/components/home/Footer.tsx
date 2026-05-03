@@ -98,7 +98,7 @@ const Footer = () => {
                   color="primary"
                 >
                   <Link
-                    href='https://discord.gg/unshortlink'
+                    href='https://discord.gg/wEb8rTbWFY'
                     target='_blank'
                     rel='noopener noreferrer'
                     aria-label='Discord'

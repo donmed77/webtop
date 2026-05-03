@@ -131,7 +131,7 @@ const languages = [
           </ul>
 
           <div className='hidden lg:flex gap-2 items-center select-none'>
-              <a href="https://discord.gg/unshortlink" target="_blank" rel="noopener noreferrer">
+              <a href="https://discord.gg/wEb8rTbWFY" target="_blank" rel="noopener noreferrer">
                 <Button
                   className="hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy !p-3"
                   style={{ borderRadius: 0, boxShadow: "unset" }}
@@ -304,7 +304,7 @@ const languages = [
                 )}
               </div>
 
-                                  <a href="https://discord.gg/unshortlink" target="_blank" rel="noopener noreferrer">
+                                  <a href="https://discord.gg/wEb8rTbWFY" target="_blank" rel="noopener noreferrer">
                 <Button
                   className="hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy !p-3"
                   style={{ borderRadius: 0, boxShadow: "unset" }}

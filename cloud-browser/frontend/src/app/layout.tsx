@@ -8,6 +8,14 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Unshort Link - Cloud Browser",
   description: "Browse any website securely in an isolated cloud environment",
+  icons: {
+    icon: [
+      { url: "/x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/x48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
