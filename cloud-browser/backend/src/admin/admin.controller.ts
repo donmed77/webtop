@@ -241,9 +241,10 @@ export class AdminController {
         // Build skip set from active sessions + warm pool so we don't kill those
         const activeSessions = this.sessionService.getActiveSessions();
         const poolStatus = this.containerService.getPoolStatus();
+        const prefix = this.containerService.getContainerPrefix();
         const skipNames = new Set([
-            ...activeSessions.map(s => `session-${s.poolId}`),
-            ...poolStatus.containers.map(c => `session-${c.id}`),
+            ...activeSessions.map(s => `${prefix}-${s.poolId}`),
+            ...poolStatus.containers.map(c => `${prefix}-${c.id}`),
         ]);
         const result = await this.containerService.cleanupOrphanedContainers(skipNames);
         return { success: true, ...result };
@@ -432,8 +433,10 @@ export class AdminController {
                 { timeout: 10000 },
             ).toString().trim();
 
+            const prefix = this.containerService.getContainerPrefix();
+
             for (const line of output.split('\n')) {
-                if (!line.startsWith('session-')) continue;
+                if (!line.startsWith(prefix + '-')) continue;
                 const [name, cpuStr, memStr, netStr] = line.split('|');
                 const cpu = parseFloat(cpuStr) || 0;
                 const memMatch = memStr?.match(/([\d.]+)(MiB|GiB)/);

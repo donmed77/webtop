@@ -29,9 +29,11 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private readonly portRangeStart: number;
     private readonly portRangeEnd: number;
     private readonly containerImage: string;
-    private readonly networkName = 'cloud-browser-isolated';
+    private readonly networkName: string;
     private readonly seccompProfile: string;
     private readonly dockerBridgeIp: string;
+    private readonly containerPrefix: string;
+    private readonly projectRoot: string;
     private healthCheckRunning = false;
     private cleanupInProgress = false;
     private shuttingDown = false;
@@ -56,6 +58,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.portRangeEnd = this.configService.get<number>('PORT_RANGE_END', 4100);
         this.containerImage = this.configService.get<string>('CONTAINER_IMAGE', 'webtop-browser:latest');
         this.dockerBridgeIp = this.configService.get<string>('DOCKER_BRIDGE_IP', '172.17.0.1');
+        this.containerPrefix = this.configService.get<string>('CONTAINER_PREFIX', 'session');
+        this.networkName = this.configService.get<string>('NETWORK_NAME', 'cloud-browser-isolated');
+        this.projectRoot = this.configService.get<string>('PROJECT_ROOT', '/root/apps/webtop');
 
         // Load hardened seccomp profile for session containers
         // SECURITY #6: Hard-fail if seccomp profile is missing or corrupt — never run unconfined
@@ -136,8 +141,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             const deadline = Date.now() + 120_000; // 2 min hard timeout
             let attempt = 0;
 
-            // Validate container name format: session-[8 hex chars]
-            const validName = (name: string) => /^session-[a-f0-9]{8}$/.test(name);
+            // Validate container name format: {prefix}-[8 hex chars]
+            const prefix = this.containerPrefix;
+            const validName = (name: string) => new RegExp(`^${prefix}-[a-f0-9]{8}$`).test(name);
 
             while (Date.now() < deadline) {
                 attempt++;
@@ -147,7 +153,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 try {
                     containers = await this.docker.listContainers({
                         all: true,
-                        filters: { name: ['session-'] },
+                        filters: { name: [`${prefix}-`] },
                     });
                 } catch {
                     containers = [];
@@ -156,7 +162,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                 // Build orphan list (excluding skip containers)
                 const orphans = containers
                     .map(c => ({ name: c.Names?.[0]?.replace(/^\//, '') || '', id: c.Id }))
-                    .filter(c => c.name.startsWith('session-') && validName(c.name) && !skipContainerNames.has(c.name));
+                    .filter(c => c.name.startsWith(`${prefix}-`) && validName(c.name) && !skipContainerNames.has(c.name));
 
                 if (orphans.length === 0) {
                     this.logger.log(`Orphan cleanup verified clean (attempt ${attempt})`);
@@ -305,7 +311,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         if (this.shuttingDown) throw new Error('Cannot create containers during shutdown');
         const id = uuidv4().slice(0, 8);
         const port = this.getAvailablePort();
-        const containerName = `session-${id}`;
+        const containerName = `${this.containerPrefix}-${id}`;
 
         this.logger.log(`Creating warm container ${containerName} on port ${port}`);
 
@@ -330,8 +336,8 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
                     // Volume mounts from @browser spec
                     Binds: [
                         // Chrome policies removed — clean launch like :9500 test image
-                        '/root/apps/webtop/browser/scripts:/custom-cont-init.d:ro',
-                        '/root/apps/webtop/browser/assets:/assets:ro',
+                        `${this.projectRoot}/browser/scripts:/custom-cont-init.d:ro`,
+                        `${this.projectRoot}/browser/assets:/assets:ro`,
                     ],
                     // tmpfs from @browser spec
                     // SECURITY #15: nosuid prevents SUID escalation, nodev prevents device files
@@ -857,6 +863,10 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
 
     getInitialWarm(): number {
         return this.initialWarm;
+    }
+
+    getContainerPrefix(): string {
+        return this.containerPrefix;
     }
 
     /**

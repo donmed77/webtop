@@ -65,8 +65,9 @@ export class SessionService implements OnModuleInit {
         this.loggingService.clearExpiredActiveSessions();
         const savedSessions = this.loggingService.getActiveSessionsFromDb();
 
-        // Build skip set of container names (session-${poolId}) so orphan cleanup doesn't destroy them
-        const skipContainerNames = new Set<string>(savedSessions.map(s => `session-${s.poolId}`));
+        // Build skip set of container names ({prefix}-${poolId}) so orphan cleanup doesn't destroy them
+        const prefix = this.containerService.getContainerPrefix();
+        const skipContainerNames = new Set<string>(savedSessions.map(s => `${prefix}-${s.poolId}`));
 
         // Clean up orphaned containers, but skip those belonging to restored sessions
         await this.containerService.cleanupOrphanedContainers(skipContainerNames);
@@ -86,8 +87,8 @@ export class SessionService implements OnModuleInit {
                 status: 'active',
             };
 
-            // Verify the Docker container is still running (container name = session-${poolId})
-            const containerName = `session-${s.poolId}`;
+            // Verify the Docker container is still running (container name = {prefix}-${poolId})
+            const containerName = `${prefix}-${s.poolId}`;
             try {
                 const Docker = require('dockerode');
                 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
