@@ -128,7 +128,7 @@ function SessionEndedContent() {
 
             {/* Feedback link */}
             <a
-                href="mailto:feedback@unshortlink.com?subject=Session Feedback"
+                href="mailto:contact@unshortlink.com?subject=Session Feedback"
                 className="text-sm dark:text-white/30 text-gray-400 dark:hover:text-white/50 hover:text-gray-600 transition-colors"
             >
                 Share feedback

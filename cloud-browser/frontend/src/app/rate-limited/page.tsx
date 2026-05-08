@@ -66,7 +66,7 @@ export default function RateLimitedPage() {
 
                 {/* Upgrade CTA */}
                 <a
-                    href="mailto:upgrade@unshortlink.com?subject=I'd like more sessions"
+                    href="mailto:contact@unshortlink.com?subject=I'd like more sessions"
                     className="block w-full"
                 >
                     <Button
