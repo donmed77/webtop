@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SEO (environment-specific)
+public/robots.txt
+public/sitemap.xml
