@@ -36,19 +36,19 @@ export default function RateLimitedPage() {
                 </div>
 
                 {/* Title */}
-                <h1 className="text-2xl font-bold mb-2 dark:text-white text-gray-900">Daily Limit Reached</h1>
+                <h1 className="text-2xl font-bold mb-2 text-white">Daily Limit Reached</h1>
 
                 {/* Message */}
-                <p className="dark:text-white/50 text-gray-500 mb-5 text-sm">
+                <p className="text-white/50 mb-5 text-sm">
                     You&apos;ve used all your free sessions for today.
                 </p>
 
                 {/* Usage info */}
                 {rateLimit !== null && (
                     <div className="mb-6">
-                        <p className="dark:text-white/50 text-gray-500 mb-3 text-sm">
-                            <span className="font-semibold dark:text-white text-gray-900">{rateLimit.used}</span> of{" "}
-                            <span className="font-semibold dark:text-white text-gray-900">{rateLimit.limit}</span> sessions used today
+                        <p className="text-white/50 mb-3 text-sm">
+                            <span className="font-semibold text-white">{rateLimit.used}</span> of{" "}
+                            <span className="font-semibold text-white">{rateLimit.limit}</span> sessions used today
                         </p>
 
                         {/* Progress bar */}
@@ -66,13 +66,13 @@ export default function RateLimitedPage() {
 
                 {/* Upgrade CTA */}
                 <a
-                    href="mailto:upgrade@unshortlink.com?subject=I'd like more sessions"
+                    href="mailto:contact@unshortlink.com?subject=I'd like more sessions"
                     className="block w-full"
                 >
                     <Button
                         variant="contained"
                         fullWidth
-                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !py-2.5 !text-sm !normal-case !font-medium !mb-3"
+                        className="!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !py-2.5 !text-sm !normal-case !font-medium !mb-3"
                         style={{ boxShadow: "none" }}
                     >
                         Get More Sessions
@@ -84,7 +84,7 @@ export default function RateLimitedPage() {
                     onClick={() => router.push("/")}
                     variant="outlined"
                     fullWidth
-                    className="dark:!text-white/60 !text-gray-500 dark:!border-white/10 !border-gray-200 !rounded-none !py-2.5 !text-sm !normal-case !font-medium"
+                    className="!text-white/60 !border-white/10 !rounded-none !py-2.5 !text-sm !normal-case !font-medium"
                     style={{ boxShadow: "none" }}
                 >
                     Back to Home

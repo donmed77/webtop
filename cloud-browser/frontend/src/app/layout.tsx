@@ -26,6 +26,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        <link
+          rel="preload"
+          href="/images/Unshortlink-Background.webp"
+          as="image"
+          type="image/webp"
+        />
         <Script
           id="microsoft-clarity"
           strategy="afterInteractive"

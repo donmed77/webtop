@@ -4,11 +4,8 @@ import Navbar from "@/components/home/Navbar";
 import { useEffect, useMemo } from "react";
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Footer from "@/components/home/Footer";
-import useThemeStore from "@/stores/theme-store";
 
 const LandingLayoutWrapper = ({ children }: { children: React.ReactNode }) => {
-  const { theme: mode } = useThemeStore();
-
   const theme = useMemo(
     () =>
       createTheme({
@@ -21,8 +18,8 @@ const LandingLayoutWrapper = ({ children }: { children: React.ReactNode }) => {
           },
         },
         palette: {
-          mode,
-          primary: { main: mode == 'dark' ? '#a97dff' : '#8437fe' },
+          mode: 'dark',
+          primary: { main: '#a97dff' },
         },
         breakpoints: {
           values: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 },
@@ -32,27 +29,27 @@ const LandingLayoutWrapper = ({ children }: { children: React.ReactNode }) => {
             styleOverrides: {
               root: {
                 "& .MuiOutlinedInput-root": {
-                  color: mode == 'dark' ? '#fff' : '#000',
+                  color: '#fff',
                   borderRadius: "0",
                   "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: mode == 'dark' ? "#353535" : "#EEEEEE",
+                    borderColor: "#353535",
                     borderWidth: "2px",
                   },
                   "&.Mui-focused": {
                     "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: mode == 'dark' ? '#a97dff' : '#8437fe',
+                      borderColor: '#a97dff',
                       borderWidth: "2px",
                     },
                   },
                   "&:hover:not(.Mui-focused)": {
                     "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: mode == 'dark' ? "#353535" : "#EEEEEE",
+                      borderColor: "#353535",
                     },
                   },
                 },
                 "& .MuiInputLabel-outlined": {
                   "&.Mui-focused": {
-                    color: mode == 'dark' ? '#a97dff' : '#8437fe',
+                    color: '#a97dff',
                   },
                 },
               },
@@ -62,7 +59,7 @@ const LandingLayoutWrapper = ({ children }: { children: React.ReactNode }) => {
             styleOverrides: {
               paper: {
                 boxShadow: 'none',
-                border: `2px solid ${mode === 'dark' ? '#353535' : '#EEEEEE'}`,
+                border: '2px solid #353535',
                 borderRadius: '0',
               },
             },
@@ -72,16 +69,12 @@ const LandingLayoutWrapper = ({ children }: { children: React.ReactNode }) => {
           },
         },
       }),
-    [mode],
+    [],
   );
 
   useEffect(() => {
-    if (mode == 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [mode]);
+    document.documentElement.classList.add('dark');
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>

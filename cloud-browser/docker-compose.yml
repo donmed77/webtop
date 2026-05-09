@@ -38,6 +38,8 @@ services:
       - NETWORK_NAME=${NETWORK_NAME:-cloud-browser-isolated}
       - PROJECT_ROOT=${PROJECT_ROOT:-/root/apps/webtop}
       - FRONTEND_URL=${FRONTEND_URL:-https://unshortlink.com}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - backend_data:/app/data

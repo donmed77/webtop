@@ -7,12 +7,12 @@ import CallToAction from "./CallToAction";
 import { useTranslations } from "next-intl";
 
 const LOGOS = [
-  { src: "/images/Cuttly.png", alt: "Cuttly logo", width: 137, height: 60 },
-  { src: "/images/Bitly.png", alt: "Bitly logo", width: 111, height: 60 },
-  { src: "/images/Buffer.png", alt: "Buffer logo", width: 160, height: 60 },
-  { src: "/images/Shortio.png", alt: "Short.io logo", width: 160, height: 60 },
-  { src: "/images/Rebrandly.png", alt: "Rebrandly logo", width: 160, height: 60 },
-  { src: "/images/Tinyurl.png", alt: "Tinyurl logo", width: 160, height: 60 },
+  { src: "/images/Cuttly.webp", alt: "Cuttly logo", width: 137, height: 60 },
+  { src: "/images/Bitly.webp", alt: "Bitly logo", width: 111, height: 60 },
+  { src: "/images/Buffer.webp", alt: "Buffer logo", width: 160, height: 60 },
+  { src: "/images/Shortio.webp", alt: "Short.io logo", width: 160, height: 60 },
+  { src: "/images/Rebrandly.webp", alt: "Rebrandly logo", width: 160, height: 60 },
+  { src: "/images/Tinyurl.webp", alt: "Tinyurl logo", width: 160, height: 60 },
 ] as const;
 
 const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}) => {
@@ -40,13 +40,13 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
               lg: 6.5
             }}>
             <div className="w-full flex flex-col gap-1 md:gap-2 justify-center sm:mt-8 xl:mt-20">
-              <h1 className="text-primary-purple dark:text-primary-purple-light font-bold text-[22px]">
+              <h1 className="text-primary-purple-light font-bold text-[22px]">
                 {t('wheregoes')}
               </h1>
               <h2 className="flex flex-col md:text-[60px] font-extrabold md:leading-[72px]  text-[50px] leading-[60px]">
                 {t('title')}
               </h2>
-              <p className=" py-4 font-normal text-[18px] leading-[30px] mt-2 md:mt-3 dark:opacity-80">
+              <p className=" py-4 font-normal text-[18px] leading-[30px] mt-2 md:mt-3 opacity-80">
                 {t('description')}
               </p>
 
@@ -69,7 +69,7 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
             >
               <div className="flex justify-center items-center">
                 <Image
-                  src="/images/Unshortlink-Background.png"
+                  src="/images/Unshortlink-Background.webp"
                   alt="Unshorten URL"
                   width={800}
                   height={800}
@@ -85,7 +85,7 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
 
         <ul
           aria-label="Supported short link providers"
-          className="grid w-full max-w-[1280px] grid-cols-2 place-items-center gap-x-6 gap-y-6 pt-16 opacity-40 dark:opacity-50 md:grid-cols-3 md:gap-x-10 md:gap-y-8 xl:grid-cols-6 xl:gap-x-16 xl:gap-y-12"
+          className="grid w-full max-w-[1280px] grid-cols-2 place-items-center gap-x-6 gap-y-6 pt-16 opacity-40 opacity-50 md:grid-cols-3 md:gap-x-10 md:gap-y-8 xl:grid-cols-6 xl:gap-x-16 xl:gap-y-12"
         >
           {LOGOS.map((logo) => (
             <li key={logo.src} className="flex shrink-0 items-center justify-center">
@@ -96,7 +96,7 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
                 height={logo.height}
                 sizes="160px"
                 loading="lazy"
-                className="h-12 w-auto max-w-none shrink-0 dark:contrast-0"
+                className="h-12 w-auto max-w-none shrink-0 contrast-0"
               />
             </li>
           ))}

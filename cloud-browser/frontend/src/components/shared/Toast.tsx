@@ -1,8 +1,5 @@
-"use client";
-
 import { Slide, Snackbar, SnackbarContent, ToggleButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import useThemeStore from "@/stores/theme-store";
 
 type ToastType = "success" | "error";
 type Vertical = "top" | "bottom";
@@ -30,14 +27,7 @@ const Toast = ({
   actionLabel,
   onAction,
 }: ToastProps) => {
-  const { theme } = useThemeStore();
-
-  const bg =
-    type === "error"
-      ? "#ef5350"
-      : theme === "light"
-      ? "#8437fe"
-      : "#a97dff";
+  const bg = type === "error" ? "#ef5350" : "#a97dff";
 
   const handleClose = (
     _event: React.SyntheticEvent | Event,

@@ -41,10 +41,23 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     openGraph: {
       title,
       description,
+      url: locale === 'en' ? `${siteUrl}/` : `${siteUrl}/${locale}`,
+      siteName: 'Unshort Link',
+      type: 'website',
+      images: [
+        {
+          url: `${siteUrl}/share_landscape.webp`,
+          width: 1200,
+          height: 630,
+          alt: 'Unshort Link - Cloud Browser',
+        },
+      ],
     },
     twitter: {
+      card: 'summary_large_image',
       title,
       description,
+      images: [`${siteUrl}/share_landscape.webp`],
     },
   };
 }
@@ -65,7 +78,7 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <div className={`${poppins.className} bg-white dark:bg-primary-navy text-primary-navy dark:text-white`}>
+    <div className={`${poppins.className} bg-primary-navy text-white`}>
       <NextIntlClientProvider messages={messages}>
         <LandingLayoutWrapper>
           {children}

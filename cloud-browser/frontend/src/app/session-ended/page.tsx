@@ -76,15 +76,15 @@ function SessionEndedContent() {
             </div>
 
             {/* Title */}
-            <h1 className="text-2xl font-bold mb-2 dark:text-white text-gray-900">{title}</h1>
-            {subtitle && <p className="dark:text-white/50 text-gray-500 mb-5 text-sm">{subtitle}</p>}
+            <h1 className="text-2xl font-bold mb-2 text-white">{title}</h1>
+            {subtitle && <p className="text-white/50 mb-5 text-sm">{subtitle}</p>}
 
             {/* Rate limit info — only for non-viewers */}
             {!isViewerParam && rateLimit !== null ? (
                 <div className="mb-6">
-                    <p className="dark:text-white/50 text-gray-500 mb-3 text-sm">
-                        You&apos;ve used <span className="font-semibold dark:text-white text-gray-900">{rateLimit.used}</span> of{" "}
-                        <span className="font-semibold dark:text-white text-gray-900">{rateLimit.limit}</span> sessions today
+                    <p className="text-white/50 mb-3 text-sm">
+                        You&apos;ve used <span className="font-semibold text-white">{rateLimit.used}</span> of{" "}
+                        <span className="font-semibold text-white">{rateLimit.limit}</span> sessions today
                     </p>
 
                     {/* Progress bar */}
@@ -102,14 +102,14 @@ function SessionEndedContent() {
                         />
                     </div>
 
-                    <p className="text-sm dark:text-white/40 text-gray-400">
+                    <p className="text-sm text-white/40 text-gray-400">
                         {isLimited
                             ? "You've reached your daily limit. Come back tomorrow!"
                             : `${rateLimit.remaining} session${rateLimit.remaining !== 1 ? "s" : ""} remaining today`}
                     </p>
                 </div>
             ) : (
-                <p className="dark:text-white/50 text-gray-500 mb-6 text-sm">
+                <p className="text-white/50 mb-6 text-sm">
                     {isViewerParam ? "The host's session has ended." : "Thanks for using Cloud Browser!"}
                 </p>
             )}
@@ -120,7 +120,7 @@ function SessionEndedContent() {
                 variant="contained"
                 fullWidth
                 disabled={isLimited}
-                className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !py-2.5 !text-sm !normal-case !font-medium !mb-3 disabled:!opacity-40"
+                className="!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !py-2.5 !text-sm !normal-case !font-medium !mb-3 disabled:!opacity-40"
                 style={{ boxShadow: "none" }}
             >
                 Start New Session
@@ -128,8 +128,8 @@ function SessionEndedContent() {
 
             {/* Feedback link */}
             <a
-                href="mailto:feedback@unshortlink.com?subject=Session Feedback"
-                className="text-sm dark:text-white/30 text-gray-400 dark:hover:text-white/50 hover:text-gray-600 transition-colors"
+                href="mailto:contact@unshortlink.com?subject=Session Feedback"
+                className="text-sm text-white/30 text-gray-400 hover:text-white/50 transition-colors"
             >
                 Share feedback
             </a>
@@ -148,7 +148,7 @@ export default function SessionEndedPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h1 className="text-2xl font-bold mb-2 dark:text-white text-gray-900">Session Ended</h1>
+                    <h1 className="text-2xl font-bold mb-2 text-white">Session Ended</h1>
                 </div>
             }>
                 <SessionEndedContent />

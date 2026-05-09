@@ -1,7 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ContainerService } from '../container/container.service';
 import { SessionService } from '../session/session.service';
 import { QueueService } from '../queue/queue.service';
+import { AdminGuard } from '../admin/admin.guard';
 
 @Controller('health')
 export class HealthController {
@@ -11,8 +12,19 @@ export class HealthController {
         private queueService: QueueService,
     ) { }
 
+    // Public — safe to expose, returns minimal info only
     @Get()
     getHealth() {
+        return {
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    // Admin only — returns full pool/session details
+    @UseGuards(AdminGuard)
+    @Get('detailed')
+    getDetailedHealth() {
         const poolStatus = this.containerService.getPoolStatus();
 
         return {

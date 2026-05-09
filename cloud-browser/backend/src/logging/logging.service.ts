@@ -224,7 +224,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 COUNT(*) as count,
                 ROUND(AVG(duration), 0) as avgDuration
             FROM session_logs
-            WHERE started_at >= DATE('now', ?)
+            WHERE started_at >= DATE('now', 'localtime', ?)
             GROUP BY DATE(started_at)
             ORDER BY date DESC
         `);
@@ -291,7 +291,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
         const stmt = this.db.prepare(`
             SELECT client_ip, COUNT(*) as count
             FROM session_logs
-            WHERE DATE(started_at) = DATE('now')
+            WHERE DATE(started_at) = DATE('now', 'localtime')
             GROUP BY client_ip
         `);
         const rows = stmt.all() as { client_ip: string; count: number }[];
@@ -347,7 +347,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
         try {
             const result = this.db.prepare(`
                 SELECT COUNT(*) as count FROM session_logs
-                WHERE DATE(started_at) = DATE('now')
+                WHERE DATE(started_at) = DATE('now', 'localtime')
             `).get() as { count: number };
             return result.count;
         } catch {
@@ -360,7 +360,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
         try {
             const result = this.db.prepare(`
                 SELECT ROUND(AVG(duration), 0) as avg FROM session_logs
-                WHERE DATE(started_at) = DATE('now') AND duration IS NOT NULL
+                WHERE DATE(started_at) = DATE('now', 'localtime') AND duration IS NOT NULL
             `).get() as { avg: number | null };
             return result.avg;
         } catch {
@@ -389,7 +389,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
     saveDailyPeak(peak: number): void {
         try {
             this.db.prepare(`
-                INSERT INTO daily_peak (date, peak) VALUES (DATE('now'), ?)
+                INSERT INTO daily_peak (date, peak) VALUES (DATE('now', 'localtime'), ?)
                 ON CONFLICT(date) DO UPDATE SET peak = MAX(peak, excluded.peak)
             `).run(peak);
         } catch (err) {
@@ -401,7 +401,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
     getDailyPeak(): number {
         try {
             const result = this.db.prepare(`
-                SELECT peak FROM daily_peak WHERE date = DATE('now')
+                SELECT peak FROM daily_peak WHERE date = DATE('now', 'localtime')
             `).get() as { peak: number } | undefined;
             return result?.peak || 0;
         } catch {

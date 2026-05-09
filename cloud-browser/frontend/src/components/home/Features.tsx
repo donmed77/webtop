@@ -12,38 +12,38 @@ const Features = () => {
     {
         title: t('wheregoes'),
         description: t('wheregoes-description'),
-        image: '/images/UnshortenURL.png',
+        image: '/images/UnshortenURL.webp',
         alt: 'Expand URL'
     },
     {
         title: t('phishing-detection'),
         description: t('phishing-detection-description'),
-        image: '/images/Phishing-Detection.png',
+        image: '/images/Phishing-Detection.webp',
         alt: 'Unsafe Links'
     },
     {
         title: t('privacy-guard'),
         description: t('privacy-guard-description'),
-        image: '/images/Privacy-Guard.png',
+        image: '/images/Privacy-Guard.webp',
         alt: 'Privacy Guard'
     },
     {
         title: t('integrations-api'),
         description: t('integrations-api-description'),
-        image: '/images/Integrations-API.png',
+        image: '/images/Integrations-API.webp',
         alt: 'API Integration'
     },
     {
         title: t('borwser-extension'),
         description: t('borwser-extension-description'),
-        image: '/images/Browser-Extension.png',
+        image: '/images/Browser-Extension.webp',
         comingSoon: true,
         alt: 'Link Redirect Extension'
     },
     {
         title: t('live-preview'),
         description: t('live-preview-description'),
-        image: '/images/Live-Preview.png',
+        image: '/images/Live-Preview.webp',
         alt: 'Live Preview'
     },
 ]

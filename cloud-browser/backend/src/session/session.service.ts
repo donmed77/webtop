@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import { ContainerService } from '../container/container.service';
 import { LoggingService } from '../logging/logging.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 export interface Session {
     id: string;
@@ -47,6 +48,7 @@ export class SessionService implements OnModuleInit {
         private containerService: ContainerService,
         private configService: ConfigService,
         private loggingService: LoggingService,
+        private telegramService: TelegramService,
     ) {
         this.sessionDuration = this.configService.get<number>('SESSION_DURATION', 300);
         this.rateLimitPerDay = this.configService.get<number>('RATE_LIMIT_PER_DAY', 3);
@@ -118,6 +120,9 @@ export class SessionService implements OnModuleInit {
 
         // Initialize warm pool AFTER restored containers are registered (ports are reserved)
         await this.containerService.initializePoolAndHealthCheck();
+
+        // Register stats callback for Telegram daily summary & heartbeat
+        this.telegramService.registerStatsCallback(() => this.getStatsForTelegram());
     }
 
     // Fix #2: Made public so admin controller can anonymize at display time
@@ -164,6 +169,12 @@ export class SessionService implements OnModuleInit {
 
         const count = this.ipSessionCount.get(clientIp) || 0;
         const remaining = this.rateLimitPerDay - count;
+
+        // Send Telegram alert when rate limit is hit
+        if (remaining <= 0) {
+            this.telegramService.sendRateLimitHit(clientIp, count, this.rateLimitPerDay);
+        }
+
         return { allowed: remaining > 0, remaining: Math.max(0, remaining) };
     }
 
@@ -252,6 +263,16 @@ export class SessionService implements OnModuleInit {
 
         // Chrome launch is DEFERRED until the client connects and Selkies
         // resizes the display. See session.gateway.ts handleClientReady().
+
+        // Send Telegram notification
+        this.telegramService.sendSessionStarted({
+            id: sessionId,
+            url: finalUrl,
+            clientIp: session.clientIp,
+            port: container.port,
+            poolId: container.id,
+        });
+
         return { session };
     }
 
@@ -400,6 +421,31 @@ export class SessionService implements OnModuleInit {
             }
         }
         return limited;
+    }
+
+    /** Collect stats for Telegram daily summary & hourly heartbeat */
+    private getStatsForTelegram(): any {
+        const poolStatus = this.containerService.getPoolStatus();
+        return {
+            daily: {
+                sessionsToday: this.sessionsToday,
+                avgDuration: this.getAvgSessionDuration(),
+                peakConcurrent: this.peakConcurrent,
+                rateLimitedCount: this.getRateLimitedIps().length,
+                poolHitRate: poolStatus.metrics.poolHitRate,
+                warm: poolStatus.warm,
+                active: poolStatus.active,
+            },
+            health: {
+                warm: poolStatus.warm,
+                active: poolStatus.active,
+                booting: poolStatus.booting,
+                poolHitRate: poolStatus.metrics.poolHitRate,
+                avgBootTimeMs: poolStatus.metrics.avgBootTimeMs,
+                sessionsToday: this.sessionsToday,
+                queueLength: 0, // Will be overridden if queue is accessible
+            },
+        };
     }
 
     // ---- DT3: System Controls ----
