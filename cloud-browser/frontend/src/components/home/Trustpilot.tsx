@@ -17,8 +17,8 @@ const Trustpilot = () => {
           className="h-24"
           src="/images/Trustpilot-White.webp"
           alt="Trustpilot Reviews"
-          width="200"
-          height="96"
+          width="453"
+          height="212"
           loading="lazy"
         />
         </Link>
