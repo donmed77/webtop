@@ -14,14 +14,12 @@ const Trustpilot = () => {
         }}>
         <Link href='https://www.trustpilot.com/review/unshortlink.com' rel='noopener noreferrer nofollow' target='_blank'>
         <img
-          className="h-24 hidden"
-          src="/images/Trustpilot.webp"
-          alt="Trustpilot Reviews"
-        />
-        <img
-          className="h-24 block"
+          className="h-24"
           src="/images/Trustpilot-White.webp"
           alt="Trustpilot Reviews"
+          width="200"
+          height="96"
+          loading="lazy"
         />
         </Link>
     
@@ -34,8 +32,7 @@ const Trustpilot = () => {
           md: 1
         }}>
 
-      <a className='hidden' href="https://www.producthunt.com/posts/unshortlink?embed=true&utm_source=badge-featured&utm_medium=badge&utm_souce=badge-unshortlink" target="_blank" rel='noopener noreferrer nofollow'><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=474828&theme=light" alt="UnshortLink - Expand&#0032;URLs&#0032;&#0038;&#0032;links&#0032;and&#0032;know&#0032;what&#0032;you’re&#0032;clicking | Product Hunt" width="250" height="54" /></a>
-      <a className='block'  href="https://www.producthunt.com/posts/unshortlink?embed=true&utm_source=badge-featured&utm_medium=badge&utm_souce=badge-unshortlink" target="_blank" rel='noopener noreferrer nofollow'><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=474828&theme=neutral" alt="UnshortLink - Expand&#0032;URLs&#0032;&#0038;&#0032;links&#0032;and&#0032;know&#0032;what&#0032;you’re&#0032;clicking | Product Hunt" width="250" height="54" /></a>
+      <a className='block' href="https://www.producthunt.com/posts/unshortlink?embed=true&utm_source=badge-featured&utm_medium=badge&utm_souce=badge-unshortlink" target="_blank" rel='noopener noreferrer nofollow'><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=474828&theme=neutral" alt="UnshortLink - Expand&#0032;URLs&#0032;&#0038;&#0032;links&#0032;and&#0032;know&#0032;what&#0032;you're&#0032;clicking | Product Hunt" width="250" height="54" loading="lazy" /></a>
       </Grid>
 
   </Grid>

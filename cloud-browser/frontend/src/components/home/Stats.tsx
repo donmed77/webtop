@@ -25,7 +25,7 @@ const Stats = () => {
               width: {md:'90%', sm:'100%', xs:'100%'}
             }}>
               <div className="flex justify-center items-center  ">
-                <img src="/images/Safe-World.webp" alt="Online Security" />
+                <img src="/images/Safe-World.webp" alt="Online Security" width="400" height="400" loading="lazy" />
               </div>
             </Box>
             </Grid>
