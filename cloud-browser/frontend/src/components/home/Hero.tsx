@@ -7,12 +7,12 @@ import CallToAction from "./CallToAction";
 import { useTranslations } from "next-intl";
 
 const LOGOS = [
-  { src: "/images/Cuttly.png", alt: "Cuttly logo", width: 137, height: 60 },
-  { src: "/images/Bitly.png", alt: "Bitly logo", width: 111, height: 60 },
-  { src: "/images/Buffer.png", alt: "Buffer logo", width: 160, height: 60 },
-  { src: "/images/Shortio.png", alt: "Short.io logo", width: 160, height: 60 },
-  { src: "/images/Rebrandly.png", alt: "Rebrandly logo", width: 160, height: 60 },
-  { src: "/images/Tinyurl.png", alt: "Tinyurl logo", width: 160, height: 60 },
+  { src: "/images/Cuttly.webp", alt: "Cuttly logo", width: 137, height: 60 },
+  { src: "/images/Bitly.webp", alt: "Bitly logo", width: 111, height: 60 },
+  { src: "/images/Buffer.webp", alt: "Buffer logo", width: 160, height: 60 },
+  { src: "/images/Shortio.webp", alt: "Short.io logo", width: 160, height: 60 },
+  { src: "/images/Rebrandly.webp", alt: "Rebrandly logo", width: 160, height: 60 },
+  { src: "/images/Tinyurl.webp", alt: "Tinyurl logo", width: 160, height: 60 },
 ] as const;
 
 const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}) => {
@@ -69,7 +69,7 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
             >
               <div className="flex justify-center items-center">
                 <Image
-                  src="/images/Unshortlink-Background.png"
+                  src="/images/Unshortlink-Background.webp"
                   alt="Unshorten URL"
                   width={800}
                   height={800}

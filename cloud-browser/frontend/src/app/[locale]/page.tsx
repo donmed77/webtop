@@ -31,7 +31,7 @@ export default async function App({ params }: { params: Promise<{ locale: string
         "url": "https://unshortlink.com",
         "image": {
           "@type": "ImageObject",
-          "url": "/share_landscape.png"
+          "url": "/share_landscape.webp"
         },
         "sameAs": [
           "https://www.facebook.com/unshortlink",

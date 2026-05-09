@@ -71,8 +71,8 @@ const Footer = () => {
                   color="primary"
                 >
                   <Link href='https://www.facebook.com/unshortlink/' target='_blank' rel='noopener noreferrer'>
-                    <img className=' h-10 hidden' src="/images/Facebook-icon.png" alt="Facebook icon" />
-                    <img className=' h-10 block' src="/images/Facebook-icon-white.png" alt="Facebook icon" />
+                    <img className=' h-10 hidden' src="/images/Facebook-icon.webp" alt="Facebook icon" />
+                    <img className=' h-10 block' src="/images/Facebook-icon-white.webp" alt="Facebook icon" />
                   </Link>
            
                 </Button>
@@ -85,8 +85,8 @@ const Footer = () => {
                   color="primary"
                 >
                   <Link href='https://x.com/unshortlink' target='_blank' rel='noopener noreferrer'>
-                  <img className=' h-10 hidden' src="/images/X-icon.png" alt="X icon" />
-                  <img className=' h-10 block' src="/images/X-icon-white.png" alt="X icon" />
+                  <img className=' h-10 hidden' src="/images/X-icon.webp" alt="X icon" />
+                  <img className=' h-10 block' src="/images/X-icon-white.webp" alt="X icon" />
                   </Link>
 
                 </Button>
@@ -125,8 +125,8 @@ const Footer = () => {
               <h2 className='text-lg md:text-xl'>{t('partner')}</h2> 
               <div>
                   <Link href='https://cutt.ly' target='_blank' rel='noopener noreferrer sponsored'>
-                  <img className=' cursor-pointer h-14 hidden' src="/images/Cuttly.colored.png" alt="Cuttly logo" />
-                  <img className=' cursor-pointer h-14 block' src="/images/Cuttly-White.png" alt="Cuttly logo" />
+                  <img className=' cursor-pointer h-14 hidden' src="/images/Cuttly.colored.webp" alt="Cuttly logo" />
+                  <img className=' cursor-pointer h-14 block' src="/images/Cuttly-White.webp" alt="Cuttly logo" />
                   </Link>
               </div>
           </div>

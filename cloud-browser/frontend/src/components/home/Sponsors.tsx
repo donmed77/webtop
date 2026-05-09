@@ -14,8 +14,8 @@ const Sponsors = () => {
       </Box>
       <div className='py-[45px] px-[88px] bg-dark-bg'>
           <Link href='https://cutt.ly' target='_blank' rel='noopener noreferrer sponsored'>
-              <img className=' cursor-pointer h-14 hidden' src="/images/Cuttly.colored.png" alt="Cuttly logo" />
-              <img className=' cursor-pointer h-14 block' src="/images/Cuttly-White.png" alt="Cuttly logo" />
+              <img className=' cursor-pointer h-14 hidden' src="/images/Cuttly.colored.webp" alt="Cuttly logo" />
+              <img className=' cursor-pointer h-14 block' src="/images/Cuttly-White.webp" alt="Cuttly logo" />
           </Link>
       </div>
     </section>

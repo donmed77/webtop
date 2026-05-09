@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       type: 'website',
       images: [
         {
-          url: `${siteUrl}/share_landscape.png`,
+          url: `${siteUrl}/share_landscape.webp`,
           width: 1200,
           height: 630,
           alt: 'Unshort Link - Cloud Browser',
@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       card: 'summary_large_image',
       title,
       description,
-      images: [`${siteUrl}/share_landscape.png`],
+      images: [`${siteUrl}/share_landscape.webp`],
     },
   };
 }

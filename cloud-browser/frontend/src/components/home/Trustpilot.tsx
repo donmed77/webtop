@@ -15,12 +15,12 @@ const Trustpilot = () => {
         <Link href='https://www.trustpilot.com/review/unshortlink.com' rel='noopener noreferrer nofollow' target='_blank'>
         <img
           className="h-24 hidden"
-          src="/images/Trustpilot.png"
+          src="/images/Trustpilot.webp"
           alt="Trustpilot Reviews"
         />
         <img
           className="h-24 block"
-          src="/images/Trustpilot-White.png"
+          src="/images/Trustpilot-White.webp"
           alt="Trustpilot Reviews"
         />
         </Link>
