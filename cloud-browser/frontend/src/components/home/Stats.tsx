@@ -44,7 +44,7 @@ const Stats = () => {
                   <p className='text-[35px] leading-[45px] md:leading-[37px]  md:text-[40px] font-bold'>+15K</p>
                   <p className=' text-base text-[18px] md:text-[20px]'>{t('unshortened-url')}</p>
                 </Box>
-                <div className="!h-[1px] !max-h-[1px] w-full dark:bg-light-gray dark:opacity-30 bg-dark-bg opacity-20 my-5" />
+                <div className="!h-[1px] !max-h-[1px] w-full bg-light-gray opacity-30 my-5" />
               </Box>
 
               <Box sx={{
@@ -54,7 +54,7 @@ const Stats = () => {
                   <p className=' text-[35px] leading-[45px] md:leading-[37px]  md:text-[40px] font-bold'>+25K</p>
                   <p className=' text-base text-[18px] md:text-[20px]'>{t('active-users')}</p>
                 </Box>
-                <div className="!h-[1px] !max-h-[1px] w-full dark:bg-light-gray dark:opacity-30 bg-dark-bg opacity-20 my-5" />
+                <div className="!h-[1px] !max-h-[1px] w-full bg-light-gray opacity-30 my-5" />
               </Box>
 
               <Box sx={{
@@ -64,7 +64,7 @@ const Stats = () => {
                   <p className=' text-[35px] leading-[45px] md:leading-[37px]  md:text-[40px] font-bold'>+10M</p>
                   <p className=' text-base text-[18px] md:text-[20px]'>{t('malicious-url')}</p>
                 </Box>
-                <div className="!h-[1px] !max-h-[1px] w-full dark:bg-light-gray dark:opacity-30 bg-dark-bg opacity-20 my-5" />
+                <div className="!h-[1px] !max-h-[1px] w-full bg-light-gray opacity-30 my-5" />
               </Box>
 
               <Box sx={{

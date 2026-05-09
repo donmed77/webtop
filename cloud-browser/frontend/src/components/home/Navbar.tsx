@@ -79,12 +79,12 @@ const languages = [
 
   return (
     <nav className='sticky z-[1000] top-0 left-0 right-0 flex items-center w-full justify-center '>
-      <div className=' absolute z-20 w-full top-0  !h-[90px] !min-h-[90px] max-w-[1280px] px-3 md:px-6 xl:px-0  bg-white  dark:bg-primary-navy flex justify-between py-[18px] items-center'>
+      <div className=' absolute z-20 w-full top-0  !h-[90px] !min-h-[90px] max-w-[1280px] px-3 md:px-6 xl:px-0   bg-primary-navy flex justify-between py-[18px] items-center'>
       <Link href='/'>
-      <div className='block dark:hidden'>
+      <div className='hidden'>
             <Logo />
         </div>
-        <div className='hidden dark:block'>
+        <div className='block'>
             <LogoWhite />
         </div>
       </Link>
@@ -99,7 +99,7 @@ const languages = [
                   rel={page.blank ? 'noopener noreferrer nofollow' : '' }
                 >
                   <Button
-                    className=" hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !font-medium text-sm !w-fit !border-0 dark:!text-white gap-1 !duration-0 !text-primary-navy flex  items-center justify-center !p-3 !pr-5   dark:!border-zinc-600"
+                    className=" hover:!bg-primary-navy !min-w-fit !font-medium text-sm !w-fit !border-0 !text-white gap-1 !duration-0 flex  items-center justify-center !p-3 !pr-5   !border-zinc-600"
                     style={{ borderRadius: 0, boxShadow: "unset"}}
                     variant="outlined"
                     color="primary"
@@ -119,7 +119,7 @@ const languages = [
                     </Typography>
                     {page.new && (
                       <div className='ml-1'>
-                        <div className='bg-primary-purple dark:bg-primary-purple-light text-white text-[8px] font-medium px-1 py-1 leading-none'>{t('new')}</div>
+                        <div className='bg-primary-purple-light text-white text-[8px] font-medium px-1 py-1 leading-none'>{t('new')}</div>
                       </div>
                     )}
                   </Button>
@@ -133,7 +133,7 @@ const languages = [
           <div className='hidden lg:flex gap-2 items-center select-none'>
               <a href="https://discord.gg/wEb8rTbWFY" target="_blank" rel="noopener noreferrer">
                 <Button
-                  className="hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy !p-3"
+                  className="hover:!bg-primary-navy !min-w-fit !w-fit !border-0 !text-white !duration-0 !p-3"
                   style={{ borderRadius: 0, boxShadow: "unset" }}
                   variant="outlined"
                   color="primary"
@@ -147,7 +147,7 @@ const languages = [
 
               <div className='relative'>
                 <Button
-                  className="hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy flex gap-2 items-center !p-3"
+                  className="hover:!bg-primary-navy !min-w-fit !w-fit !border-0 !text-white !duration-0 flex gap-2 items-center !p-3"
                   style={{ borderRadius: 0, boxShadow: "unset" }}
                   variant="outlined"
                   color="primary"
@@ -158,11 +158,11 @@ const languages = [
                 {langOpen && (
                   <>
                     <div className='fixed inset-0 z-40' onClick={() => setLangOpen(false)} />
-                    <div className='absolute top-full right-0 z-50 bg-white dark:bg-primary-navy border border-zinc-200 dark:border-zinc-600 min-w-full'>
+                    <div className='absolute top-full right-0 z-50 bg-primary-navy border border-zinc-600 min-w-full'>
                       {languages.map((lang) => (
                         <button
                           key={lang.lang}
-                          className='flex gap-2 items-center w-full px-3 py-3 text-primary-navy dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-medium'
+                          className='flex gap-2 items-center w-full px-3 py-3 text-white hover:bg-zinc-800 text-sm font-medium'
                           onClick={() => { setLangOpen(false); onSelectChange({ target: { value: lang.lang } }); }}
                         >
                           <img src={`https://flagcdn.com/w20/${lang.flag}.png`} alt={lang.label} className='w-4 h-auto' />
@@ -179,7 +179,7 @@ const languages = [
 
           <div className='block lg:hidden'>
           <Button
-                  className=" hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !font-medium text-sm !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy flex gap-2 items-center justify-center !p-3   dark:!border-zinc-600"
+                  className=" hover:!bg-primary-navy !min-w-fit !font-medium text-sm !w-fit !border-0 !text-white !duration-0 flex gap-2 items-center justify-center !p-3   !border-zinc-600"
                   style={{ borderRadius: 0, boxShadow: "unset"}}
                   variant="outlined"
                   color="primary"
@@ -191,7 +191,7 @@ const languages = [
 
 
       </div>
-      <div className='h-[1px] bg-zinc-200 dark:bg-zinc-600  w-full mt-[90px]'/>
+      <div className='h-[1px] bg-zinc-600  w-full mt-[90px]'/>
       <Drawer
       anchor={'top'}
       open={open}
@@ -199,23 +199,23 @@ const languages = [
       slotProps={{ paper: { sx: { overflow: 'visible' } } }}
     >
 
-      <div className='bg-white w-[100vw] dark:bg-primary-navy h-fit !min-w-full'>
+      <div className='bg-white w-[100vw] bg-primary-navy h-fit !min-w-full'>
         <div className='!w-full flex flex-col py-5 relative'>
-        <div className='h-[1px] bg-zinc-100 dark:bg-zinc-600  w-full mt-[90px] absolute top-0'/>
+        <div className='h-[1px] bg-zinc-600  w-full mt-[90px] absolute top-0'/>
           <div className='flex justify-between items-center px-3 md:px-6'>
             <div className=' ml-[2px]'>
             <Link href='/'>
-                <div className='block dark:hidden'>
+                <div className='hidden'>
                     <Logo />
                 </div>
-                <div className='hidden dark:block'>
+                <div className='block'>
                     <LogoWhite />
                 </div>
             </Link>
 
             </div>
             <Button
-                  className=" hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !font-medium text-sm !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy flex gap-2 items-center justify-center !p-3   dark:!border-zinc-600"
+                  className=" hover:!bg-primary-navy !min-w-fit !font-medium text-sm !w-fit !border-0 !text-white !duration-0 flex gap-2 items-center justify-center !p-3   !border-zinc-600"
                   style={{ borderRadius: 0, boxShadow: "unset"}}
                   variant="outlined"
                   color="primary"
@@ -237,7 +237,7 @@ const languages = [
                 onClick={() => setOpen(false)}
               >
                 <Button
-                  className=" hover:!bg-white dark:hover:!bg-primary-navy  !font-medium !grid !place-content-start text-sm !border-l-0 ! border-r-0 !border-t-0 ! !border-zinc-200 dark:!text-white !duration-0 !text-primary-navy gap-2 !px-3 md:!px-6 !py-5   dark:!border-zinc-600"
+                  className=" hover:!bg-primary-navy  !font-medium !grid !place-content-start text-sm !border-l-0 ! border-r-0 !border-t-0 ! !text-white !duration-0 gap-2 !px-3 md:!px-6 !py-5   !border-zinc-600"
                   style={{ borderRadius: 0, boxShadow: "unset"}}
                   variant="outlined"
                   color="primary"
@@ -259,7 +259,7 @@ const languages = [
 
                   {page.new && (
                       <div className=''>
-                        <div className='bg-primary-purple dark:bg-primary-purple-light text-white text-[8px] font-medium px-1 py-1 leading-none'>{t('new')}</div>
+                        <div className='bg-primary-purple-light text-white text-[8px] font-medium px-1 py-1 leading-none'>{t('new')}</div>
                       </div>
                     )}
 
@@ -277,7 +277,7 @@ const languages = [
 
               <div className='relative'>
                 <Button
-                  className="hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy flex gap-2 items-center !p-3"
+                  className="hover:!bg-primary-navy !min-w-fit !w-fit !border-0 !text-white !duration-0 flex gap-2 items-center !p-3"
                   style={{ borderRadius: 0, boxShadow: "unset" }}
                   variant="outlined"
                   color="primary"
@@ -288,11 +288,11 @@ const languages = [
                 {langOpen && (
                   <>
                     <div className='fixed inset-0 z-40' onClick={() => setLangOpen(false)} />
-                    <div className='absolute top-full left-0 z-50 bg-white dark:bg-primary-navy border border-zinc-200 dark:border-zinc-600 min-w-full'>
+                    <div className='absolute top-full left-0 z-50 bg-primary-navy border border-zinc-600 min-w-full'>
                       {languages.map((lang) => (
                         <button
                           key={lang.lang}
-                          className='flex gap-2 items-center w-full px-3 py-3 text-primary-navy dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-medium'
+                          className='flex gap-2 items-center w-full px-3 py-3 text-white hover:bg-zinc-800 text-sm font-medium'
                           onClick={() => { setLangOpen(false); onSelectChange({ target: { value: lang.lang } }); }}
                         >
                           <img src={`https://flagcdn.com/w20/${lang.flag}.png`} alt={lang.label} className='w-4 h-auto' />
@@ -306,7 +306,7 @@ const languages = [
 
                                   <a href="https://discord.gg/wEb8rTbWFY" target="_blank" rel="noopener noreferrer">
                 <Button
-                  className="hover:!bg-white dark:hover:!bg-primary-navy !min-w-fit !w-fit !border-0 dark:!text-white !duration-0 !text-primary-navy !p-3"
+                  className="hover:!bg-primary-navy !min-w-fit !w-fit !border-0 !text-white !duration-0 !p-3"
                   style={{ borderRadius: 0, boxShadow: "unset" }}
                   variant="outlined"
                   color="primary"

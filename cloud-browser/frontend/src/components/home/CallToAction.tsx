@@ -134,7 +134,7 @@ const CallToAction = ({
         </div>
         <Button
           type="submit"
-          className="sm:!min-w-fit !duration-0 bg-primary-purple dark:!bg-primary-purple-light sm:!w-fit !text-white  h-[56px] sm:!px-6 !text-[16px]"
+          className="sm:!min-w-fit !duration-0 bg-primary-purple !bg-primary-purple-light sm:!w-fit !text-white  h-[56px] sm:!px-6 !text-[16px]"
           style={{ borderRadius: 0, boxShadow: "unset" }}
           variant="contained"
           color="primary"
@@ -148,7 +148,7 @@ const CallToAction = ({
         <div className="flex flex-wrap gap-1 text-[14px]">
           <p>{t("try-these")}:</p>
           <p
-            className="cursor-pointer underline min-w-fit text-primary-purple dark:text-primary-purple-light"
+            className="cursor-pointer underline min-w-fit text-primary-purple-light"
             onClick={() => setUrl("cutt.ly/UraWGrsu")}
           >
             cutt.ly/UraWGrsu

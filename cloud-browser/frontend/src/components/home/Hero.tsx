@@ -40,13 +40,13 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
               lg: 6.5
             }}>
             <div className="w-full flex flex-col gap-1 md:gap-2 justify-center sm:mt-8 xl:mt-20">
-              <h1 className="text-primary-purple dark:text-primary-purple-light font-bold text-[22px]">
+              <h1 className="text-primary-purple-light font-bold text-[22px]">
                 {t('wheregoes')}
               </h1>
               <h2 className="flex flex-col md:text-[60px] font-extrabold md:leading-[72px]  text-[50px] leading-[60px]">
                 {t('title')}
               </h2>
-              <p className=" py-4 font-normal text-[18px] leading-[30px] mt-2 md:mt-3 dark:opacity-80">
+              <p className=" py-4 font-normal text-[18px] leading-[30px] mt-2 md:mt-3 opacity-80">
                 {t('description')}
               </p>
 
@@ -85,7 +85,7 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
 
         <ul
           aria-label="Supported short link providers"
-          className="grid w-full max-w-[1280px] grid-cols-2 place-items-center gap-x-6 gap-y-6 pt-16 opacity-40 dark:opacity-50 md:grid-cols-3 md:gap-x-10 md:gap-y-8 xl:grid-cols-6 xl:gap-x-16 xl:gap-y-12"
+          className="grid w-full max-w-[1280px] grid-cols-2 place-items-center gap-x-6 gap-y-6 pt-16 opacity-40 opacity-50 md:grid-cols-3 md:gap-x-10 md:gap-y-8 xl:grid-cols-6 xl:gap-x-16 xl:gap-y-12"
         >
           {LOGOS.map((logo) => (
             <li key={logo.src} className="flex shrink-0 items-center justify-center">
@@ -96,7 +96,7 @@ const Hero = ({link, scrapeId, data}:{link?:string, scrapeId?:number, data?:any}
                 height={logo.height}
                 sizes="160px"
                 loading="lazy"
-                className="h-12 w-auto max-w-none shrink-0 dark:contrast-0"
+                className="h-12 w-auto max-w-none shrink-0 contrast-0"
               />
             </li>
           ))}

@@ -1436,7 +1436,7 @@ export default function AdminPage() {
                                                             <div className="flex gap-1">
                                                                 <Button size="sm" variant="outline" onClick={() => ipAction("block", stat.ip)} className="cursor-pointer text-xs bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300 active:bg-red-500/30 transition-colors duration-150"><ShieldBan className="h-3 w-3 mr-1" />Block</Button>
                                                                 <Button size="sm" variant="outline" onClick={() => ipAction("whitelist", stat.ip)} className="cursor-pointer text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:text-emerald-300 active:bg-emerald-500/30 transition-colors duration-150"><ShieldCheck className="h-3 w-3 mr-1" />Whitelist</Button>
-                                                                <Button size="sm" variant="outline" onClick={() => ipAction("clear-limit", stat.ip)} className="cursor-pointer text-xs bg-zinc-500/10 text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/20 hover:text-zinc-300 active:bg-zinc-500/30 transition-colors duration-150"><Eraser className="h-3 w-3 mr-1" />Clear</Button>
+                                                                <Button size="sm" variant="outline" onClick={() => ipAction("clear-limit", stat.ip)} className="cursor-pointer text-xs bg-zinc-500/10 border-zinc-500/30 hover:bg-zinc-500/20 hover:text-zinc-300 active:bg-zinc-500/30 transition-colors duration-150"><Eraser className="h-3 w-3 mr-1" />Clear</Button>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -2691,7 +2691,7 @@ export default function AdminPage() {
                                 {" · "}
                                 <span className="text-white font-mono">{viewerOverlay.ip}</span>
                             </span>
-                            <span className="text-zinc-500 text-xs">View-only · No input forwarded</span>
+                            <span className="text-xs">View-only · No input forwarded</span>
                         </div>
                         <button
                             onClick={() => setViewerOverlay(null)}

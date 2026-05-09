@@ -12,10 +12,10 @@ const Sponsors = () => {
       }}>
      <h2>{t('title')}</h2> 
       </Box>
-      <div className='py-[45px] px-[88px] bg-light-gray dark:bg-dark-bg'>
+      <div className='py-[45px] px-[88px] bg-dark-bg'>
           <Link href='https://cutt.ly' target='_blank' rel='noopener noreferrer sponsored'>
-              <img className=' cursor-pointer h-14 dark:hidden block' src="/images/Cuttly.colored.png" alt="Cuttly logo" />
-              <img className=' cursor-pointer h-14 hidden dark:block' src="/images/Cuttly-White.png" alt="Cuttly logo" />
+              <img className=' cursor-pointer h-14 hidden' src="/images/Cuttly.colored.png" alt="Cuttly logo" />
+              <img className=' cursor-pointer h-14 block' src="/images/Cuttly-White.png" alt="Cuttly logo" />
           </Link>
       </div>
     </section>

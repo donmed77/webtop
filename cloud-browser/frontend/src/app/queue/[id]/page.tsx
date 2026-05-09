@@ -102,14 +102,14 @@ export default function QueuePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <h2 className="text-xl font-semibold mb-2 dark:text-white text-gray-900">Daily Limit Reached</h2>
-                    <p className="dark:text-white/50 text-gray-500 mb-6 text-sm">
+                    <h2 className="text-xl font-semibold mb-2 text-white">Daily Limit Reached</h2>
+                    <p className="text-white/50 mb-6 text-sm">
                         You&apos;ve reached your daily session limit. Come back tomorrow for more browsing!
                     </p>
                     <Button
                         onClick={() => router.push("/")}
                         variant="contained"
-                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !px-8 !py-2.5 !text-sm !normal-case !font-medium"
+                        className="!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !px-8 !py-2.5 !text-sm !normal-case !font-medium"
                         style={{ boxShadow: "none" }}
                     >
                         Back to Home
@@ -130,14 +130,14 @@ export default function QueuePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
                     </div>
-                    <h2 className="text-xl font-semibold mb-2 dark:text-white text-gray-900">Something Went Wrong</h2>
-                    <p className="dark:text-white/50 text-gray-500 mb-6 text-sm">
+                    <h2 className="text-xl font-semibold mb-2 text-white">Something Went Wrong</h2>
+                    <p className="text-white/50 mb-6 text-sm">
                         We couldn&apos;t create your session. Please try again.
                     </p>
                     <Button
                         onClick={() => router.push("/")}
                         variant="contained"
-                        className="!bg-[var(--color-primary-purple)] dark:!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !px-8 !py-2.5 !text-sm !normal-case !font-medium"
+                        className="!bg-[var(--color-primary-purple-light)] !text-white !rounded-none !px-8 !py-2.5 !text-sm !normal-case !font-medium"
                         style={{ boxShadow: "none" }}
                     >
                         Try Again
@@ -187,13 +187,13 @@ export default function QueuePage() {
                 </div>
 
                 {/* Status text */}
-                <p className="text-center dark:text-white text-gray-900 mb-2 font-medium">
+                <p className="text-center text-white mb-2 font-medium">
                     {getStatusText()}
                 </p>
 
                 {/* Queue message (only when waiting AND server data received) */}
                 {status === "waiting" && joined && (
-                    <p className="text-center dark:text-white/50 text-gray-500 text-sm mb-6">
+                    <p className="text-center text-white/50 text-sm mb-6">
                         {getQueueMessage()}
                     </p>
                 )}
@@ -204,7 +204,7 @@ export default function QueuePage() {
                         <Button
                             onClick={handleLeaveQueue}
                             variant="text"
-                            className="!text-sm !normal-case dark:!text-white/40 !text-gray-400 hover:dark:!text-white/60 hover:!text-gray-600"
+                            className="!text-sm !normal-case !text-white/40 !text-gray-400 hover:!text-white/60 hover:!text-gray-600"
                         >
                             {status === "waiting" ? "Leave Queue" : "Cancel"}
                         </Button>

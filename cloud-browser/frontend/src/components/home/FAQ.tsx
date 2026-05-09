@@ -70,9 +70,9 @@ const FAQ = () => {
 
                   {
                       FAQdata.map((data, index) => (
-                          <Accordion key={index} className='!bg-white dark:!bg-transparent !drop-shadow-none !w-full !border-b !border-zinc-300 dark:!border-zinc-600 py-2 '>
+                          <Accordion key={index} className='!bg-transparent !drop-shadow-none !w-full !border-b !border-zinc-300 !border-zinc-600 py-2 '>
                               <AccordionSummary
-                              className='dark:!bg-transparent'
+                              className='!bg-transparent'
                               // expandIcon={<CheveronIcon dark={theme == 'dark'}/>}
                               expandIcon={<CheveronIcon />}
                               aria-controls="panel1-content"
@@ -81,7 +81,7 @@ const FAQ = () => {
                               <p className='text-base text-[20px] lg:text-[23px] font-medium lg:font-normal'>{data.question}</p>
                               </AccordionSummary>
                               <AccordionDetails>
-                              <p className='font-normal text-[16px] lg:text-[18px] leading-[25px] lg:leading-[30px] mt-2 md:mt-3 dark:opacity-80'>
+                              <p className='font-normal text-[16px] lg:text-[18px] leading-[25px] lg:leading-[30px] mt-2 md:mt-3 opacity-80'>
                                   {data.answer}
                               </p>
                               </AccordionDetails>

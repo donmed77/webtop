@@ -78,7 +78,7 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <div className={`${poppins.className} bg-white dark:bg-primary-navy text-primary-navy dark:text-white`}>
+    <div className={`${poppins.className} bg-primary-navy text-white`}>
       <NextIntlClientProvider messages={messages}>
         <LandingLayoutWrapper>
           {children}
