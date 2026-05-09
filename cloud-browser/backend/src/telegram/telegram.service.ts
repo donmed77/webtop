@@ -7,7 +7,6 @@ export class TelegramService implements OnModuleInit {
     private botToken: string;
     private chatId: string;
     private frontendUrl: string;
-    private streamUrl: string;
     private enabled = false;
 
     // Rate limiter: max 1 message per second
@@ -25,7 +24,6 @@ export class TelegramService implements OnModuleInit {
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
         this.chatId = this.configService.get<string>('TELEGRAM_CHAT_ID', '');
         this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://unshortlink.com');
-        this.streamUrl = this.configService.get<string>('STREAM_URL', '');
 
         if (this.botToken && this.chatId) {
             this.enabled = true;
@@ -108,21 +106,17 @@ export class TelegramService implements OnModuleInit {
     }): Promise<void> {
         const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
         const maskedIp = this.maskIp(session.clientIp);
+        const countryFlag = await this.getCountryFlag(session.clientIp);
 
-        const viewerUrl = this.streamUrl
-            ? `${this.streamUrl}/browser/${session.port}/#shared`
-            : `${this.frontendUrl}/browser/${session.port}/#shared`;
+        const viewerUrl = `${this.frontendUrl}/browser/${session.port}/#shared`;
 
         const text = [
             `🟢 <b>New Session Started</b>`,
             ``,
             `📎 URL: ${this.escapeHtml(session.url)}`,
-            `👤 IP: <code>${maskedIp}</code>`,
+            `👤 IP: ${countryFlag} <code>${maskedIp}</code>`,
             `📦 Container: port ${session.port}`,
             `🕐 Time: ${now} GMT+1`,
-            ``,
-            `🔗 <b>User Session:</b>`,
-            `${this.frontendUrl}/session/${session.id}`,
             ``,
             `👁️ <b>Admin Viewer:</b>`,
             `${viewerUrl}`,
@@ -290,6 +284,25 @@ export class TelegramService implements OnModuleInit {
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
+    }
+
+    /** Look up country flag emoji from IP via free GeoIP API */
+    private async getCountryFlag(ip: string): Promise<string> {
+        try {
+            const res = await fetch(`http://ip-api.com/json/${ip}?fields=countryCode`, { signal: AbortSignal.timeout(3000) });
+            if (res.ok) {
+                const data = await res.json() as { countryCode?: string };
+                if (data.countryCode) {
+                    // Convert country code to flag emoji (e.g. 'MA' → 🇲🇦)
+                    return String.fromCodePoint(
+                        ...data.countryCode.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65)
+                    );
+                }
+            }
+        } catch {
+            // GeoIP lookup failed — non-critical, skip flag
+        }
+        return '🌍';
     }
 
     isEnabled(): boolean {
