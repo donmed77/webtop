@@ -51,7 +51,7 @@ const Footer = () => {
       <div className='h-[1px] bg-zinc-600  w-full'/>
       <div className='px-3 md:px-6 xl:px-0 w-full flex justify-between gap-4 md:flex-row flex-col-reverse max-w-[1280px] '>
           <div className='flex flex-col  md:text-start md:items-start gap-4 mt-4 w-full md:w-[40%]'>
-            <Link href='/'>
+            <Link href='/' aria-label='Unshortlink Home'>
             <LogoWhite />
             </Link>
               <Typography className='font-normal text-[15px]'>{t('footer-description')}</Typography>
@@ -65,7 +65,7 @@ const Footer = () => {
                   color="primary"
                 >
                   <Link href='https://www.facebook.com/unshortlink/' target='_blank' rel='noopener noreferrer'>
-                    <img className='h-10' src="/images/Facebook-icon-white.webp" alt="Facebook icon" width="70" height="70" loading="lazy" />
+                    <img className='h-10' src="/images/Facebook-icon-white.webp" alt="Facebook icon" loading="lazy" />
                   </Link>
            
                 </Button>
@@ -78,7 +78,7 @@ const Footer = () => {
                   color="primary"
                 >
                   <Link href='https://x.com/unshortlink' target='_blank' rel='noopener noreferrer'>
-                  <img className='h-10' src="/images/X-icon-white.webp" alt="X icon" width="70" height="70" loading="lazy" />
+                  <img className='h-10' src="/images/X-icon-white.webp" alt="X icon" loading="lazy" />
                   </Link>
 
                 </Button>
@@ -117,7 +117,7 @@ const Footer = () => {
               <h2 className='text-lg md:text-xl'>{t('partner')}</h2> 
               <div>
                   <Link href='https://cutt.ly' target='_blank' rel='noopener noreferrer sponsored'>
-                  <img className='cursor-pointer h-14' src="/images/Cuttly-White.webp" alt="Cuttly logo" width="470" height="124" loading="lazy" />
+                  <img className='cursor-pointer h-14' src="/images/Cuttly-White.webp" alt="Cuttly logo" loading="lazy" />
                   </Link>
               </div>
           </div>

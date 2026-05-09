@@ -80,7 +80,7 @@ const languages = [
   return (
     <nav className='sticky z-[1000] top-0 left-0 right-0 flex items-center w-full justify-center '>
       <div className=' absolute z-20 w-full top-0  !h-[90px] !min-h-[90px] max-w-[1280px] px-3 md:px-6 xl:px-0   bg-primary-navy flex justify-between py-[18px] items-center'>
-      <Link href='/'>
+      <Link href='/' aria-label='Unshortlink Home'>
         <LogoWhite />
       </Link>
 
@@ -148,7 +148,7 @@ const languages = [
                   color="primary"
                   onClick={() => setLangOpen(v => !v)}
                 >
-                  {(() => { const l = languages.find(l => l.lang === locale); return l ? <><img src={`https://flagcdn.com/w20/${l.flag}.png`} alt={l.label} className='w-4 h-auto' width="20" height="15" loading="lazy" /><Typography className='!text-[16px] !font-medium'>{l.label}</Typography><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="-ml-1"><path d="M7 10l5 5 5-5z"/></svg></> : null; })()}
+                  {(() => { const l = languages.find(l => l.lang === locale); return l ? <><img src={`https://flagcdn.com/w20/${l.flag}.png`} alt={l.label} className='w-4 h-auto' /><Typography className='!text-[16px] !font-medium'>{l.label}</Typography><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="-ml-1"><path d="M7 10l5 5 5-5z"/></svg></> : null; })()}
                 </Button>
                 {langOpen && (
                   <>
@@ -160,7 +160,7 @@ const languages = [
                           className='flex gap-2 items-center w-full px-3 py-3 text-white hover:bg-zinc-800 text-sm font-medium'
                           onClick={() => { setLangOpen(false); onSelectChange({ target: { value: lang.lang } }); }}
                         >
-                          <img src={`https://flagcdn.com/w20/${lang.flag}.png`} alt={lang.label} className='w-4 h-auto' width="20" height="15" loading="lazy" />
+                          <img src={`https://flagcdn.com/w20/${lang.flag}.png`} alt={lang.label} className='w-4 h-auto' />
                           {lang.label}
                         </button>
                       ))}
@@ -179,6 +179,7 @@ const languages = [
                   variant="outlined"
                   color="primary"
                   onClick={() => setOpen(true)}
+                  aria-label="Open menu"
                 >
             <MenuIcon className='!w-[2rem] !h-[2rem]'/>
             </Button>
@@ -273,7 +274,7 @@ const languages = [
                   color="primary"
                   onClick={() => setLangOpen(v => !v)}
                 >
-                  {(() => { const l = languages.find(l => l.lang === locale); return l ? <><img src={`https://flagcdn.com/w20/${l.flag}.png`} alt={l.label} className='w-4 h-auto' width="20" height="15" loading="lazy" /><Typography className='!text-[16px] !font-medium'>{l.label}</Typography><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="-ml-1"><path d="M7 10l5 5 5-5z"/></svg></> : null; })()}
+                  {(() => { const l = languages.find(l => l.lang === locale); return l ? <><img src={`https://flagcdn.com/w20/${l.flag}.png`} alt={l.label} className='w-4 h-auto' /><Typography className='!text-[16px] !font-medium'>{l.label}</Typography><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="-ml-1"><path d="M7 10l5 5 5-5z"/></svg></> : null; })()}
                 </Button>
                 {langOpen && (
                   <>
@@ -285,7 +286,7 @@ const languages = [
                           className='flex gap-2 items-center w-full px-3 py-3 text-white hover:bg-zinc-800 text-sm font-medium'
                           onClick={() => { setLangOpen(false); onSelectChange({ target: { value: lang.lang } }); }}
                         >
-                          <img src={`https://flagcdn.com/w20/${lang.flag}.png`} alt={lang.label} className='w-4 h-auto' width="20" height="15" loading="lazy" />
+                          <img src={`https://flagcdn.com/w20/${lang.flag}.png`} alt={lang.label} className='w-4 h-auto' />
                           {lang.label}
                         </button>
                       ))}
