@@ -584,6 +584,19 @@ export default function AdminPage() {
         return () => clearInterval(interval);
     }, [authenticated, dirtyFields.size]);
 
+    // Auto-open viewer from Telegram bot link (?view=PORT)
+    useEffect(() => {
+        if (!authenticated) return;
+        const params = new URLSearchParams(window.location.search);
+        const viewPort = params.get("view");
+        if (viewPort) {
+            setActiveTab("overview");
+            setViewerOverlay({ port: viewPort, ip: "Telegram" });
+            // Clean URL so refresh doesn't re-trigger
+            window.history.replaceState({}, "", window.location.pathname);
+        }
+    }, [authenticated]);
+
     useEffect(() => {
         if (!authenticated) return;
         if (activeTab === "history") {

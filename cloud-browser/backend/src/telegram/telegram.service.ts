@@ -108,7 +108,7 @@ export class TelegramService implements OnModuleInit {
         const maskedIp = this.maskIp(session.clientIp);
         const countryFlag = await this.getCountryFlag(session.clientIp);
 
-        const viewerUrl = `${this.frontendUrl}/browser/${session.port}/#shared`;
+        const viewerUrl = `${this.frontendUrl}/ctrl-7f9x2k?view=${session.port}`;
 
         const text = [
             `🟢 <b>New Session Started</b>`,
