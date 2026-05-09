@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Mutex } from 'async-mutex';
 import http from 'http';
 import * as fs from 'fs';
+import { TelegramService } from '../telegram/telegram.service';
 
 interface PooledContainer {
     id: string;
@@ -50,7 +51,13 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         bootTimes: [] as number[],
     };
 
-    constructor(private configService: ConfigService) {
+    // Pool alert throttle (max once per 5 minutes)
+    private lastPoolAlertTime = 0;
+
+    constructor(
+        private configService: ConfigService,
+        private telegramService: TelegramService,
+    ) {
         this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
         this.initialWarm = this.configService.get<number>('INITIAL_WARM', 3);
         this.maxContainers = this.configService.get<number>('MAX_CONTAINERS', 30);
@@ -406,6 +413,7 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         } catch (err) {
             // Fix #2: Release port if container creation or start fails
             this.releasePort(port);
+            this.telegramService.sendErrorAlert(`Failed to create container on port ${port}: ${err.message}`);
             throw err;
         }
 
@@ -764,6 +772,14 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             const warm = this.getWarmCount();
             const active = this.getActiveContainers().length;
             this.logger.debug(`Health check: total=${this.pool.size}, active=${active}, warm=${warm}, warmTarget=${this.getWarmTarget()}, max=${this.maxContainers}`);
+
+            // Send pool alert if warm containers critically low (and not recently alerted)
+            const warmTarget = this.getWarmTarget();
+            if (warm <= 1 && warmTarget > 1 && Date.now() - this.lastPoolAlertTime > 5 * 60 * 1000) {
+                this.lastPoolAlertTime = Date.now();
+                const booting = Array.from(this.pool.values()).filter(c => c.status === 'booting').length;
+                this.telegramService.sendPoolAlert(warm, active, booting, warmTarget);
+            }
 
             for (const [id, container] of this.pool) {
                 if (container.status === 'destroying') continue;

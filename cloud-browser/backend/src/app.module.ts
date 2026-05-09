@@ -10,6 +10,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { SurveyModule } from './survey/survey.module';
 import { SecurityModule } from './security/security.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SecurityModule } from './security/security.module';
     FeedbackModule,
     SurveyModule,
     SecurityModule,
+    TelegramModule,
   ],
 })
 export class AppModule { }
