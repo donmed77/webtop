@@ -3,7 +3,7 @@ import React, { startTransition, useState } from 'react'
 import Link from 'next/link'
 import MenuIcon from '@mui/icons-material/Menu';
 import Close from '@mui/icons-material/Close';
-import useThemeStore from '@/stores/theme-store';
+
 import Logo from '@/assets/unshortlink_logo.svg'
 import LogoWhite from '@/assets/unshortlink_logo_white.svg'
 import { usePathname, useRouter } from 'next/navigation';
@@ -13,11 +13,11 @@ const Navbar = () => {
 
   const [open, setOpen] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
-  const { theme } = useThemeStore();
+
 
   const t = useTranslations('shared');
 
- const statusDot = theme == 'light' ? <div className='status-dot-primary'/> : <div className='status-dot-secondary'/>
+ const statusDot = <div className='status-dot-secondary'/>
 //  const statusDot = <div className='status-dot-primary'/>
  const pages: { name: string; path: string; blank?: boolean; new?: boolean; icon?: React.ReactNode }[] = [
   {
