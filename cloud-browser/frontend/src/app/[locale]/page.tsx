@@ -1,13 +1,15 @@
 
 import Hero from '@/components/home/Hero'
-import Features from "@/components/home/Features";
-import Stats from "@/components/home/Stats";
-import Sponsors from "@/components/home/Sponsors";
-import Testimonials from "@/components/home/Testimonials";
-import Trustpilot from "@/components/home/Trustpilot";
-import FAQ from "@/components/home/FAQ";
+import dynamic from 'next/dynamic'
 import { Graph } from "schema-dts";
 import { getTranslations } from 'next-intl/server';
+
+const Features = dynamic(() => import("@/components/home/Features"));
+const Stats = dynamic(() => import("@/components/home/Stats"));
+const Sponsors = dynamic(() => import("@/components/home/Sponsors"));
+const Testimonials = dynamic(() => import("@/components/home/Testimonials"));
+const Trustpilot = dynamic(() => import("@/components/home/Trustpilot"));
+const FAQ = dynamic(() => import("@/components/home/FAQ"));
 
 
 export default async function App({ params }: { params: Promise<{ locale: string }> }) {
