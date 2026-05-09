@@ -42,7 +42,7 @@ export default function NotFound() {
             sx={{
               borderColor: "rgba(255,255,255,0.2)",
               color: "#fff",
-              borderRadius: "8px",
+              borderRadius: 0,
               padding: "10px 24px",
               textTransform: "none",
               fontFamily: "'Poppins', sans-serif",
@@ -59,13 +59,13 @@ export default function NotFound() {
           variant="contained"
           onClick={() => router.push("/")}
           sx={{
-            backgroundColor: "#7c5cfc",
-            borderRadius: "8px",
+            backgroundColor: "#a97dff",
+            borderRadius: 0,
             padding: "10px 24px",
             textTransform: "none",
             fontFamily: "'Poppins', sans-serif",
             "&:hover": {
-              backgroundColor: "#6a4ce0",
+              backgroundColor: "#9060f0",
             },
           }}
         >
