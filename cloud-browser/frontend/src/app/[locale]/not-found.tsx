@@ -1,12 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { Button } from "@mui/material";
 import { useRouter } from "next/navigation";
-import notFoundAnimation from "@/assets/404.animation.json";
-
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 export default function LocaleNotFound() {
   const router = useRouter();
@@ -19,13 +15,17 @@ export default function LocaleNotFound() {
         fontFamily: "'Poppins', sans-serif",
       }}
     >
-      <div className="w-full max-w-sm">
-        <Lottie
-          animationData={notFoundAnimation}
-          style={{ width: "100%", height: "100%" }}
-          loop
-        />
-      </div>
+      <h1
+        className="font-bold text-center"
+        style={{
+          fontSize: "clamp(120px, 20vw, 200px)",
+          color: "#a97dff",
+          lineHeight: 1,
+          letterSpacing: "-4px",
+        }}
+      >
+        404
+      </h1>
 
       <div className="flex flex-col gap-2 items-center justify-center mt-4">
         <h1 className="text-3xl font-bold text-white">Page Not Found</h1>
