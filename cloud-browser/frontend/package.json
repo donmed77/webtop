@@ -17,6 +17,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fix-webm-duration": "^1.0.6",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "next-intl": "^4.11.0",
