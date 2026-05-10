@@ -1,9 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+type PageStatus = 'loading' | 'valid' | 'expired' | 'error';
+type StreamStatus = 'connecting' | 'streaming' | 'paused' | 'reconnecting' | 'ended';
+
+const STATUS_CONFIG: Record<StreamStatus, { icon: string; label: string; color: string }> = {
+    connecting: { icon: '📡', label: 'Connecting', color: '#9ca3af' },
+    streaming: { icon: '🎬', label: 'Streaming', color: '#22c55e' },
+    paused: { icon: '⏸️', label: 'Paused', color: '#eab308' },
+    reconnecting: { icon: '🔄', label: 'Reconnecting', color: '#f97316' },
+    ended: { icon: '🔴', label: 'Ended', color: '#ef4444' },
+};
 
 export default function AdminViewerPage() {
     const params = useParams();
@@ -11,34 +22,94 @@ export default function AdminViewerPage() {
     const port = params.port as string;
     const token = searchParams.get('t') || '';
 
-    const [status, setStatus] = useState<'loading' | 'valid' | 'expired' | 'error'>('loading');
+    const [pageStatus, setPageStatus] = useState<PageStatus>('loading');
+    const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
     const [errorMsg, setErrorMsg] = useState('');
+    const [expiresAt, setExpiresAt] = useState<Date | null>(null);
+    const [timeRemaining, setTimeRemaining] = useState('--:--');
+    const sessionIdRef = useRef<string>('');
 
+    // Validate token on load
     useEffect(() => {
         if (!port || !token) {
-            setStatus('error');
+            setPageStatus('error');
             setErrorMsg('Missing viewer token.');
             return;
         }
 
-        // Validate token against backend
         fetch(`${API_URL}/api/session/viewer/validate?port=${port}&t=${encodeURIComponent(token)}`)
             .then(res => res.json())
             .then(data => {
                 if (data.valid) {
-                    setStatus('valid');
+                    setPageStatus('valid');
+                    setExpiresAt(new Date(data.expiresAt));
+                    sessionIdRef.current = data.sessionId;
                 } else {
-                    setStatus('expired');
+                    setPageStatus('expired');
                     setErrorMsg(data.reason || 'Session is no longer active.');
                 }
             })
             .catch(() => {
-                setStatus('error');
+                setPageStatus('error');
                 setErrorMsg('Failed to connect to server.');
             });
     }, [port, token]);
 
-    if (status === 'loading') {
+    // Countdown timer — updates every second
+    useEffect(() => {
+        if (!expiresAt) return;
+        const tick = () => {
+            const diff = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+            const min = Math.floor(diff / 60);
+            const sec = diff % 60;
+            setTimeRemaining(`${min}:${sec.toString().padStart(2, '0')}`);
+            if (diff <= 0) {
+                setStreamStatus('ended');
+            }
+        };
+        tick();
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+    }, [expiresAt]);
+
+    // Poll backend every 5s to check if session is still active
+    useEffect(() => {
+        if (pageStatus !== 'valid') return;
+        const interval = setInterval(() => {
+            fetch(`${API_URL}/api/session/viewer/validate?port=${port}&t=${encodeURIComponent(token)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.valid) {
+                        setStreamStatus('ended');
+                    }
+                })
+                .catch(() => { /* ignore network blips */ });
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [pageStatus, port, token]);
+
+    // Listen for iframe postMessage events (stream status from Selkies)
+    useEffect(() => {
+        if (pageStatus !== 'valid') return;
+        const handler = (e: MessageEvent) => {
+            if (!e.data || typeof e.data !== 'object') return;
+            if (e.data.type === 'streamStarted') {
+                setStreamStatus('streaming');
+            }
+            if (e.data.type === 'pipelineStatusUpdate') {
+                if (e.data.video === false && streamStatus === 'streaming') {
+                    setStreamStatus('paused');
+                } else if (e.data.video === true) {
+                    setStreamStatus('streaming');
+                }
+            }
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, [pageStatus, streamStatus]);
+
+    // --- Loading state ---
+    if (pageStatus === 'loading') {
         return (
             <div style={styles.container}>
                 <div style={styles.card}>
@@ -49,7 +120,8 @@ export default function AdminViewerPage() {
         );
     }
 
-    if (status === 'expired' || status === 'error') {
+    // --- Error / expired state ---
+    if (pageStatus === 'expired' || pageStatus === 'error') {
         return (
             <div style={styles.container}>
                 <div style={styles.card}>
@@ -62,19 +134,29 @@ export default function AdminViewerPage() {
         );
     }
 
-    // Valid — render the viewer iframe (read-only via pointer-events: none)
-    const streamBase = typeof window !== 'undefined' ? window.location.origin : '';
+    // --- Valid — render viewer ---
+    const statusCfg = STATUS_CONFIG[streamStatus];
 
     return (
         <div style={styles.viewerContainer}>
-            {/* Minimal top bar */}
+            {/* Top bar */}
             <div style={styles.topBar}>
                 <span style={styles.badge}>👁️ Admin Viewer</span>
-                <span style={styles.portLabel}>Port {port}</span>
+
+                <span style={styles.separator}>│</span>
+
+                <span style={{ ...styles.statusBadge, color: statusCfg.color }}>
+                    {statusCfg.icon} {statusCfg.label}
+                </span>
+
+                <span style={styles.separator}>│</span>
+
+                <span style={styles.timer}>⏱️ {timeRemaining}</span>
+
                 <span style={styles.readOnly}>🔒 Read-only</span>
             </div>
 
-            {/* Viewer iframe — pointer-events: none prevents ALL input */}
+            {/* Viewer iframe */}
             <iframe
                 src={`/browser/${port}/#shared`}
                 style={styles.iframe}
@@ -82,8 +164,19 @@ export default function AdminViewerPage() {
                 sandbox="allow-scripts allow-same-origin"
             />
 
-            {/* Invisible overlay to block all clicks (extra safety on top of pointer-events:none) */}
+            {/* Click blocker overlay */}
             <div style={styles.clickBlocker} />
+
+            {/* Session ended overlay */}
+            {streamStatus === 'ended' && (
+                <div style={styles.endedOverlay}>
+                    <div style={styles.card}>
+                        <div style={styles.icon}>🔴</div>
+                        <h1 style={styles.title}>Session Ended</h1>
+                        <p style={styles.text}>The user has disconnected or the session expired.</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -149,24 +242,31 @@ const styles: Record<string, React.CSSProperties> = {
         background: 'rgba(124, 58, 237, 0.15)',
         borderBottom: '1px solid rgba(124, 58, 237, 0.3)',
         zIndex: 10,
+        fontFamily: "'Inter', sans-serif",
     },
     badge: {
         color: '#fff',
         fontSize: '13px',
         fontWeight: 600,
-        fontFamily: "'Inter', sans-serif",
     },
-    portLabel: {
-        color: 'rgba(255,255,255,0.5)',
+    separator: {
+        color: 'rgba(255,255,255,0.2)',
+        fontSize: '13px',
+    },
+    statusBadge: {
         fontSize: '12px',
-        fontFamily: "'Inter', sans-serif",
+        fontWeight: 600,
+    },
+    timer: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: '12px',
+        fontFamily: "'Inter', monospace",
     },
     readOnly: {
         marginLeft: 'auto',
         color: '#7c3aed',
         fontSize: '12px',
         fontWeight: 600,
-        fontFamily: "'Inter', sans-serif",
     },
     iframe: {
         flex: 1,
@@ -176,11 +276,20 @@ const styles: Record<string, React.CSSProperties> = {
     },
     clickBlocker: {
         position: 'absolute' as const,
-        top: '40px', // below top bar
+        top: '40px',
         left: 0,
         right: 0,
         bottom: 0,
         zIndex: 5,
         cursor: 'not-allowed',
+    },
+    endedOverlay: {
+        position: 'absolute' as const,
+        inset: 0,
+        background: 'rgba(0,0,0,0.85)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 20,
     },
 };

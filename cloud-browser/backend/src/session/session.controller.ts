@@ -141,7 +141,7 @@ export class SessionController {
             return { valid: false, reason: 'Session ended' };
         }
 
-        return { valid: true };
+        return { valid: true, expiresAt: session.expiresAt.toISOString(), sessionId: session.id };
     }
 
     @Get(':id')
