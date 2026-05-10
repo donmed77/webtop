@@ -84,12 +84,14 @@ export default function AdminViewerPage() {
                         setStreamStatus('ended');
                     } else if (data.containerRunning === false) {
                         setStreamStatus('container_down');
+                    } else if (data.userConnectionState === 'failed' || data.userConnectionState === 'disconnected') {
+                        setStreamStatus('connection_lost');
                     } else if (data.userVisible === false) {
                         setStreamStatus('away');
                     } else {
-                        // Restore from away/container_down if things are back to normal
+                        // Restore if things are back to normal
                         setStreamStatus(prev => 
-                            prev === 'away' || prev === 'container_down' ? 'streaming' : prev
+                            ['away', 'container_down', 'connection_lost'].includes(prev) ? 'streaming' : prev
                         );
                     }
                 })
@@ -98,7 +100,7 @@ export default function AdminViewerPage() {
         return () => clearInterval(interval);
     }, [pageStatus, port, token]);
 
-    // Listen for iframe postMessage events (stream status + WebRTC state from Selkies)
+    // Listen for iframe postMessage events (stream status from Selkies)
     useEffect(() => {
         if (pageStatus !== 'valid') return;
         const handler = (e: MessageEvent) => {
@@ -113,14 +115,6 @@ export default function AdminViewerPage() {
                     setStreamStatus('streaming');
                 } else if (e.data.video === false) {
                     setStreamStatus(prev => prev === 'streaming' || prev === 'away' ? 'away' : prev);
-                }
-            }
-            // WebRTC connectionState forwarded from injected JS
-            if (e.data.type === 'webrtcState') {
-                if (e.data.state === 'failed' || e.data.state === 'disconnected') {
-                    setStreamStatus('connection_lost');
-                } else if (e.data.state === 'connected') {
-                    setStreamStatus(prev => prev === 'connection_lost' ? 'streaming' : prev);
                 }
             }
         };

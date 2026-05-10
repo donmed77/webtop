@@ -559,6 +559,15 @@ export default function SessionPage() {
             if (e.data?.type === "audioState") {
                 setAudioMuted(e.data.muted);
             }
+            // Report WebRTC connection state to backend for admin viewer
+            if (e.data?.type === "webrtcState" && sessionId) {
+                fetch(`/api/session/${sessionId}/visibility`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ connectionState: e.data.state }),
+                    keepalive: true,
+                }).catch(() => { });
+            }
         };
         window.addEventListener("message", handleStreamMessage);
         return () => window.removeEventListener("message", handleStreamMessage);

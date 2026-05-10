@@ -151,6 +151,7 @@ export class SessionController {
             expiresAt: session.expiresAt.toISOString(),
             sessionId: session.id,
             userVisible: session.userVisible !== false,
+            userConnectionState: session.userConnectionState || 'connected',
             containerRunning,
         };
     }
@@ -190,14 +191,15 @@ export class SessionController {
         }
         return { success: true };
     }
-    // User's session page reports tab visibility (Page Visibility API)
+    // User's session page reports tab visibility + WebRTC state
     @Patch(':id/visibility')
-    updateVisibility(@Param('id') id: string, @Body() body: { visible: boolean }) {
+    updateVisibility(@Param('id') id: string, @Body() body: { visible?: boolean; connectionState?: string }) {
         const session = this.sessionService.getSession(id);
         if (!session) {
             throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
         }
-        session.userVisible = body.visible;
+        if (body.visible !== undefined) session.userVisible = body.visible;
+        if (body.connectionState) session.userConnectionState = body.connectionState;
         return { success: true };
     }
 }
