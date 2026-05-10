@@ -6,12 +6,14 @@ import { useParams, useSearchParams } from 'next/navigation';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 type PageStatus = 'loading' | 'valid' | 'expired' | 'error';
-type StreamStatus = 'connecting' | 'streaming' | 'away' | 'ended';
+type StreamStatus = 'connecting' | 'streaming' | 'away' | 'connection_lost' | 'container_down' | 'ended';
 
 const STATUS_CONFIG: Record<StreamStatus, { icon: string; label: string; color: string }> = {
     connecting: { icon: '📡', label: 'Connecting', color: '#9ca3af' },
     streaming: { icon: '🖥️', label: 'Connected', color: '#22c55e' },
     away: { icon: '⏸️', label: 'User Away', color: '#eab308' },
+    connection_lost: { icon: '🔌', label: 'Connection Lost', color: '#ef4444' },
+    container_down: { icon: '💀', label: 'Container Down', color: '#ef4444' },
     ended: { icon: '🔴', label: 'Ended', color: '#ef4444' },
 };
 
@@ -80,19 +82,23 @@ export default function AdminViewerPage() {
                 .then(data => {
                     if (!data.valid) {
                         setStreamStatus('ended');
+                    } else if (data.containerRunning === false) {
+                        setStreamStatus('container_down');
                     } else if (data.userVisible === false) {
                         setStreamStatus('away');
                     } else {
-                        // User is back — restore connected if we were showing away
-                        setStreamStatus(prev => prev === 'away' ? 'streaming' : prev);
+                        // Restore from away/container_down if things are back to normal
+                        setStreamStatus(prev => 
+                            prev === 'away' || prev === 'container_down' ? 'streaming' : prev
+                        );
                     }
                 })
                 .catch(() => { /* ignore network blips */ });
-        }, 3000); // Poll every 3s for responsive away detection
+        }, 3000);
         return () => clearInterval(interval);
     }, [pageStatus, port, token]);
 
-    // Listen for iframe postMessage events (stream status from Selkies)
+    // Listen for iframe postMessage events (stream status + WebRTC state from Selkies)
     useEffect(() => {
         if (pageStatus !== 'valid') return;
         const handler = (e: MessageEvent) => {
@@ -106,8 +112,15 @@ export default function AdminViewerPage() {
                 if (e.data.video === true) {
                     setStreamStatus('streaming');
                 } else if (e.data.video === false) {
-                    // Only show "away" if we were previously connected
                     setStreamStatus(prev => prev === 'streaming' || prev === 'away' ? 'away' : prev);
+                }
+            }
+            // WebRTC connectionState forwarded from injected JS
+            if (e.data.type === 'webrtcState') {
+                if (e.data.state === 'failed' || e.data.state === 'disconnected') {
+                    setStreamStatus('connection_lost');
+                } else if (e.data.state === 'connected') {
+                    setStreamStatus(prev => prev === 'connection_lost' ? 'streaming' : prev);
                 }
             }
         };
