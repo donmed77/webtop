@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as os from 'os';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { exec } from 'child_process';
 
 @Injectable()
@@ -140,7 +141,8 @@ export class TelegramService implements OnModuleInit {
             this.countryNames.set(countryCode, country);
         }
 
-        const viewerUrl = `${this.frontendUrl}/ctrl-7f9x2k?view=${session.port}`;
+        const viewerToken = this.generateViewerToken(session.id, session.port);
+        const viewerUrl = `${this.frontendUrl}/admin/view/${session.port}?t=${viewerToken}`;
 
         const text = [
             `🟢 <b>New Session Started</b>`,
@@ -544,6 +546,53 @@ export class TelegramService implements OnModuleInit {
             stream.on('error', () => { /* ignore read errors */ });
         } catch {
             // File access error — ignore
+        }
+    }
+
+    // ======== VIEWER TOKEN ========
+
+    /** Generate a signed viewer token for one-click admin viewing */
+    generateViewerToken(sessionId: string, port: number): string {
+        const timestamp = Date.now();
+        const payload = `${sessionId}:${port}:${timestamp}`;
+        const hmac = crypto.createHmac('sha256', this.botToken)
+            .update(payload)
+            .digest('hex');
+        // Format: base64url(timestamp:sessionId:hmac)
+        const raw = `${timestamp}:${sessionId}:${hmac}`;
+        return Buffer.from(raw).toString('base64url');
+    }
+
+    /** Validate a viewer token — returns { valid, sessionId } */
+    validateViewerToken(token: string, port: number): { valid: boolean; sessionId?: string; reason?: string } {
+        try {
+            const raw = Buffer.from(token, 'base64url').toString('utf-8');
+            const parts = raw.split(':');
+            if (parts.length < 3) return { valid: false, reason: 'Invalid token format' };
+
+            const timestamp = parseInt(parts[0], 10);
+            const sessionId = parts[1];
+            const receivedHmac = parts.slice(2).join(':'); // In case sessionId contained ':'
+
+            // Check expiry (2 hours)
+            const TWO_HOURS = 2 * 60 * 60 * 1000;
+            if (Date.now() - timestamp > TWO_HOURS) {
+                return { valid: false, reason: 'Token expired' };
+            }
+
+            // Verify HMAC
+            const payload = `${sessionId}:${port}:${timestamp}`;
+            const expectedHmac = crypto.createHmac('sha256', this.botToken)
+                .update(payload)
+                .digest('hex');
+
+            if (!crypto.timingSafeEqual(Buffer.from(receivedHmac), Buffer.from(expectedHmac))) {
+                return { valid: false, reason: 'Invalid token signature' };
+            }
+
+            return { valid: true, sessionId };
+        } catch {
+            return { valid: false, reason: 'Token decode failed' };
         }
     }
 
