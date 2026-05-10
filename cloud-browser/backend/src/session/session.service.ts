@@ -72,7 +72,10 @@ export class SessionService implements OnModuleInit {
         const skipContainerNames = new Set<string>(savedSessions.map(s => `${prefix}-${s.poolId}`));
 
         // Clean up orphaned containers, but skip those belonging to restored sessions
-        await this.containerService.cleanupOrphanedContainers(skipContainerNames);
+        const orphanResult = await this.containerService.cleanupOrphanedContainers(skipContainerNames);
+        if (orphanResult.found > 0) {
+            this.telegramService.sendOrphanCleanup(orphanResult.found, orphanResult.killed);
+        }
 
         // Restore sessions and verify their containers still exist
         let restoredCount = 0;
