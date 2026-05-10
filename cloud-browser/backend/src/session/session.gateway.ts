@@ -74,6 +74,9 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
                 const wasPrimary = this.sessionPrimary.get(sessionId) === client.id;
                 if (wasPrimary) {
                     this.sessionPrimary.delete(sessionId);
+                    // Mark user connection as lost for admin viewer
+                    const session = this.sessionService.getSession(sessionId);
+                    if (session) session.userConnectionState = 'disconnected';
                     // Cancel any stale timer from a previous disconnect
                     const existing = this.reconnectingSessions.get(sessionId);
                     if (existing) clearTimeout(existing.timer);
@@ -185,6 +188,8 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             }
         }
         this.sessionPrimary.set(data.sessionId, client.id);
+        // Mark user connection as restored for admin viewer
+        session.userConnectionState = 'connected';
 
         client.emit('session:joined', {
             sessionId: session.id,
