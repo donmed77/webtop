@@ -100,22 +100,15 @@ export default function AdminViewerPage() {
         return () => clearInterval(interval);
     }, [pageStatus, port, token]);
 
-    // Listen for iframe postMessage events (stream status from Selkies)
+    // Listen for iframe postMessage events — ONLY for initial stream detection.
+    // All other status transitions are driven by the backend poll (single source of truth).
     useEffect(() => {
         if (pageStatus !== 'valid') return;
         const handler = (e: MessageEvent) => {
             if (!e.data || typeof e.data !== 'object') return;
-            // streamStarted is posted by our injected Nginx JS
-            if (e.data.type === 'streamStarted') {
-                setStreamStatus('streaming');
-            }
-            // Detect stream status via pipelineStatusUpdate
-            if (e.data.type === 'pipelineStatusUpdate') {
-                if (e.data.video === true) {
-                    setStreamStatus('streaming');
-                } else if (e.data.video === false) {
-                    setStreamStatus(prev => prev === 'streaming' || prev === 'away' ? 'away' : prev);
-                }
+            if (e.data.type === 'streamStarted' ||
+                (e.data.type === 'pipelineStatusUpdate' && e.data.video === true)) {
+                setStreamStatus(prev => prev === 'connecting' ? 'streaming' : prev);
             }
         };
         window.addEventListener('message', handler);
