@@ -6,11 +6,12 @@ import { useParams, useSearchParams } from 'next/navigation';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 type PageStatus = 'loading' | 'valid' | 'expired' | 'error';
-type StreamStatus = 'connecting' | 'streaming' | 'ended';
+type StreamStatus = 'connecting' | 'streaming' | 'away' | 'ended';
 
 const STATUS_CONFIG: Record<StreamStatus, { icon: string; label: string; color: string }> = {
     connecting: { icon: '📡', label: 'Connecting', color: '#9ca3af' },
     streaming: { icon: '🖥️', label: 'Connected', color: '#22c55e' },
+    away: { icon: '⏸️', label: 'User Away', color: '#eab308' },
     ended: { icon: '🔴', label: 'Ended', color: '#ef4444' },
 };
 
@@ -95,14 +96,19 @@ export default function AdminViewerPage() {
             if (e.data.type === 'streamStarted') {
                 setStreamStatus('streaming');
             }
-            // Backup: also detect stream via pipelineStatusUpdate
-            if (e.data.type === 'pipelineStatusUpdate' && e.data.video === true) {
-                setStreamStatus('streaming');
+            // Detect stream status via pipelineStatusUpdate
+            if (e.data.type === 'pipelineStatusUpdate') {
+                if (e.data.video === true) {
+                    setStreamStatus('streaming');
+                } else if (e.data.video === false) {
+                    // Only show "away" if we were previously connected
+                    setStreamStatus(prev => prev === 'streaming' || prev === 'away' ? 'away' : prev);
+                }
             }
         };
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
-    }, [pageStatus, streamStatus]);
+    }, [pageStatus]);
 
     // --- Loading state ---
     if (pageStatus === 'loading') {
