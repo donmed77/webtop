@@ -168,15 +168,25 @@ export default function SessionPage() {
     }, []);
 
     // Reset latency on tab return — avoids showing WebRTC reconnection spikes
+    // Also report visibility state to backend for admin viewer
     useEffect(() => {
         const handleVisibility = () => {
             if (document.visibilityState === "visible") {
                 setLatency(null);
             }
+            // Report to backend so admin viewer can show "User Away"
+            if (sessionId) {
+                fetch(`/api/session/${sessionId}/visibility`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ visible: document.visibilityState === "visible" }),
+                    keepalive: true,
+                }).catch(() => { });
+            }
         };
         document.addEventListener("visibilitychange", handleVisibility);
         return () => document.removeEventListener("visibilitychange", handleVisibility);
-    }, []);
+    }, [sessionId]);
 
     // Lock body scroll on session page (prevents parent page from scrolling on mobile swipe)
     useEffect(() => {

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Param, Body, Ip, Query, Req, Res, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Patch, Param, Body, Ip, Query, Req, Res, HttpException, HttpStatus } from '@nestjs/common';
 import { IsString, IsNotEmpty } from 'class-validator';
 import { SessionService } from './session.service';
 import { QueueService } from '../queue/queue.service';
@@ -141,7 +141,7 @@ export class SessionController {
             return { valid: false, reason: 'Session ended' };
         }
 
-        return { valid: true, expiresAt: session.expiresAt.toISOString(), sessionId: session.id };
+        return { valid: true, expiresAt: session.expiresAt.toISOString(), sessionId: session.id, userVisible: session.userVisible !== false };
     }
 
     @Get(':id')
@@ -177,6 +177,16 @@ export class SessionController {
         if (!success) {
             throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
         }
+        return { success: true };
+    }
+    // User's session page reports tab visibility (Page Visibility API)
+    @Patch(':id/visibility')
+    updateVisibility(@Param('id') id: string, @Body() body: { visible: boolean }) {
+        const session = this.sessionService.getSession(id);
+        if (!session) {
+            throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
+        }
+        session.userVisible = body.visible;
         return { success: true };
     }
 }
