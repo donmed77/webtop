@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { SharedModule } from './shared/shared.module';
 import { SessionModule } from './session/session.module';
 import { QueueModule } from './queue/queue.module';
 import { ContainerModule } from './container/container.module';
@@ -18,6 +19,7 @@ import { TelegramModule } from './telegram/telegram.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    SharedModule,
     LoggingModule,
     ContainerModule,
     SessionModule,

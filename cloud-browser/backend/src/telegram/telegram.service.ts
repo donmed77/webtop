@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { exec } from 'child_process';
+import { GeoipService } from '../shared/geoip.service';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -38,7 +39,7 @@ export class TelegramService implements OnModuleInit {
     // Callbacks for stats (set by session/container services)
     private statsCallback: (() => any) | null = null;
 
-    constructor(private configService: ConfigService) {
+    constructor(private configService: ConfigService, private geoipService: GeoipService) {
         this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
         this.chatId = this.configService.get<string>('TELEGRAM_CHAT_ID', '');
         this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://unshortlink.com');
@@ -133,7 +134,8 @@ export class TelegramService implements OnModuleInit {
     }): Promise<void> {
         const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
         const maskedIp = this.maskIp(session.clientIp);
-        const { flag, country, countryCode } = await this.getCountryInfo(session.clientIp);
+        const { countryCode, country } = await this.geoipService.lookup(session.clientIp);
+        const flag = this.geoipService.toFlag(countryCode);
 
         // Track country for daily summary
         if (countryCode && countryCode !== 'XX') {
@@ -163,7 +165,8 @@ export class TelegramService implements OnModuleInit {
     async sendRateLimitHit(clientIp: string, attempts: number, limit: number): Promise<void> {
         const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
         const maskedIp = this.maskIp(clientIp);
-        const { flag } = await this.getCountryInfo(clientIp);
+        const { countryCode } = await this.geoipService.lookup(clientIp);
+        const flag = this.geoipService.toFlag(countryCode);
 
         const text = [
             `🛑 <b>Rate Limit Hit</b>`,
@@ -305,7 +308,8 @@ export class TelegramService implements OnModuleInit {
     /** 🔒 SSH Login Detected */
     async sendSshLogin(user: string, ip: string): Promise<void> {
         const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' });
-        const { flag } = await this.getCountryInfo(ip);
+        const { countryCode } = await this.geoipService.lookup(ip);
+        const flag = this.geoipService.toFlag(countryCode);
 
         const text = [
             `🔒 <b>SSH Login Detected</b>`,
@@ -650,7 +654,7 @@ export class TelegramService implements OnModuleInit {
             .slice(0, n)
             .map(([code, count]) => ({
                 country: this.countryNames.get(code) || code,
-                flag: this.countryCodeToFlag(code),
+                flag: this.geoipService.toFlag(code),
                 count,
             }));
     }

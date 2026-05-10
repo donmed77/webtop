@@ -10,7 +10,7 @@ import { SecurityService } from '../security/security.service';
 import { AdminGuard } from './admin.guard';
 import * as os from 'os';
 import { execSync } from 'child_process';
-import * as geoip from 'geoip-lite';
+import { GeoipService } from '../shared/geoip.service';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -28,22 +28,27 @@ export class AdminController {
         private feedbackService: FeedbackService,
         private surveyService: SurveyService,
         private securityService: SecurityService,
+        private geoipService: GeoipService,
     ) { }
 
     // ---- D2: Active Sessions ----
 
 
     @Get('sessions')
-    getActiveSessions() {
-        return this.sessionService.getActiveSessions().map(session => ({
-            id: session.id,
-            port: session.port,
-            url: session.url,
-            clientIp: session.clientIp,
-            countryCode: geoip.lookup(session.clientIp)?.country || null,
-            startedAt: session.startedAt,
-            expiresAt: session.expiresAt,
-            timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
+    async getActiveSessions() {
+        const sessions = this.sessionService.getActiveSessions();
+        return Promise.all(sessions.map(async session => {
+            const { countryCode } = await this.geoipService.lookup(session.clientIp);
+            return {
+                id: session.id,
+                port: session.port,
+                url: session.url,
+                clientIp: session.clientIp,
+                countryCode,
+                startedAt: session.startedAt,
+                expiresAt: session.expiresAt,
+                timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
+            };
         }));
     }
 
@@ -138,12 +143,12 @@ export class AdminController {
     // ---- D5: Rate Limits ----
 
     @Get('rate-limits')
-    getRateLimits() {
+    async getRateLimits() {
         const stats = this.sessionService.getRateLimitStats();
         // Enrich stats with country codes
-        const enrichedStats = stats.map((s: any) => ({
-            ...s,
-            countryCode: geoip.lookup(s.ip)?.country || null,
+        const enrichedStats = await Promise.all(stats.map(async (s: any) => {
+            const { countryCode } = await this.geoipService.lookup(s.ip);
+            return { ...s, countryCode };
         }));
         return {
             stats: enrichedStats,
