@@ -16,6 +16,7 @@ export interface Session {
     startedAt: Date;
     expiresAt: Date;
     status: 'active' | 'ended' | 'expired';
+    userVisible?: boolean;
 }
 
 @Injectable()

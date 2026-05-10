@@ -80,10 +80,15 @@ export default function AdminViewerPage() {
                 .then(data => {
                     if (!data.valid) {
                         setStreamStatus('ended');
+                    } else if (data.userVisible === false) {
+                        setStreamStatus('away');
+                    } else {
+                        // User is back — restore connected if we were showing away
+                        setStreamStatus(prev => prev === 'away' ? 'streaming' : prev);
                     }
                 })
                 .catch(() => { /* ignore network blips */ });
-        }, 5000);
+        }, 3000); // Poll every 3s for responsive away detection
         return () => clearInterval(interval);
     }, [pageStatus, port, token]);
 
