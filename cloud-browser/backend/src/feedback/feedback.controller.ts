@@ -7,10 +7,14 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import * as fs from 'fs';
 import { FeedbackService } from './feedback.service';
 import { AdminGuard } from '../admin/admin.guard';
+import { GeoipService } from '../shared/geoip.service';
 
 @Controller()
 export class FeedbackController {
-    constructor(private readonly feedbackService: FeedbackService) { }
+    constructor(
+        private readonly feedbackService: FeedbackService,
+        private readonly geoipService: GeoipService,
+    ) { }
 
     // ---- Public endpoint (users submit from session) ----
 
@@ -110,12 +114,11 @@ export class FeedbackController {
 
     @Get('admin/feedback')
     @UseGuards(AdminGuard)
-    listFeedback(
+    async listFeedback(
         @Query('status') status?: string,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ) {
-        const geoip = require('geoip-lite');
         const result = this.feedbackService.getAllFeedback(
             status,
             parseInt(limit || '50', 10),
@@ -123,9 +126,9 @@ export class FeedbackController {
         );
         return {
             ...result,
-            feedback: result.feedback.map((item: any) => ({
-                ...item,
-                countryCode: geoip.lookup(item.clientIp)?.country || null,
+            feedback: await Promise.all(result.feedback.map(async (item: any) => {
+                const { countryCode } = await this.geoipService.lookup(item.clientIp);
+                return { ...item, countryCode };
             })),
         };
     }

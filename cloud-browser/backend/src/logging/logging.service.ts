@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as geoip from 'geoip-lite';
+import { GeoipService } from '../shared/geoip.service';
 
 export interface SessionLog {
     id: number;
@@ -25,7 +25,7 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
     private readonly retentionDays: number;
     private cleanupInterval: NodeJS.Timeout;
 
-    constructor(private configService: ConfigService) {
+    constructor(private configService: ConfigService, private geoipService: GeoipService) {
         const dataDir = this.configService.get<string>('DATA_DIR', './data');
         this.dbPath = path.join(dataDir, 'sessions.db');
         this.retentionDays = this.configService.get<number>('LOG_RETENTION_DAYS', 30);
@@ -116,10 +116,9 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
     /**
      * Log session start
      */
-    logSessionStart(sessionId: string, url: string, clientIp: string): void {
+    async logSessionStart(sessionId: string, url: string, clientIp: string): Promise<void> {
         try {
-            const geo = geoip.lookup(clientIp);
-            const countryCode = geo?.country || null;
+            const { countryCode } = await this.geoipService.lookup(clientIp);
             const stmt = this.db.prepare(`
                 INSERT INTO session_logs (session_id, url, client_ip, country_code, started_at)
                 VALUES (?, ?, ?, ?, ?)

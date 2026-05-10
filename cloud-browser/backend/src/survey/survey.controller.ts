@@ -4,10 +4,14 @@ import {
 } from '@nestjs/common';
 import { SurveyService } from './survey.service';
 import { AdminGuard } from '../admin/admin.guard';
+import { GeoipService } from '../shared/geoip.service';
 
 @Controller()
 export class SurveyController {
-    constructor(private readonly surveyService: SurveyService) { }
+    constructor(
+        private readonly surveyService: SurveyService,
+        private readonly geoipService: GeoipService,
+    ) { }
 
     // ---- Public endpoint ----
 
@@ -53,20 +57,19 @@ export class SurveyController {
 
     @Get('admin/surveys')
     @UseGuards(AdminGuard)
-    getSurveys(
+    async getSurveys(
         @Query('page') page?: string,
         @Query('limit') limit?: string,
     ) {
-        const geoip = require('geoip-lite');
         const result = this.surveyService.getSurveys(
             parseInt(page || '1', 10),
             Math.min(parseInt(limit || '50', 10), 100),
         );
         return {
             ...result,
-            surveys: result.surveys.map((s: any) => ({
-                ...s,
-                countryCode: geoip.lookup(s.clientIp)?.country || null,
+            surveys: await Promise.all(result.surveys.map(async (s: any) => {
+                const { countryCode } = await this.geoipService.lookup(s.clientIp);
+                return { ...s, countryCode };
             })),
         };
     }
