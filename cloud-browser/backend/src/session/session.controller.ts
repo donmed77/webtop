@@ -3,6 +3,7 @@ import { IsString, IsNotEmpty } from 'class-validator';
 import { SessionService } from './session.service';
 import { QueueService } from '../queue/queue.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { ContainerService } from '../container/container.service';
 
 export class CreateSessionDto {
     @IsString()
@@ -16,6 +17,7 @@ export class SessionController {
         private sessionService: SessionService,
         private queueService: QueueService,
         private telegramService: TelegramService,
+        private containerService: ContainerService,
     ) { }
 
     /**
@@ -118,7 +120,7 @@ export class SessionController {
     // Viewer token validation (used by standalone admin viewer page)
     // MUST be above @Get(':id') to avoid wildcard conflict
     @Get('viewer/validate')
-    validateViewerToken(
+    async validateViewerToken(
         @Query('port') port: string,
         @Query('t') token: string,
     ) {
@@ -141,7 +143,16 @@ export class SessionController {
             return { valid: false, reason: 'Session ended' };
         }
 
-        return { valid: true, expiresAt: session.expiresAt.toISOString(), sessionId: session.id, userVisible: session.userVisible !== false };
+        // Step 3: Check if Docker container is actually running
+        const containerRunning = await this.containerService.isContainerRunningOnPort(portNum);
+
+        return {
+            valid: true,
+            expiresAt: session.expiresAt.toISOString(),
+            sessionId: session.id,
+            userVisible: session.userVisible !== false,
+            containerRunning,
+        };
     }
 
     @Get(':id')

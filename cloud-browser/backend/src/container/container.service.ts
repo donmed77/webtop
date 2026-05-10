@@ -756,6 +756,19 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         return Array.from(this.pool.values()).filter(c => c.status === 'active');
     }
 
+    /** Check if the Docker container on a given port is actually running (not just in pool) */
+    async isContainerRunningOnPort(port: number): Promise<boolean> {
+        const container = Array.from(this.pool.values()).find(c => c.port === port);
+        if (!container) return false;
+        try {
+            const dc = this.docker.getContainer(container.containerId);
+            const info = await dc.inspect();
+            return info.State?.Running === true;
+        } catch {
+            return false;
+        }
+    }
+
     getWarmCount(): number {
         return Array.from(this.pool.values()).filter(c => c.status === 'warm').length;
     }
