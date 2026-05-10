@@ -755,16 +755,29 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     getActiveContainers(): PooledContainer[] {
         return Array.from(this.pool.values()).filter(c => c.status === 'active');
     }
+    /** Cache for container health checks — avoids hitting Docker API every poll */
+    private containerHealthCache: Map<number, { running: boolean; checkedAt: number }> = new Map();
+    private static readonly HEALTH_CACHE_TTL_MS = 10_000; // 10s
 
-    /** Check if the Docker container on a given port is actually running (not just in pool) */
+    /** Check if the Docker container on a given port is actually running (cached 10s) */
     async isContainerRunningOnPort(port: number): Promise<boolean> {
+        const cached = this.containerHealthCache.get(port);
+        if (cached && Date.now() - cached.checkedAt < ContainerService.HEALTH_CACHE_TTL_MS) {
+            return cached.running;
+        }
         const container = Array.from(this.pool.values()).find(c => c.port === port);
-        if (!container) return false;
+        if (!container) {
+            this.containerHealthCache.set(port, { running: false, checkedAt: Date.now() });
+            return false;
+        }
         try {
             const dc = this.docker.getContainer(container.containerId);
             const info = await dc.inspect();
-            return info.State?.Running === true;
+            const running = info.State?.Running === true;
+            this.containerHealthCache.set(port, { running, checkedAt: Date.now() });
+            return running;
         } catch {
+            this.containerHealthCache.set(port, { running: false, checkedAt: Date.now() });
             return false;
         }
     }

@@ -191,15 +191,14 @@ export class SessionController {
         }
         return { success: true };
     }
-    // User's session page reports tab visibility + WebRTC state
+    // User's session page reports tab visibility (Page Visibility API)
     @Patch(':id/visibility')
-    updateVisibility(@Param('id') id: string, @Body() body: { visible?: boolean; connectionState?: string }) {
+    updateVisibility(@Param('id') id: string, @Body() body: { visible: boolean }) {
         const session = this.sessionService.getSession(id);
         if (!session) {
             throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
         }
-        if (body.visible !== undefined) session.userVisible = body.visible;
-        if (body.connectionState) session.userConnectionState = body.connectionState;
+        session.userVisible = body.visible;
         return { success: true };
     }
 }
