@@ -202,6 +202,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             this.connectionLostTimers.delete(data.sessionId);
         }
         session.userConnectionState = 'connected';
+        session.userVisible = true;
 
         client.emit('session:joined', {
             sessionId: session.id,
