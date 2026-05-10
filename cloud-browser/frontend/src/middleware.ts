@@ -14,6 +14,6 @@ export default function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Exclude cloud-browser routes, API, static files, and Next.js internals
-    "/((?!api|_next|queue|session|session-ended|survey|rate-limited|ctrl-7f9x2k|sounds|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|txt|xml|webmanifest|mp3)).*)",
+    "/((?!api|_next|queue|session|session-ended|survey|rate-limited|ctrl-7f9x2k|admin|sounds|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|txt|xml|webmanifest|mp3)).*)",
   ],
 };
