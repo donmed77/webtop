@@ -2,6 +2,7 @@ import { Controller, Post, Get, Delete, Param, Body, Ip, Query, Req, Res, HttpEx
 import { IsString, IsNotEmpty } from 'class-validator';
 import { SessionService } from './session.service';
 import { QueueService } from '../queue/queue.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 export class CreateSessionDto {
     @IsString()
@@ -14,6 +15,7 @@ export class SessionController {
     constructor(
         private sessionService: SessionService,
         private queueService: QueueService,
+        private telegramService: TelegramService,
     ) { }
 
     /**
@@ -111,6 +113,35 @@ export class SessionController {
         }
         const valid = this.sessionService.validateBrowserAccess(parseInt(port, 10), token || null);
         return res.status(valid ? 200 : 403).send(valid ? 'OK' : 'Forbidden');
+    }
+
+    // Viewer token validation (used by standalone admin viewer page)
+    // MUST be above @Get(':id') to avoid wildcard conflict
+    @Get('viewer/validate')
+    validateViewerToken(
+        @Query('port') port: string,
+        @Query('t') token: string,
+    ) {
+        if (!port || !token) {
+            return { valid: false, reason: 'Missing port or token' };
+        }
+
+        const portNum = parseInt(port, 10);
+
+        // Step 1: Validate HMAC signature + expiry
+        const result = this.telegramService.validateViewerToken(token, portNum);
+        if (!result.valid) {
+            return { valid: false, reason: result.reason };
+        }
+
+        // Step 2: Check if session is still active on this port with the same sessionId
+        const activeSessions = this.sessionService.getActiveSessions();
+        const session = activeSessions.find(s => s.port === portNum && s.id === result.sessionId);
+        if (!session) {
+            return { valid: false, reason: 'Session ended' };
+        }
+
+        return { valid: true };
     }
 
     @Get(':id')
