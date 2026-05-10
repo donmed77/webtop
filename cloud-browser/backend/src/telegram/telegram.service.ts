@@ -32,7 +32,6 @@ export class TelegramService implements OnModuleInit {
     private countryNames: Map<string, string> = new Map(); // countryCode -> country name
 
     // SSH log watcher
-    private sshWatcher: fs.FSWatcher | null = null;
     private lastAuthLogSize = 0;
 
     // Callbacks for stats (set by session/container services)
@@ -499,11 +498,12 @@ export class TelegramService implements OnModuleInit {
             const stat = fs.statSync(authLogPath);
             this.lastAuthLogSize = stat.size;
 
-            this.sshWatcher = fs.watch(authLogPath, () => {
+            // Poll every 30 seconds (fs.watch doesn't work with Docker read-only mounts)
+            setInterval(() => {
                 this.checkNewSshLogins(authLogPath);
-            });
+            }, 30_000);
 
-            this.logger.log('SSH login watcher started');
+            this.logger.log('SSH login watcher started (polling mode)');
         } catch (err) {
             this.logger.warn(`SSH watcher failed to start: ${err.message}`);
         }
