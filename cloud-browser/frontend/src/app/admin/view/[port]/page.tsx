@@ -154,20 +154,20 @@ export default function AdminViewerPage() {
     return (
         <div style={styles.viewerContainer}>
             {/* Top bar */}
-            <div style={styles.topBar}>
-                <span style={styles.badge}>👁️ Admin Viewer</span>
+            <div className="viewer-topbar">
+                <span className="viewer-badge">👁️ <span className="viewer-badge-text">Admin Viewer</span></span>
 
-                <span style={styles.separator}>│</span>
+                <span className="viewer-sep">│</span>
 
-                <span style={{ ...styles.statusBadge, color: statusCfg.color }}>
+                <span className="viewer-status" style={{ color: statusCfg.color }}>
                     {statusCfg.icon} {statusCfg.label}
                 </span>
 
-                <span style={styles.separator}>│</span>
+                <span className="viewer-sep">│</span>
 
-                <span style={styles.timer}>⏱️ {timeRemaining}</span>
+                <span className="viewer-timer">⏱️ {timeRemaining}</span>
 
-                <span style={styles.readOnly}>🔒 Read-only</span>
+                <span className="viewer-readonly">🔒 <span className="viewer-readonly-text">Read-only</span></span>
             </div>
 
             {/* Viewer iframe */}
@@ -246,40 +246,6 @@ const styles: Record<string, React.CSSProperties> = {
         background: '#000',
         display: 'flex',
         flexDirection: 'column' as const,
-    },
-    topBar: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '8px 16px',
-        background: 'rgba(124, 58, 237, 0.15)',
-        borderBottom: '1px solid rgba(124, 58, 237, 0.3)',
-        zIndex: 10,
-        fontFamily: "'Inter', sans-serif",
-    },
-    badge: {
-        color: '#fff',
-        fontSize: '13px',
-        fontWeight: 600,
-    },
-    separator: {
-        color: 'rgba(255,255,255,0.2)',
-        fontSize: '13px',
-    },
-    statusBadge: {
-        fontSize: '12px',
-        fontWeight: 600,
-    },
-    timer: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: '12px',
-        fontFamily: "'Inter', monospace",
-    },
-    readOnly: {
-        marginLeft: 'auto',
-        color: '#7c3aed',
-        fontSize: '12px',
-        fontWeight: 600,
     },
     iframe: {
         flex: 1,
