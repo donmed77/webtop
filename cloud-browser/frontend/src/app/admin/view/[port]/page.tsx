@@ -6,13 +6,11 @@ import { useParams, useSearchParams } from 'next/navigation';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 type PageStatus = 'loading' | 'valid' | 'expired' | 'error';
-type StreamStatus = 'connecting' | 'streaming' | 'paused' | 'reconnecting' | 'ended';
+type StreamStatus = 'connecting' | 'streaming' | 'ended';
 
 const STATUS_CONFIG: Record<StreamStatus, { icon: string; label: string; color: string }> = {
     connecting: { icon: '📡', label: 'Connecting', color: '#9ca3af' },
     streaming: { icon: '🎬', label: 'Streaming', color: '#22c55e' },
-    paused: { icon: '⏸️', label: 'Paused', color: '#eab308' },
-    reconnecting: { icon: '🔄', label: 'Reconnecting', color: '#f97316' },
     ended: { icon: '🔴', label: 'Ended', color: '#ef4444' },
 };
 
@@ -93,15 +91,13 @@ export default function AdminViewerPage() {
         if (pageStatus !== 'valid') return;
         const handler = (e: MessageEvent) => {
             if (!e.data || typeof e.data !== 'object') return;
+            // streamStarted is posted by our injected Nginx JS
             if (e.data.type === 'streamStarted') {
                 setStreamStatus('streaming');
             }
-            if (e.data.type === 'pipelineStatusUpdate') {
-                if (e.data.video === false && streamStatus === 'streaming') {
-                    setStreamStatus('paused');
-                } else if (e.data.video === true) {
-                    setStreamStatus('streaming');
-                }
+            // Backup: also detect stream via pipelineStatusUpdate
+            if (e.data.type === 'pipelineStatusUpdate' && e.data.video === true) {
+                setStreamStatus('streaming');
             }
         };
         window.addEventListener('message', handler);
@@ -161,7 +157,6 @@ export default function AdminViewerPage() {
                 src={`/browser/${port}/#shared`}
                 style={styles.iframe}
                 allow="autoplay"
-                sandbox="allow-scripts allow-same-origin"
             />
 
             {/* Click blocker overlay */}
