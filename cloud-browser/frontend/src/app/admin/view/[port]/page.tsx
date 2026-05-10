@@ -10,7 +10,7 @@ type StreamStatus = 'connecting' | 'streaming' | 'ended';
 
 const STATUS_CONFIG: Record<StreamStatus, { icon: string; label: string; color: string }> = {
     connecting: { icon: '📡', label: 'Connecting', color: '#9ca3af' },
-    streaming: { icon: '🎬', label: 'Streaming', color: '#22c55e' },
+    streaming: { icon: '🖥️', label: 'Connected', color: '#22c55e' },
     ended: { icon: '🔴', label: 'Ended', color: '#ef4444' },
 };
 
