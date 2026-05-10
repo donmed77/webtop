@@ -29,6 +29,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
     private sessionViewers: Map<string, Set<string>> = new Map(); // sessionId -> Set<viewer socketId>
     private clientIsViewer: Map<string, boolean> = new Map(); // socketId -> isViewer
     private reconnectingSessions: Map<string, { disconnectedAt: number; timer: NodeJS.Timeout }> = new Map();
+    private connectionLostTimers: Map<string, NodeJS.Timeout> = new Map(); // sessionId -> delayed disconnect timer
     private timerInterval: NodeJS.Timeout;
 
     constructor(private sessionService: SessionService) {
@@ -74,9 +75,15 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
                 const wasPrimary = this.sessionPrimary.get(sessionId) === client.id;
                 if (wasPrimary) {
                     this.sessionPrimary.delete(sessionId);
-                    // Mark user connection as lost for admin viewer
-                    const session = this.sessionService.getSession(sessionId);
-                    if (session) session.userConnectionState = 'disconnected';
+                    // Delay "connection lost" indicator — avoid false positives from brief reconnects
+                    const connectionLostTimer = setTimeout(() => {
+                        const session = this.sessionService.getSession(sessionId);
+                        // Only mark disconnected if no new primary reconnected
+                        if (session && !this.sessionPrimary.has(sessionId)) {
+                            session.userConnectionState = 'disconnected';
+                        }
+                    }, 10_000); // 10s grace period
+                    this.connectionLostTimers.set(sessionId, connectionLostTimer);
                     // Cancel any stale timer from a previous disconnect
                     const existing = this.reconnectingSessions.get(sessionId);
                     if (existing) clearTimeout(existing.timer);
@@ -188,7 +195,12 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
             }
         }
         this.sessionPrimary.set(data.sessionId, client.id);
-        // Mark user connection as restored for admin viewer
+        // Cancel pending connection lost timer and restore state
+        const pendingTimer = this.connectionLostTimers.get(data.sessionId);
+        if (pendingTimer) {
+            clearTimeout(pendingTimer);
+            this.connectionLostTimers.delete(data.sessionId);
+        }
         session.userConnectionState = 'connected';
 
         client.emit('session:joined', {
