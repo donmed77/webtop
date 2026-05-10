@@ -58,8 +58,8 @@ export default function AdminViewerLayout({ children }: { children: React.ReactN
                         padding: 6px 10px;
                         min-height: 32px;
                     }
-                    .viewer-badge-text {
-                        display: none;
+                    .viewer-badge {
+                        font-size: 11px;
                     }
                     .viewer-sep {
                         display: none;
