@@ -48,6 +48,9 @@ export class AdminController {
                 startedAt: session.startedAt,
                 expiresAt: session.expiresAt,
                 timeRemaining: this.sessionService.getSessionTimeRemaining(session.id),
+                userVisible: session.userVisible !== false,
+                userConnectionState: session.userConnectionState || 'connected',
+                viewerCount: this.sessionGateway.getViewerCount(session.id),
             };
         }));
     }

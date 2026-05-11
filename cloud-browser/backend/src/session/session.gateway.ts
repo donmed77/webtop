@@ -301,6 +301,11 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
         }
     }
 
+    /** Get viewer count for a session (used by admin dashboard) */
+    getViewerCount(sessionId: string): number {
+        return this.sessionViewers.get(sessionId)?.size || 0;
+    }
+
     private emitViewerCount(sessionId: string) {
         const count = this.sessionViewers.get(sessionId)?.size || 0;
         const primaryId = this.sessionPrimary.get(sessionId);
