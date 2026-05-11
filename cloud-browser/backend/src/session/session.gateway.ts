@@ -75,6 +75,9 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
                 const wasPrimary = this.sessionPrimary.get(sessionId) === client.id;
                 if (wasPrimary) {
                     this.sessionPrimary.delete(sessionId);
+                    // Clear any existing connection lost timer before creating a new one
+                    const existingCL = this.connectionLostTimers.get(sessionId);
+                    if (existingCL) clearTimeout(existingCL);
                     // Delay "connection lost" indicator — avoid false positives from brief reconnects
                     const connectionLostTimer = setTimeout(() => {
                         const session = this.sessionService.getSession(sessionId);
@@ -99,6 +102,9 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
         const clients = this.sessionClients.get(sessionId);
         if (!clients || clients.size === 0) {
             this.reconnectingSessions.delete(sessionId);
+            // Clean up connection lost timer to prevent leaks
+            const pendingCL = this.connectionLostTimers.get(sessionId);
+            if (pendingCL) { clearTimeout(pendingCL); this.connectionLostTimers.delete(sessionId); }
             const session = this.sessionService.getSession(sessionId);
             if (session && session.status === 'active') {
                 this.logger.log(`Session ${sessionId} abandoned, ending...`);

@@ -73,7 +73,7 @@ export default function AdminViewerPage() {
         return () => clearInterval(interval);
     }, [expiresAt]);
 
-    // Poll backend every 5s to check if session is still active
+    // Poll backend every 3s to check if session is still active
     useEffect(() => {
         if (pageStatus !== 'valid') return;
         const interval = setInterval(() => {
