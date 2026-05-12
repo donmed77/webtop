@@ -117,6 +117,9 @@ interface Session {
     startedAt: string;
     expiresAt: string;
     timeRemaining: number;
+    userVisible?: boolean;
+    userConnectionState?: string;
+    viewerCount?: number;
 }
 
 interface QueueEntry {
@@ -1096,11 +1099,13 @@ export default function AdminPage() {
                                             <thead>
                                                 <tr className="border-b">
                                                     <th className="text-left p-2">Session ID</th>
+                                                    <th className="text-left p-2">Status</th>
                                                     <th className="text-left p-2">Port</th>
                                                     <th className="text-left p-2">URL</th>
                                                     <th className="text-left p-2">Client IP</th>
                                                     <th className="text-left p-2">Started</th>
                                                     <th className="text-left p-2">Time Left</th>
+                                                    <th className="text-left p-2">👁️</th>
                                                     <th className="text-left p-2">Actions</th>
                                                 </tr>
                                             </thead>
@@ -1108,11 +1113,35 @@ export default function AdminPage() {
                                                 {sessions.map((session) => (
                                                     <tr key={session.id} className="border-b">
                                                         <td className="p-2 font-mono text-xs">{session.id.slice(0, 8)}...</td>
+                                                        <td className="p-2">
+                                                            {session.userConnectionState === 'disconnected' ? (
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400">
+                                                                    <span className="w-2 h-2 rounded-full bg-red-400" />Lost
+                                                                </span>
+                                                            ) : session.userVisible === false ? (
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-yellow-400">
+                                                                    <span className="w-2 h-2 rounded-full bg-yellow-400" />Away
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                                                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />Connected
+                                                                </span>
+                                                            )}
+                                                        </td>
                                                         <td className="p-2">{session.port}</td>
                                                         <td className="p-2 max-w-xs truncate">{session.url}</td>
                                                         <td className="p-2"><FlagIP ip={session.clientIp} countryCode={session.countryCode} /></td>
                                                         <td className="p-2">{formatDate(session.startedAt)}</td>
-                                                        <td className="p-2 font-mono">{formatTime(session.timeRemaining)}</td>
+                                                        <td className="p-2 font-mono tabular-nums">
+                                                            <span className={session.timeRemaining <= 60 ? 'text-red-400 font-semibold' : session.timeRemaining <= 120 ? 'text-yellow-400' : ''}>
+                                                                {formatTime(session.timeRemaining)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <span className={`text-xs font-mono ${(session.viewerCount || 0) > 0 ? 'text-purple-400' : 'text-muted-foreground'}`}>
+                                                                {session.viewerCount || 0}/1
+                                                            </span>
+                                                        </td>
                                                         <td className="p-2">
                                                             <div className="flex gap-2">
                                                                 <Button

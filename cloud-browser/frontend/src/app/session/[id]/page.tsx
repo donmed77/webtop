@@ -180,7 +180,6 @@ export default function SessionPage() {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ visible: document.visibilityState === "visible" }),
-                    keepalive: true,
                 }).catch(() => { });
             }
         };
