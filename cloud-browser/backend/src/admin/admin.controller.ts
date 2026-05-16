@@ -107,6 +107,7 @@ export class AdminController {
                 userConnectionState: session.userConnectionState || 'connected',
                 viewerCount: this.sessionGateway.getViewerCount(session.id),
                 containerRunning,
+                streamReady: this.sessionGateway.isStreamReady(session.id),
             };
         }));
     }

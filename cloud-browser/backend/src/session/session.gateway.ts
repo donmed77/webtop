@@ -306,6 +306,11 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
         return this.sessionViewers.get(sessionId)?.size || 0;
     }
 
+    /** Check if session stream is ready (Chrome launched) */
+    isStreamReady(sessionId: string): boolean {
+        return this.chromeLaunched.has(sessionId);
+    }
+
     private emitViewerCount(sessionId: string) {
         const count = this.sessionViewers.get(sessionId)?.size || 0;
         const primaryId = this.sessionPrimary.get(sessionId);

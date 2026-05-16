@@ -121,6 +121,7 @@ interface Session {
     userConnectionState?: string;
     viewerCount?: number;
     containerRunning?: boolean;
+    streamReady?: boolean;
 }
 
 interface QueueEntry {
@@ -1155,6 +1156,10 @@ export default function AdminPage() {
                                                             ) : session.userVisible === false ? (
                                                                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-yellow-400">
                                                                     <span className="w-2 h-2 rounded-full bg-yellow-400" />Away
+                                                                </span>
+                                                            ) : session.streamReady === false ? (
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-400">
+                                                                    <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />📡 Connecting
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
