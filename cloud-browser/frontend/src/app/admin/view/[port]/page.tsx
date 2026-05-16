@@ -91,7 +91,7 @@ export default function AdminViewerPage() {
                     } else {
                         // Restore if things are back to normal
                         setStreamStatus(prev => 
-                            ['away', 'container_down', 'connection_lost'].includes(prev) ? 'streaming' : prev
+                            ['connecting', 'away', 'container_down', 'connection_lost'].includes(prev) ? 'streaming' : prev
                         );
                     }
                 })
