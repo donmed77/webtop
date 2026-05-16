@@ -40,9 +40,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     private shuttingDown = false;
 
     // Runtime-adjustable container resources (affect new containers only)
-    private cpuCores: number = 6;
-    private memoryGB: number = 12;
-    private shmGB: number = 12;
+    private cpuCores: number;
+    private memoryGB: number;
+    private shmGB: number;
 
     // Metrics
     private metrics = {
@@ -68,6 +68,9 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.containerPrefix = this.configService.get<string>('CONTAINER_PREFIX', 'session');
         this.networkName = this.configService.get<string>('NETWORK_NAME', 'cloud-browser-isolated');
         this.projectRoot = this.configService.get<string>('PROJECT_ROOT', '/root/apps/webtop');
+        this.cpuCores = this.configService.get<number>('CPU_CORES', 6);
+        this.memoryGB = this.configService.get<number>('RAM_GB', 12);
+        this.shmGB = this.configService.get<number>('SHM_GB', 12);
 
         // Load hardened seccomp profile for session containers
         // SECURITY #6: Hard-fail if seccomp profile is missing or corrupt — never run unconfined
