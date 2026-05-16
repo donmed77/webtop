@@ -334,6 +334,17 @@ export default function AdminPage() {
     const [fsEvents, setFsEvents] = useState<FsEvent[]>([]);
     const [dockerImage, setDockerImage] = useState<{ digest: string | null; tracked: boolean }>({ digest: null, tracked: false });
 
+    // Build version
+    const [buildVersion, setBuildVersion] = useState<{
+        backend: { commit: string; branch: string; builtAt: string };
+        frontend: { commit: string; branch: string; builtAt: string };
+        nginx: { configHash: string; lastModified: string };
+        synced: boolean;
+    } | null>(null);
+    const [versionSpinning, setVersionSpinning] = useState(false);
+    const [deployHistory, setDeployHistory] = useState<{ id: number; commitHash: string; branch: string; builtAt: string; deployedAt: string }[]>([]);
+    const [showDeployHistory, setShowDeployHistory] = useState(false);
+
     // Config form state — track which sliders the user has touched
     const [newPoolSize, setNewPoolSize] = useState("");
     const [newDuration, setNewDuration] = useState("");
@@ -586,6 +597,24 @@ export default function AdminPage() {
         const interval = setInterval(fetchAll, 3000);
         return () => clearInterval(interval);
     }, [authenticated, dirtyFields.size]);
+
+    // Fetch build version (on auth + manual refresh)
+    const fetchVersion = useCallback(async () => {
+        try {
+            const res = await fetch(`${apiUrl}/api/admin/version`, { headers: getAuthHeaders() });
+            if (res.ok) setBuildVersion(await res.json());
+        } catch { /* ignore */ }
+    }, [authenticated]);
+
+    useEffect(() => {
+        if (!authenticated) return;
+        fetchVersion();
+        // Also fetch deploy history
+        fetch(`${apiUrl}/api/admin/version/history`, { headers: getAuthHeaders() })
+            .then(r => r.ok ? r.json() : [])
+            .then(data => setDeployHistory(data))
+            .catch(() => {});
+    }, [authenticated]);
 
     // Auto-open viewer from Telegram bot link (?view=PORT)
     useEffect(() => {
@@ -2749,6 +2778,99 @@ export default function AdminPage() {
                             style={{ pointerEvents: "none" }}
                         />
                     </div>
+                </div>
+            )}
+            {/* Build Version Footer */}
+            {buildVersion && buildVersion.backend.commit !== 'unknown' && (
+                <div className="fixed bottom-0 left-0 right-0 py-1.5 px-4 bg-zinc-900/80 backdrop-blur-sm border-t border-zinc-800 text-[11px] font-mono text-zinc-500 z-40">
+                    <div className="flex items-center justify-center gap-3 flex-wrap">
+                        {/* Sync status */}
+                        {buildVersion.synced ? (
+                            <span className="text-emerald-500" title="Backend and Frontend are on the same commit">✓ synced</span>
+                        ) : (
+                            <span className="text-amber-400 animate-pulse" title="Backend and Frontend are on different commits!">⚠ mismatch</span>
+                        )}
+
+                        <span className="text-zinc-700">|</span>
+
+                        {/* Backend */}
+                        <span className="text-zinc-600">BE</span>
+                        <span className="text-zinc-400">{buildVersion.backend.commit}</span>
+                        <span className="text-zinc-600">({buildVersion.backend.branch})</span>
+
+                        <span className="text-zinc-700">·</span>
+
+                        {/* Frontend */}
+                        <span className="text-zinc-600">FE</span>
+                        <span className={buildVersion.synced ? 'text-zinc-400' : 'text-amber-400'}>{buildVersion.frontend.commit}</span>
+
+                        <span className="text-zinc-700">·</span>
+
+                        {/* Nginx */}
+                        <span className="text-zinc-600">Nginx</span>
+                        <span className="text-zinc-400">{buildVersion.nginx.configHash}</span>
+
+                        <span className="text-zinc-700">|</span>
+
+                        {/* Build time in Algeria timezone */}
+                        <span>built {(() => {
+                            try {
+                                const d = new Date(buildVersion.backend.builtAt);
+                                return d.toLocaleString('en-GB', { timeZone: 'Africa/Algiers', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+                            } catch { return buildVersion.backend.builtAt; }
+                        })()}</span>
+
+                        {/* Refresh button */}
+                        <button
+                            onClick={async () => {
+                                setVersionSpinning(true);
+                                await fetchVersion();
+                                // Also refresh deploy history
+                                try {
+                                    const r = await fetch(`${apiUrl}/api/admin/version/history`, { headers: getAuthHeaders() });
+                                    if (r.ok) setDeployHistory(await r.json());
+                                } catch { /* ignore */ }
+                                setTimeout(() => setVersionSpinning(false), 600);
+                            }}
+                            className="ml-1 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                            title="Refresh version info"
+                        >
+                            <svg className={`w-3 h-3 ${versionSpinning ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+
+                        {/* Deploy history toggle */}
+                        <button
+                            onClick={() => setShowDeployHistory(!showDeployHistory)}
+                            className="ml-1 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                            title="Deploy history"
+                        >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Deploy history dropdown */}
+                    {showDeployHistory && deployHistory.length > 0 && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-96 max-h-48 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl p-2">
+                            <div className="text-[10px] text-zinc-400 font-semibold mb-1 px-1">Deploy History</div>
+                            {deployHistory.map((d) => (
+                                <div key={d.id} className="flex items-center gap-2 px-1 py-0.5 hover:bg-zinc-800 rounded text-[10px]">
+                                    <span className="text-zinc-400 font-semibold">{d.commitHash}</span>
+                                    <span className="text-zinc-600">{d.branch}</span>
+                                    <span className="text-zinc-500 ml-auto">
+                                        {(() => {
+                                            try {
+                                                return new Date(d.deployedAt).toLocaleString('en-GB', { timeZone: 'Africa/Algiers', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+                                            } catch { return d.deployedAt; }
+                                        })()}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </main>

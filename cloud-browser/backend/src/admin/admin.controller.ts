@@ -10,6 +10,8 @@ import { SecurityService } from '../security/security.service';
 import { AdminGuard } from './admin.guard';
 import * as os from 'os';
 import { execSync } from 'child_process';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
 import { GeoipService } from '../shared/geoip.service';
 
 @Controller('admin')
@@ -30,6 +32,56 @@ export class AdminController {
         private securityService: SecurityService,
         private geoipService: GeoipService,
     ) { }
+
+    // ---- Build Version ----
+
+    @Get('version')
+    async getVersion() {
+        const backend = {
+            commit: process.env.GIT_COMMIT || 'unknown',
+            branch: process.env.GIT_BRANCH || 'unknown',
+            builtAt: process.env.BUILD_TIME || 'unknown',
+        };
+
+        // Fetch frontend version (via Docker internal network, not public URL which nginx routes to backend)
+        let frontend = { commit: 'unknown', branch: 'unknown', builtAt: 'unknown' };
+        try {
+            const res = await fetch('http://frontend:3000/api/version', { signal: AbortSignal.timeout(3000) });
+            if (res.ok) frontend = await res.json();
+        } catch { /* frontend unreachable */ }
+
+        // Nginx config hash
+        let nginx = { configHash: 'unknown', lastModified: 'unknown' };
+        const nginxPaths = [
+            '/host_watch/nginx_sites/cloud-browser.conf',
+            '/host_watch/nginx_sites/dev-cloud-browser.conf',
+        ];
+        for (const p of nginxPaths) {
+            try {
+                if (fs.existsSync(p)) {
+                    const content = fs.readFileSync(p, 'utf-8');
+                    nginx.configHash = crypto.createHash('md5').update(content).digest('hex').slice(0, 8);
+                    const stat = fs.statSync(p);
+                    nginx.lastModified = stat.mtime.toISOString();
+                    break;
+                }
+            } catch { /* ignore */ }
+        }
+
+        // Version mismatch detection
+        const synced = backend.commit !== 'unknown' && frontend.commit !== 'unknown'
+            && backend.commit === frontend.commit;
+
+        // Log this deploy to history (idempotent — only inserts if commit changed)
+        this.loggingService.logDeploy(backend.commit, backend.branch, backend.builtAt);
+
+        return { backend, frontend, nginx, synced };
+    }
+
+    @Get('version/history')
+    getVersionHistory() {
+        return this.loggingService.getDeployHistory();
+    }
 
     // ---- D2: Active Sessions ----
 

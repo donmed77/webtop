@@ -52,6 +52,10 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3005;
   await app.listen(port);
-  console.log(`🚀 Cloud Browser Backend running on port ${port}`);
+
+  const commit = process.env.GIT_COMMIT || 'unknown';
+  const branch = process.env.GIT_BRANCH || 'unknown';
+  const buildTime = process.env.BUILD_TIME || 'unknown';
+  console.log(`🚀 Cloud Browser Backend running on port ${port} | ${commit} (${branch}) built ${buildTime}`);
 }
 bootstrap();

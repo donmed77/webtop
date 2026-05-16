@@ -100,6 +100,16 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 date TEXT PRIMARY KEY,
                 peak INTEGER NOT NULL DEFAULT 0
             );
+
+            -- Deploy version history
+            CREATE TABLE IF NOT EXISTS deploy_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                commit_hash TEXT NOT NULL,
+                branch TEXT,
+                built_at TEXT,
+                deployed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(commit_hash)
+            );
         `);
 
         // Add country_code column if it doesn't exist (migration)
@@ -432,6 +442,35 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
         } catch (err) {
             this.logger.error(`Failed to reset daily peaks: ${err.message}`);
             return 0;
+        }
+    }
+
+    // ---- Deploy Version History ----
+
+    /** Idempotent: only inserts if commit hash is new */
+    logDeploy(commit: string, branch: string, builtAt: string) {
+        if (!commit || commit === 'unknown') return;
+        try {
+            this.db.prepare(`
+                INSERT OR IGNORE INTO deploy_history (commit_hash, branch, built_at, deployed_at)
+                VALUES (?, ?, ?, ?)
+            `).run(commit, branch, builtAt, new Date().toISOString());
+        } catch (err) {
+            this.logger.error(`Failed to log deploy: ${err.message}`);
+        }
+    }
+
+    getDeployHistory(limit = 20): { id: number; commitHash: string; branch: string; builtAt: string; deployedAt: string }[] {
+        try {
+            return this.db.prepare(`
+                SELECT id, commit_hash as commitHash, branch, built_at as builtAt, deployed_at as deployedAt
+                FROM deploy_history
+                ORDER BY id DESC
+                LIMIT ?
+            `).all(limit) as any[];
+        } catch (err) {
+            this.logger.error(`Failed to get deploy history: ${err.message}`);
+            return [];
         }
     }
 }
