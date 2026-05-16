@@ -120,6 +120,7 @@ interface Session {
     userVisible?: boolean;
     userConnectionState?: string;
     viewerCount?: number;
+    containerRunning?: boolean;
 }
 
 interface QueueEntry {
@@ -1143,7 +1144,11 @@ export default function AdminPage() {
                                                     <tr key={session.id} className="border-b">
                                                         <td className="p-2 font-mono text-xs">{session.id.slice(0, 8)}...</td>
                                                         <td className="p-2">
-                                                            {session.userConnectionState === 'disconnected' ? (
+                                                            {session.containerRunning === false ? (
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400">
+                                                                    <span className="w-2 h-2 rounded-full bg-red-400" />💀 Down
+                                                                </span>
+                                                            ) : session.userConnectionState === 'disconnected' ? (
                                                                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400">
                                                                     <span className="w-2 h-2 rounded-full bg-red-400" />Lost
                                                                 </span>

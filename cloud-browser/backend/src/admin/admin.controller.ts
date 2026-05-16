@@ -90,7 +90,10 @@ export class AdminController {
     async getActiveSessions() {
         const sessions = this.sessionService.getActiveSessions();
         return Promise.all(sessions.map(async session => {
-            const { countryCode } = await this.geoipService.lookup(session.clientIp);
+            const [{ countryCode }, containerRunning] = await Promise.all([
+                this.geoipService.lookup(session.clientIp),
+                this.containerService.isContainerRunningOnPort(session.port),
+            ]);
             return {
                 id: session.id,
                 port: session.port,
@@ -103,6 +106,7 @@ export class AdminController {
                 userVisible: session.userVisible !== false,
                 userConnectionState: session.userConnectionState || 'connected',
                 viewerCount: this.sessionGateway.getViewerCount(session.id),
+                containerRunning,
             };
         }));
     }
