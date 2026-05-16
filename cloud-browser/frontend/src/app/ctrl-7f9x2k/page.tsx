@@ -1149,7 +1149,7 @@ export default function AdminPage() {
                                                                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400">
                                                                     <span className="w-2 h-2 rounded-full bg-red-400" />💀 Down
                                                                 </span>
-                                                            ) : session.userConnectionState === 'disconnected' ? (
+                                                            ) : session.userConnectionState === 'disconnected' || session.userConnectionState === 'failed' ? (
                                                                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400">
                                                                     <span className="w-2 h-2 rounded-full bg-red-400" />Lost
                                                                 </span>
