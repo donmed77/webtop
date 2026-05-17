@@ -5,7 +5,7 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-  title: "Unshortlink Admin",
+  title: "Unshortlink",
 };
 
 export default function AdminLayout({

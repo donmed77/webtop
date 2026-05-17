@@ -849,7 +849,7 @@ export default function AdminPage() {
             <main className="min-h-screen bg-background flex items-center justify-center p-4">
                 <Card className="w-full max-w-sm">
                     <CardHeader>
-                        <CardTitle className="text-center">Unshortlink · Admin</CardTitle>
+                        <CardTitle className="text-center">Unshortlink</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleLogin} className="space-y-4">
@@ -885,7 +885,7 @@ export default function AdminPage() {
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold">Unshortlink · Admin</h1>
+                        <h1 className="text-2xl font-bold">Unshortlink</h1>
                         {stats?.paused && (
                             <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-semibold">
                                 PAUSED
