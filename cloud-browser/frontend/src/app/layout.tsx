@@ -6,8 +6,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Unshort Link - Cloud Browser",
-  description: "Browse any website securely in an isolated cloud environment",
+  title: "Unshorten URL - Expand URL | Link Redirect Trace",
+  description: "Unshorten Link and browse safely. Know Unshorten URL your link before you click open. Expand URL and get the original link. More than a Link redirect trace.",
   icons: {
     icon: [
       { url: "/x16.png", sizes: "16x16", type: "image/png" },
