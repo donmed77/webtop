@@ -299,6 +299,7 @@ export default function AdminPage() {
     const [limitedIps, setLimitedIps] = useState<string[]>([]);
     const [blockedIps, setBlockedIps] = useState<string[]>([]);
     const [whitelistedIps, setWhitelistedIps] = useState<string[]>([]);
+    const [rateLimitPage, setRateLimitPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [searchQuery, setSearchQuery] = useState("");
@@ -1618,7 +1619,7 @@ export default function AdminPage() {
                                         type="text"
                                         placeholder="Filter by IP address..."
                                         value={rateLimitSearch}
-                                        onChange={(e) => setRateLimitSearch(e.target.value)}
+                                        onChange={(e) => { setRateLimitSearch(e.target.value); setRateLimitPage(1); }}
                                         className="flex-1 px-3 py-2 border rounded-md bg-background"
                                     />
                                     {rateLimitSearch && (
@@ -1628,7 +1629,8 @@ export default function AdminPage() {
                                 {(rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits).length === 0 ? (
                                     <p className="text-muted-foreground text-sm">{rateLimitSearch ? "No IPs match your filter" : "No session data today"}</p>
                                 ) : (
-                                    <div className="overflow-x-auto">
+                                    <>
+                                    <div className="overflow-x-auto hidden md:block">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b">
@@ -1640,7 +1642,7 @@ export default function AdminPage() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {(rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits).map((stat) => (
+                                                {(() => { const filtered = rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits; return filtered.slice((rateLimitPage - 1) * PAGE_SIZE, rateLimitPage * PAGE_SIZE).map((stat) => (
                                                     <tr key={stat.ip} className="border-b">
                                                         <td className="p-2"><FlagIP ip={stat.ip} countryCode={stat.countryCode} /></td>
                                                         <td className="p-2">{stat.count}/{dailyLimit}</td>
@@ -1661,11 +1663,34 @@ export default function AdminPage() {
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                )); })()}
                                             </tbody>
                                         </table>
                                     </div>
+                                    {/* Mobile cards */}
+                                    <div className="md:hidden space-y-2">
+                                        {(() => { const filtered = rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits; return filtered.slice((rateLimitPage - 1) * PAGE_SIZE, rateLimitPage * PAGE_SIZE).map((stat) => (
+                                            <div key={stat.ip} className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <FlagIP ip={stat.ip} countryCode={stat.countryCode} />
+                                                    <span className={`text-xs px-2 py-0.5 rounded ${stat.remaining === 0 ? "bg-red-500/20 text-red-400" : stat.remaining <= 3 ? "bg-yellow-500/20 text-yellow-400" : "bg-green-500/20 text-green-400"}`}>
+                                                        {stat.remaining === 0 ? "Limited" : stat.remaining <= 3 ? "Low" : "OK"}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">Used: {stat.count}/{dailyLimit} · Remaining: {stat.remaining}</div>
+                                                <div className="flex gap-1">
+                                                    <Button size="sm" variant="outline" onClick={() => ipAction("block", stat.ip)} className="cursor-pointer text-xs h-7 text-red-400">Block</Button>
+                                                    <Button size="sm" variant="outline" onClick={() => ipAction("whitelist", stat.ip)} className="cursor-pointer text-xs h-7 text-emerald-400">Whitelist</Button>
+                                                    <Button size="sm" variant="outline" onClick={() => ipAction("clear-limit", stat.ip)} className="cursor-pointer text-xs h-7">Clear</Button>
+                                                </div>
+                                            </div>
+                                        )); })()}
+                                    </div>
+                                    </>
                                 )}
+                                {(() => { const filtered = rateLimitSearch ? rateLimits.filter(s => s.ip.includes(rateLimitSearch)) : rateLimits; const tp = Math.ceil(filtered.length / PAGE_SIZE); return (
+                                    <Pagination page={rateLimitPage} totalPages={tp} total={filtered.length} label="IPs" onPageChange={(p) => setRateLimitPage(p)} />
+                                ); })()}
                             </CardContent>
                         </Card>
                     </>
