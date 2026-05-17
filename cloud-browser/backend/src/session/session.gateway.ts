@@ -87,7 +87,7 @@ export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect,
                         if (session && !this.sessionPrimary.has(sessionId)) {
                             session.userConnectionState = 'disconnected';
                         }
-                    }, 10_000); // 10s grace period
+                    }, 2_000); // 2s grace — ping/pong already prevents false positives
                     this.connectionLostTimers.set(sessionId, connectionLostTimer);
                     // Cancel any stale timer from a previous disconnect
                     const existing = this.reconnectingSessions.get(sessionId);
