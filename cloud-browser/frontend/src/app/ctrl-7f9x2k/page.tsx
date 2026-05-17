@@ -1136,7 +1136,7 @@ export default function AdminPage() {
                                                     <th className="text-left p-2">Client IP</th>
                                                     <th className="text-left p-2">Started</th>
                                                     <th className="text-left p-2">Time Left</th>
-                                                    <th className="text-left p-2"><Eye className="w-4 h-4 text-purple-400 inline" /></th>
+                                                    <th className="text-left p-2"><Eye className="w-4 h-4 text-white inline" /></th>
                                                     <th className="text-left p-2">Actions</th>
                                                 </tr>
                                             </thead>
@@ -1177,7 +1177,7 @@ export default function AdminPage() {
                                                             </span>
                                                         </td>
                                                         <td className="p-2 text-center">
-                                                            <span className={`text-xs font-semibold tabular-nums ${(session.viewerCount || 0) > 0 ? 'text-purple-400' : 'text-zinc-500'}`}>
+                                                            <span className={`text-xs font-semibold tabular-nums ${(session.viewerCount || 0) > 0 ? 'text-purple-400' : 'text-white'}`}>
                                                                 {session.viewerCount || 0}<span className="text-zinc-600">/</span>1
                                                             </span>
                                                         </td>
