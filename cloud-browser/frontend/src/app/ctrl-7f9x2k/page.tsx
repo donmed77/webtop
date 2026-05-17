@@ -2774,7 +2774,7 @@ export default function AdminPage() {
 
                 return (
                     <div
-                        className="fixed inset-0 z-[100] bg-black flex flex-col"
+                        className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden"
                         onKeyDown={(e) => { if (e.key === "Escape") setViewerOverlay(null); }}
                         tabIndex={0}
                         ref={(el) => el?.focus()}
