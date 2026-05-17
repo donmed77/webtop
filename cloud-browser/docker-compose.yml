@@ -48,6 +48,9 @@ services:
       - MAX_SESSIONS=${MAX_SESSIONS:-10}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - GIT_BRANCH=${GIT_BRANCH:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - backend_data:/app/data
