@@ -48,12 +48,6 @@
     "ExtensionInstallBlocklist": [
         "*"
     ],
-    "ExtensionInstallAllowlist": [
-        "ddkjiahejlhfcafbddmgiahcphecmpfh"
-    ],
-    "ExtensionInstallForcelist": [
-        "ddkjiahejlhfcafbddmgiahcphecmpfh;https://clients2.google.com/service/update2/crx"
-    ],
     "URLBlocklist": [
         "file://*",
         "about:*",
