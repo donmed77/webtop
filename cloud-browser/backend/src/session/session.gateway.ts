@@ -15,6 +15,8 @@ import { SessionService } from './session.service';
     cors: {
         origin: process.env.FRONTEND_URL || 'http://localhost:3002',
     },
+    pingInterval: 5000,  // server pings client every 5s
+    pingTimeout: 10000,  // disconnect if no pong within 10s
 })
 export class SessionGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
     @WebSocketServer()
