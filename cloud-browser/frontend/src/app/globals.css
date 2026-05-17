@@ -231,3 +231,12 @@ html {
   background-color: transparent !important;
   background-image: none !important;
 }
+
+/* Hide scrollbar for tab navigation on mobile */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
