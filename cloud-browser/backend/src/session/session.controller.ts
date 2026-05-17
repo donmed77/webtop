@@ -143,16 +143,13 @@ export class SessionController {
             return { valid: false, reason: 'Session ended' };
         }
 
-        // Step 3: Check if Docker container is actually running
-        const containerRunning = await this.containerService.isContainerRunningOnPort(portNum);
-
         return {
             valid: true,
             expiresAt: session.expiresAt.toISOString(),
             sessionId: session.id,
             userVisible: session.userVisible !== false,
             userConnectionState: session.userConnectionState || 'connected',
-            containerRunning,
+            containerRunning: session.status === 'active',
         };
     }
 
