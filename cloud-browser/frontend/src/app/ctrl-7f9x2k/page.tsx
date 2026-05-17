@@ -1480,42 +1480,67 @@ export default function AdminPage() {
                             {history.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">No session history</p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b">
-                                                <th className="text-left p-2">Session ID</th>
-                                                <th className="text-left p-2">URL</th>
-                                                <th className="text-left p-2">Client IP</th>
-                                                <th className="text-left p-2">Started</th>
-                                                <th className="text-left p-2">Duration</th>
-                                                <th className="text-left p-2">Reason</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {history.map((log) => (
-                                                <tr key={log.id} className="border-b">
-                                                    <td className="p-2 font-mono text-xs">{log.sessionId.slice(0, 8)}...</td>
-                                                    <td className="p-2 max-w-xs truncate">{log.url}</td>
-                                                    <td className="p-2">
-                                                        <FlagIP ip={log.clientIp} countryCode={log.countryCode} />
-                                                    </td>
-                                                    <td className="p-2">{formatFullDate(log.startedAt)}</td>
-                                                    <td className="p-2">{log.duration ? formatTime(log.duration) : "-"}</td>
-                                                    <td className="p-2">
-                                                        <span className={`text-xs px-2 py-1 rounded ${log.reason === "expired" ? "bg-yellow-500/20 text-yellow-400" :
-                                                            log.reason === "user_ended" ? "bg-green-500/20 text-green-400" :
-                                                                log.reason === "admin_killed" ? "bg-red-500/20 text-red-400" :
-                                                                    "bg-gray-500/20 text-gray-400"
-                                                            }`}>
-                                                            {log.reason || "active"}
-                                                        </span>
-                                                    </td>
+                                <>
+                                    {/* Desktop table */}
+                                    <div className="overflow-x-auto hidden md:block">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="text-left p-2">Session ID</th>
+                                                    <th className="text-left p-2">URL</th>
+                                                    <th className="text-left p-2">Client IP</th>
+                                                    <th className="text-left p-2">Started</th>
+                                                    <th className="text-left p-2">Duration</th>
+                                                    <th className="text-left p-2">Reason</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody>
+                                                {history.map((log) => (
+                                                    <tr key={log.id} className="border-b">
+                                                        <td className="p-2 font-mono text-xs">{log.sessionId.slice(0, 8)}...</td>
+                                                        <td className="p-2 max-w-xs truncate">{log.url}</td>
+                                                        <td className="p-2">
+                                                            <FlagIP ip={log.clientIp} countryCode={log.countryCode} />
+                                                        </td>
+                                                        <td className="p-2">{formatFullDate(log.startedAt)}</td>
+                                                        <td className="p-2">{log.duration ? formatTime(log.duration) : "-"}</td>
+                                                        <td className="p-2">
+                                                            <span className={`text-xs px-2 py-1 rounded ${log.reason === "expired" ? "bg-yellow-500/20 text-yellow-400" :
+                                                                log.reason === "user_ended" ? "bg-green-500/20 text-green-400" :
+                                                                    log.reason === "admin_killed" ? "bg-red-500/20 text-red-400" :
+                                                                        "bg-gray-500/20 text-gray-400"
+                                                                }`}>
+                                                                {log.reason || "active"}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {/* Mobile cards */}
+                                    <div className="md:hidden space-y-2">
+                                        {history.map((log) => (
+                                            <div key={log.id} className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-xs px-2 py-0.5 rounded ${log.reason === "expired" ? "bg-yellow-500/20 text-yellow-400" :
+                                                        log.reason === "user_ended" ? "bg-green-500/20 text-green-400" :
+                                                            log.reason === "admin_killed" ? "bg-red-500/20 text-red-400" :
+                                                                "bg-gray-500/20 text-gray-400"
+                                                        }`}>
+                                                        {log.reason || "active"}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">{log.duration ? formatTime(log.duration) : "—"}</span>
+                                                </div>
+                                                <p className="text-sm truncate">{log.url}</p>
+                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                    <FlagIP ip={log.clientIp} countryCode={log.countryCode} />
+                                                    <span>{formatFullDate(log.startedAt)}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                             <Pagination page={historyPage} totalPages={historyTotalPages} total={historyTotal}
                                 label="sessions" onPageChange={(p) => { setHistoryPage(p); fetchHistory(searchQuery, p); }} />
@@ -1887,13 +1912,14 @@ export default function AdminPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-1 max-h-[500px] overflow-y-auto">
+                                <div className="space-y-1">
                                     {securityEvents.length === 0 ? (
                                         <div className="text-center text-muted-foreground py-8 text-sm">No security events</div>
-                                    ) : securityEvents.map((evt) => (
+                                    ) : securityEvents.map((evt) => (<>
+                                        {/* Desktop row */}
                                         <div
                                             key={evt.id}
-                                            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm ${
+                                            className={`hidden md:flex items-center gap-3 px-3 py-2 rounded-md text-sm ${
                                                 evt.acknowledged ? 'opacity-50' : ''
                                             } ${
                                                 evt.severity === 'critical' ? 'bg-red-500/10 border-l-2 border-red-500' :
@@ -1932,7 +1958,44 @@ export default function AdminPage() {
                                                 </button>
                                             )}
                                         </div>
-                                    ))}
+                                        {/* Mobile card */}
+                                        <div
+                                            key={`${evt.id}-m`}
+                                            className={`md:hidden rounded-lg border p-3 space-y-1.5 ${
+                                                evt.acknowledged ? 'opacity-50' : ''
+                                            } ${
+                                                evt.severity === 'critical' ? 'border-red-500/30 bg-red-500/5' :
+                                                evt.severity === 'warning' ? 'border-orange-500/30 bg-orange-500/5' :
+                                                'border-border/50 bg-muted/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                                    evt.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                                    evt.severity === 'warning' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'
+                                                }`}>{evt.severity}</span>
+                                                <span className="text-[10px] text-muted-foreground">{new Date(evt.timestamp + 'Z').toLocaleTimeString()}</span>
+                                            </div>
+                                            <p className="text-xs break-all">{evt.message}</p>
+                                            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                                <span>{evt.type.replace(/_/g, ' ')}</span>
+                                                {evt.sourceIp && <span className="font-mono">{evt.sourceIp}</span>}
+                                            </div>
+                                            {!evt.acknowledged && (
+                                                <button
+                                                    className="text-xs text-muted-foreground hover:text-white cursor-pointer"
+                                                    onClick={async () => {
+                                                        await fetch(`${apiUrl}/api/admin/security/acknowledge/${evt.id}`, {
+                                                            method: 'POST', headers: getAuthHeaders(),
+                                                        });
+                                                        fetchSecurity();
+                                                    }}
+                                                >
+                                                    ✓ Acknowledge
+                                                </button>
+                                            )}
+                                        </div>
+                                    </>))}
                                 </div>
                                 <Pagination page={securityPage} totalPages={securityTotalPages} total={securityTotal}
                                     label="events" onPageChange={(p) => { setSecurityPage(p); fetchSecurity(p); }} />
@@ -2419,7 +2482,8 @@ export default function AdminPage() {
                                 {feedbackList.length === 0 ? (
                                     <p className="text-muted-foreground text-sm text-center py-8">No feedback tickets</p>
                                 ) : (
-                                    <div className="overflow-x-auto">
+                                    <>
+                                    <div className="overflow-x-auto hidden md:block">
                                         <table className="w-full text-sm table-fixed">
                                             <thead>
                                                 <tr className="border-b">
@@ -2557,6 +2621,42 @@ export default function AdminPage() {
                                             </tbody>
                                         </table>
                                     </div>
+                                    {/* Mobile cards */}
+                                    <div className="md:hidden space-y-2">
+                                        {feedbackList.map((fb) => (
+                                            <div key={fb.id} className={`rounded-lg border p-3 space-y-2 ${fb.status === "open" ? "border-blue-500/30 bg-blue-500/5" : "border-border/50 bg-muted/20"}`}
+                                                onClick={() => setExpandedFeedback(expandedFeedback === fb.id ? null : fb.id)}>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${fb.type === "bug" ? "bg-red-500/20 text-red-400" : fb.type === "suggestion" ? "bg-amber-500/20 text-amber-400" : "bg-blue-500/20 text-blue-400"}`}>{fb.type}</span>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${fb.status === "open" ? "bg-blue-500/20 text-blue-400" : fb.status === "resolved" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>{fb.status}</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-muted-foreground">{formatFullDate(fb.createdAt)}</span>
+                                                </div>
+                                                <p className="text-sm line-clamp-2">{fb.message}</p>
+                                                {expandedFeedback === fb.id && (
+                                                    <div className="space-y-2 pt-2 border-t border-border/30">
+                                                        <p className="text-sm whitespace-pre-wrap break-all">{fb.message}</p>
+                                                        <div className="text-xs text-muted-foreground space-y-1">
+                                                            <div>IP: <FlagIP ip={fb.clientIp} countryCode={fb.countryCode} /></div>
+                                                            {fb.email && <div>Email: <span className="text-blue-400">{fb.email}</span></div>}
+                                                        </div>
+                                                        <div className="flex gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                                                            {fb.status === "open" && (<>
+                                                                <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "resolve")} className="cursor-pointer text-xs h-7 text-green-400">✓ Resolve</Button>
+                                                                <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "dismiss")} className="cursor-pointer text-xs h-7">— Dismiss</Button>
+                                                            </>)}
+                                                            {fb.status !== "open" && (
+                                                                <Button size="sm" variant="outline" onClick={() => feedbackAction(fb.id, "reopen")} className="cursor-pointer text-xs h-7 text-blue-400">↩ Reopen</Button>
+                                                            )}
+                                                            <Button size="sm" variant="destructive" onClick={() => { if (confirm("Delete?")) feedbackAction(fb.id, "delete"); }} className="cursor-pointer text-xs h-7">🗑</Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    </>
                                 )}
                                 <Pagination page={feedbackPage} totalPages={feedbackTotalPages} total={feedbackTotal}
                                     label="tickets" onPageChange={(p) => { setFeedbackPage(p); fetchFeedback(undefined, p); }} />
@@ -2733,7 +2833,8 @@ export default function AdminPage() {
                                 {surveyList.length === 0 ? (
                                     <p className="text-muted-foreground text-sm text-center py-8">No survey responses yet</p>
                                 ) : (
-                                    <div className="overflow-x-auto">
+                                    <>
+                                    <div className="overflow-x-auto hidden md:block">
                                         <table className="w-full text-sm table-fixed">
                                             <thead>
                                                 <tr className="border-b">
@@ -2866,6 +2967,39 @@ export default function AdminPage() {
                                             </tbody>
                                         </table>
                                     </div>
+                                    {/* Mobile cards */}
+                                    <div className="md:hidden space-y-2">
+                                        {surveyList.map((s) => (
+                                            <div key={s.id} className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2"
+                                                onClick={() => setExpandedSurveyId(expandedSurveyId === s.id ? null : s.id)}>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="flex gap-0.5">
+                                                        {[1,2,3,4,5].map(star => (
+                                                            <svg key={star} className={`w-3.5 h-3.5 ${star <= s.rating ? "text-amber-400" : "text-muted-foreground/20"}`} fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                            </svg>
+                                                        ))}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground">{new Date(s.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                                {s.tags.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {s.tags.map(t => (
+                                                            <span key={t} className="bg-muted px-1.5 py-0.5 rounded text-[10px]">{t.replace(/_/g,' ')}</span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <p className="text-xs text-muted-foreground line-clamp-2">{s.comment || "No comment"}</p>
+                                                {expandedSurveyId === s.id && (
+                                                    <div className="text-xs space-y-1 pt-2 border-t border-border/30">
+                                                        <div>Session: <span className="font-mono">{s.sessionId}</span></div>
+                                                        <div>IP: <FlagIP ip={s.clientIp} countryCode={s.countryCode} /></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    </>
                                 )}
                                 <Pagination page={surveyPage} totalPages={surveyTotalPages} total={surveyTotal}
                                     label="responses" onPageChange={(p) => { setSurveyPage(p); fetchSurveys(p); }} />
