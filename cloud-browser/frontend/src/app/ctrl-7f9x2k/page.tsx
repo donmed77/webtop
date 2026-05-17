@@ -618,6 +618,16 @@ export default function AdminPage() {
             .catch(() => {});
     }, [authenticated]);
 
+    // Hide body scrollbar when viewer overlay is open
+    useEffect(() => {
+        if (viewerOverlay) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [viewerOverlay]);
+
     // Auto-open viewer from Telegram bot link (?view=PORT)
     useEffect(() => {
         if (!authenticated) return;
