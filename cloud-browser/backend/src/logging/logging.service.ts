@@ -224,6 +224,42 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * Get logs for a specific date range with pagination and search
+     */
+    getLogsByDateRangePaginated(startDate: string, endDate: string, limit: number, offset: number, search?: string): { logs: SessionLog[]; total: number } {
+        const searchCondition = search
+            ? ` AND (LOWER(url) LIKE LOWER(?) OR LOWER(client_ip) LIKE LOWER(?))`
+            : '';
+        const searchParams = search ? [`%${search}%`, `%${search}%`] : [];
+
+        const countStmt = this.db.prepare(`
+            SELECT COUNT(*) as count FROM session_logs
+            WHERE started_at >= ? AND started_at <= ?${searchCondition}
+        `);
+        const total = (countStmt.get(startDate, endDate, ...searchParams) as { count: number }).count;
+
+        const dataStmt = this.db.prepare(`
+            SELECT 
+                id,
+                session_id as sessionId,
+                url,
+                client_ip as clientIp,
+                country_code as countryCode,
+                started_at as startedAt,
+                ended_at as endedAt,
+                reason,
+                duration
+            FROM session_logs
+            WHERE started_at >= ? AND started_at <= ?${searchCondition}
+            ORDER BY started_at DESC
+            LIMIT ? OFFSET ?
+        `);
+        const logs = dataStmt.all(startDate, endDate, ...searchParams, limit, offset) as SessionLog[];
+
+        return { logs, total };
+    }
+
+    /**
      * Get daily statistics
      */
     getDailyStats(days: number = 7): { date: string; count: number; avgDuration: number }[] {

@@ -182,22 +182,25 @@ export class AdminController {
     getSessionHistory(
         @Query('days') days?: string,
         @Query('search') search?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
     ) {
         const daysNum = Math.min(parseInt(days || '7', 10), 30);
+        const pageNum = Math.max(parseInt(page || '1', 10), 1);
+        const limitNum = Math.min(parseInt(limit || '20', 10), 100);
+        const offset = (pageNum - 1) * limitNum;
         const endDate = new Date().toISOString();
         const startDate = new Date(Date.now() - daysNum * 86400000).toISOString();
 
-        let logs = this.loggingService.getLogsByDateRange(startDate, endDate);
+        const result = this.loggingService.getLogsByDateRangePaginated(startDate, endDate, limitNum, offset, search);
 
-        if (search) {
-            const searchLower = search.toLowerCase();
-            logs = logs.filter(log =>
-                log.url.toLowerCase().includes(searchLower) ||
-                log.clientIp.toLowerCase().includes(searchLower)
-            );
-        }
-
-        return { logs, total: logs.length, days: daysNum };
+        return {
+            logs: result.logs,
+            total: result.total,
+            page: pageNum,
+            totalPages: Math.ceil(result.total / limitNum),
+            days: daysNum,
+        };
     }
 
     // ---- D5: Rate Limits ----

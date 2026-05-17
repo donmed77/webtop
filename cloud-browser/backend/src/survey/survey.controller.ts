@@ -61,12 +61,14 @@ export class SurveyController {
         @Query('page') page?: string,
         @Query('limit') limit?: string,
     ) {
+        const limitNum = Math.min(parseInt(limit || '20', 10), 100);
         const result = this.surveyService.getSurveys(
             parseInt(page || '1', 10),
-            Math.min(parseInt(limit || '50', 10), 100),
+            limitNum,
         );
         return {
             ...result,
+            totalPages: Math.ceil(result.total / limitNum) || 1,
             surveys: await Promise.all(result.surveys.map(async (s: any) => {
                 const { countryCode } = await this.geoipService.lookup(s.clientIp);
                 return { ...s, countryCode };

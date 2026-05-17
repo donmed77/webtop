@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw, Search, Eye, X, Check, ShieldBan, ShieldCheck, Eraser, LogOut, Users } from "lucide-react";
+import { Play, Pause, Trash2, RefreshCw, XCircle, RotateCcw, Search, Eye, X, Check, ShieldBan, ShieldCheck, Eraser, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 20;
 
 // Loads attachment media with auth headers (img/video src can't send auth)
 function AuthAttachment({ att, feedbackId, apiUrl, getAuthHeaders }: {
@@ -290,6 +292,8 @@ export default function AdminPage() {
     const [stats, setStats] = useState<Stats | null>(null);
     const [history, setHistory] = useState<SessionLog[]>([]);
     const [historyTotal, setHistoryTotal] = useState(0);
+    const [historyPage, setHistoryPage] = useState(1);
+    const [historyTotalPages, setHistoryTotalPages] = useState(1);
     const [rateLimits, setRateLimits] = useState<RateLimitStat[]>([]);
     const [dailyLimit, setDailyLimit] = useState<number>(10);
     const [limitedIps, setLimitedIps] = useState<string[]>([]);
@@ -313,11 +317,17 @@ export default function AdminPage() {
     const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
     const [feedbackFilter, setFeedbackFilter] = useState<string>("all");
     const [expandedFeedback, setExpandedFeedback] = useState<number | null>(null);
+    const [feedbackPage, setFeedbackPage] = useState(1);
+    const [feedbackTotal, setFeedbackTotal] = useState(0);
+    const [feedbackTotalPages, setFeedbackTotalPages] = useState(1);
 
     // Survey state
     const [surveyList, setSurveyList] = useState<SurveyItem[]>([]);
     const [expandedSurveyId, setExpandedSurveyId] = useState<number | null>(null);
     const [surveyStats, setSurveyStats] = useState<SurveyStats | null>(null);
+    const [surveyPage, setSurveyPage] = useState(1);
+    const [surveyTotal, setSurveyTotal] = useState(0);
+    const [surveyTotalPages, setSurveyTotalPages] = useState(1);
 
     // Server health state
     const [serverHealth, setServerHealth] = useState<ServerHealth | null>(null);
@@ -326,6 +336,8 @@ export default function AdminPage() {
     const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
     const [securityStats, setSecurityStats] = useState<SecurityStats | null>(null);
     const [securityTotal, setSecurityTotal] = useState(0);
+    const [securityPage, setSecurityPage] = useState(1);
+    const [securityTotalPages, setSecurityTotalPages] = useState(1);
     const [fileIntegrity, setFileIntegrity] = useState<FileIntegrity[]>([]);
     const [securityFilter, setSecurityFilter] = useState<string>("");
     const [suspiciousProcs, setSuspiciousProcs] = useState<ProcessInfo[]>([]);
@@ -462,16 +474,17 @@ export default function AdminPage() {
         }
     };
 
-    const fetchHistory = async (search?: string) => {
+    const fetchHistory = async (search?: string, page?: number) => {
+        const p = page ?? historyPage;
         try {
-            const url = search
-                ? `${apiUrl}/api/admin/history?days=7&search=${encodeURIComponent(search)}`
-                : `${apiUrl}/api/admin/history?days=7`;
-            const res = await fetch(url, { headers: getAuthHeaders() });
+            const params = new URLSearchParams({ days: '7', page: String(p), limit: String(PAGE_SIZE) });
+            if (search) params.set('search', search);
+            const res = await fetch(`${apiUrl}/api/admin/history?${params}`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
                 setHistory(data.logs);
                 setHistoryTotal(data.total);
+                setHistoryTotalPages(data.totalPages || 1);
             }
         } catch (err) {
             console.error("Failed to fetch history:", err);
@@ -494,17 +507,21 @@ export default function AdminPage() {
         }
     };
 
-    const fetchFeedback = async (filterOverride?: string) => {
+    const fetchFeedback = async (filterOverride?: string, page?: number) => {
         const filter = filterOverride ?? feedbackFilter;
+        const p = page ?? feedbackPage;
         try {
-            const statusParam = filter !== "all" ? `?status=${filter}` : "";
+            const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String((p - 1) * PAGE_SIZE) });
+            if (filter !== "all") params.set('status', filter);
             const [listRes, statsRes] = await Promise.all([
-                fetch(`${apiUrl}/api/admin/feedback${statusParam}`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/feedback?${params}`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/feedback/stats`, { headers: getAuthHeaders() }),
             ]);
             if (listRes.ok) {
                 const data = await listRes.json();
                 setFeedbackList(data.feedback);
+                setFeedbackTotal(data.total || 0);
+                setFeedbackTotalPages(Math.ceil((data.total || 0) / PAGE_SIZE) || 1);
             }
             if (statsRes.ok) {
                 setFeedbackStats(await statsRes.json());
@@ -663,9 +680,10 @@ export default function AdminPage() {
         return () => clearInterval(interval);
     }, [authenticated, activeTab, securityFilter]);
 
-    const fetchSecurity = async () => {
+    const fetchSecurity = async (page?: number) => {
+        const p = page ?? securityPage;
         try {
-            const params = new URLSearchParams({ limit: '50' });
+            const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String((p - 1) * PAGE_SIZE) });
             if (securityFilter) params.set('severity', securityFilter);
             const [eventsRes, statsRes, integrityRes, procsRes, portsRes, watchdogRes, diskRes, fsRes, dockerRes] = await Promise.all([
                 fetch(`${apiUrl}/api/admin/security/events?${params}`, { headers: getAuthHeaders() }),
@@ -678,7 +696,7 @@ export default function AdminPage() {
                 fetch(`${apiUrl}/api/admin/security/filesystem`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/security/docker-image`, { headers: getAuthHeaders() }),
             ]);
-            if (eventsRes.ok) { const d = await eventsRes.json(); setSecurityEvents(d.events); setSecurityTotal(d.total); }
+            if (eventsRes.ok) { const d = await eventsRes.json(); setSecurityEvents(d.events); setSecurityTotal(d.total); setSecurityTotalPages(Math.ceil(d.total / PAGE_SIZE) || 1); }
             if (statsRes.ok) setSecurityStats(await statsRes.json());
             if (integrityRes.ok) setFileIntegrity(await integrityRes.json());
             if (procsRes.ok) { const d = await procsRes.json(); setSuspiciousProcs(d.suspicious); setProcTotal(d.total); }
@@ -697,15 +715,18 @@ export default function AdminPage() {
         return () => clearInterval(interval);
     }, [authenticated, activeTab, feedbackFilter]);
 
-    const fetchSurveys = async () => {
+    const fetchSurveys = async (page?: number) => {
+        const p = page ?? surveyPage;
         try {
             const [listRes, statsRes] = await Promise.all([
-                fetch(`${apiUrl}/api/admin/surveys`, { headers: getAuthHeaders() }),
+                fetch(`${apiUrl}/api/admin/surveys?page=${p}&limit=${PAGE_SIZE}`, { headers: getAuthHeaders() }),
                 fetch(`${apiUrl}/api/admin/surveys/stats`, { headers: getAuthHeaders() }),
             ]);
             if (listRes.ok) {
                 const data = await listRes.json();
                 setSurveyList(data.surveys);
+                setSurveyTotal(data.total || 0);
+                setSurveyTotalPages(data.totalPages || 1);
             }
             if (statsRes.ok) setSurveyStats(await statsRes.json());
         } catch (err) {
@@ -715,8 +736,34 @@ export default function AdminPage() {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        fetchHistory(searchQuery);
+        setHistoryPage(1);
+        fetchHistory(searchQuery, 1);
     };
+
+    // Reusable pagination component
+    const Pagination = ({ page, totalPages, total, onPageChange, label = "items" }: {
+        page: number; totalPages: number; total: number;
+        onPageChange: (p: number) => void; label?: string;
+    }) => totalPages <= 1 ? null : (
+        <div className="flex items-center justify-between pt-4 border-t border-zinc-800 mt-4">
+            <span className="text-xs text-zinc-500">{total} {label}</span>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1}
+                    onClick={() => onPageChange(page - 1)}
+                    className="cursor-pointer h-7 w-7 p-0">
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-zinc-400 tabular-nums min-w-[80px] text-center">
+                    Page {page} of {totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={page >= totalPages}
+                    onClick={() => onPageChange(page + 1)}
+                    className="cursor-pointer h-7 w-7 p-0">
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
 
     const handleConfigSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1470,6 +1517,8 @@ export default function AdminPage() {
                                     </table>
                                 </div>
                             )}
+                            <Pagination page={historyPage} totalPages={historyTotalPages} total={historyTotal}
+                                label="sessions" onPageChange={(p) => { setHistoryPage(p); fetchHistory(searchQuery, p); }} />
                         </CardContent>
                     </Card>
                 )}
@@ -1814,7 +1863,7 @@ export default function AdminPage() {
                                     <div className="flex items-center gap-2">
                                         <select
                                             value={securityFilter}
-                                            onChange={(e) => setSecurityFilter(e.target.value)}
+                                            onChange={(e) => { setSecurityFilter(e.target.value); setSecurityPage(1); }}
                                             className="text-xs bg-muted border border-border rounded px-2 py-1"
                                         >
                                             <option value="">All</option>
@@ -1885,6 +1934,8 @@ export default function AdminPage() {
                                         </div>
                                     ))}
                                 </div>
+                                <Pagination page={securityPage} totalPages={securityTotalPages} total={securityTotal}
+                                    label="events" onPageChange={(p) => { setSecurityPage(p); fetchSecurity(p); }} />
                             </CardContent>
                         </Card>
                     </>
@@ -2346,7 +2397,7 @@ export default function AdminPage() {
                                         key={f}
                                         size="sm"
                                         variant={feedbackFilter === f ? "default" : "outline"}
-                                        onClick={() => setFeedbackFilter(f)}
+                                        onClick={() => { setFeedbackFilter(f); setFeedbackPage(1); }}
                                         className="cursor-pointer capitalize text-xs"
                                     >
                                         {f}
@@ -2507,6 +2558,8 @@ export default function AdminPage() {
                                         </table>
                                     </div>
                                 )}
+                                <Pagination page={feedbackPage} totalPages={feedbackTotalPages} total={feedbackTotal}
+                                    label="tickets" onPageChange={(p) => { setFeedbackPage(p); fetchFeedback(undefined, p); }} />
                             </CardContent>
                         </Card>
                     </>
@@ -2814,6 +2867,8 @@ export default function AdminPage() {
                                         </table>
                                     </div>
                                 )}
+                                <Pagination page={surveyPage} totalPages={surveyTotalPages} total={surveyTotal}
+                                    label="responses" onPageChange={(p) => { setSurveyPage(p); fetchSurveys(p); }} />
                             </CardContent>
                         </Card>
                     </>
