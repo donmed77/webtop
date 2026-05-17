@@ -2754,42 +2754,94 @@ export default function AdminPage() {
                 )}
             </div>
             {/* Stealth Viewer Overlay — outside tab conditionals */}
-            {viewerOverlay && (
-                <div
-                    className="fixed inset-0 z-[100] bg-black flex flex-col"
-                    onKeyDown={(e) => { if (e.key === "Escape") setViewerOverlay(null); }}
-                    tabIndex={0}
-                    ref={(el) => el?.focus()}
-                >
-                    <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/90 border-b border-zinc-700 text-sm">
-                        <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                LIVE
-                            </span>
-                            <span className="text-zinc-400">
-                                Viewing port <span className="text-white font-mono">{viewerOverlay.port}</span>
-                                {" · "}
-                                <span className="text-white font-mono">{viewerOverlay.ip}</span>
-                            </span>
-                            <span className="text-xs">View-only · No input forwarded</span>
+            {viewerOverlay && (() => {
+                const overlaySession = sessions.find(s => String(s.port) === String(viewerOverlay.port));
+                const getOverlayStatus = () => {
+                    if (!overlaySession) return { icon: '🔴', label: 'Ended', color: '#ef4444' };
+                    if (overlaySession.containerRunning === false) return { icon: '💀', label: 'Container Down', color: '#ef4444' };
+                    if (overlaySession.userConnectionState === 'disconnected' || overlaySession.userConnectionState === 'failed') return { icon: '🔌', label: 'Connection Lost', color: '#ef4444' };
+                    if (overlaySession.userVisible === false) return { icon: '⏸️', label: 'User Away', color: '#eab308' };
+                    if (overlaySession.streamReady === false) return { icon: '📡', label: 'Connecting', color: '#9ca3af' };
+                    return { icon: '🖥️', label: 'Connected', color: '#22c55e' };
+                };
+                const statusCfg = getOverlayStatus();
+                const formatOverlayTime = (seconds: number) => {
+                    const m = Math.floor(seconds / 60);
+                    const s = seconds % 60;
+                    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                };
+                const sessionEnded = !overlaySession;
+
+                return (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black flex flex-col"
+                        onKeyDown={(e) => { if (e.key === "Escape") setViewerOverlay(null); }}
+                        tabIndex={0}
+                        ref={(el) => el?.focus()}
+                    >
+                        {/* Top bar — Telegram viewer style */}
+                        <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/90 border-b border-zinc-700 text-sm">
+                            <div className="flex items-center gap-4">
+                                {/* Admin Viewer badge */}
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-semibold">
+                                    <Eye className="w-3.5 h-3.5" />
+                                    Admin Viewer
+                                </span>
+
+                                <span className="text-zinc-600">│</span>
+
+                                {/* Live status */}
+                                <span className="text-xs font-medium" style={{ color: statusCfg.color }}>
+                                    {statusCfg.icon} {statusCfg.label}
+                                </span>
+
+                                <span className="text-zinc-600">│</span>
+
+                                {/* Timer */}
+                                <span className="text-xs font-mono text-zinc-300">
+                                    ⏱️ {overlaySession ? formatOverlayTime(overlaySession.timeRemaining) : '--:--'}
+                                </span>
+
+                                <span className="text-zinc-600">│</span>
+
+                                {/* Read-only */}
+                                <span className="text-xs text-zinc-400">
+                                    🔒 Read-only
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setViewerOverlay(null)}
+                                className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer text-xs"
+                            >
+                                Close (Esc)
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setViewerOverlay(null)}
-                            className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer text-xs"
-                        >
-                            Close (Esc)
-                        </button>
+                        <div className="flex-1 relative">
+                            <iframe
+                                src={`/browser/${viewerOverlay.port}/#shared`}
+                                className="w-full h-full border-0"
+                                style={{ pointerEvents: "none" }}
+                            />
+                            {/* Session ended overlay */}
+                            {sessionEnded && (
+                                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+                                    <div className="text-center">
+                                        <div className="text-4xl mb-3">🔴</div>
+                                        <h2 className="text-xl font-semibold text-white mb-2">Session Ended</h2>
+                                        <p className="text-zinc-400 text-sm">The user has disconnected or the session expired.</p>
+                                        <button
+                                            onClick={() => setViewerOverlay(null)}
+                                            className="mt-4 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white text-sm transition-colors cursor-pointer"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex-1 relative">
-                        <iframe
-                            src={`/browser/${viewerOverlay.port}/#shared`}
-                            className="w-full h-full border-0"
-                            style={{ pointerEvents: "none" }}
-                        />
-                    </div>
-                </div>
-            )}
+                );
+            })()}
             {/* Build Version Footer */}
             {buildVersion && buildVersion.backend.commit !== 'unknown' && (
                 <div className="fixed bottom-0 left-0 right-0 py-1.5 px-4 bg-zinc-900/80 backdrop-blur-sm border-t border-zinc-800 text-[11px] font-mono text-zinc-500 z-40">
