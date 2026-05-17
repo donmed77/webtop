@@ -61,8 +61,8 @@ export class TelegramService implements OnModuleInit {
         // Schedule daily summary at midnight (server timezone)
         this.scheduleDailySummary();
 
-        // Schedule hourly health heartbeat
-        this.scheduleHealthHeartbeat();
+        // Hourly health heartbeat — disabled
+        // this.scheduleHealthHeartbeat();
 
         // Schedule system monitor (CPU, Memory, Disk) every 5 minutes
         this.scheduleSystemMonitor();
@@ -364,18 +364,23 @@ export class TelegramService implements OnModuleInit {
 
     // ======== SCHEDULERS ========
 
+    private lastDailySummaryDate: string = '';
+
     private scheduleDailySummary(): void {
-        // Check every minute if it's midnight
+        // Check every 30 seconds for midnight to avoid missing the window
         this.dailySummaryInterval = setInterval(() => {
             const now = new Date();
             // Convert to server timezone (Africa/Casablanca = GMT+1)
-            const hours = now.getUTCHours() + 1; // GMT+1
+            const adjustedHour = (now.getUTCHours() + 1) % 24;
             const minutes = now.getUTCMinutes();
+            const todayKey = now.toISOString().slice(0, 10);
 
-            if (hours === 24 && minutes === 0) {
+            // Trigger at 00:00 but only once per day
+            if (adjustedHour === 0 && minutes === 0 && this.lastDailySummaryDate !== todayKey) {
+                this.lastDailySummaryDate = todayKey;
                 this.triggerDailySummary();
             }
-        }, 60_000);
+        }, 30_000);
     }
 
     private scheduleHealthHeartbeat(): void {
