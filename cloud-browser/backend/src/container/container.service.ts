@@ -677,6 +677,101 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`Chrome window not detected in ${containerId} within ${timeoutMs}ms — proceeding anyway`);
     }
 
+    /**
+     * Capture a screenshot of the container's X11 display.
+     * Uses Python+PIL inside the container to capture, resize, and JPEG-encode.
+     * Returns { jpegBase64, isBlack } — the JPEG is only ~5KB.
+     */
+    async captureScreenshot(containerId: string): Promise<{ jpegBase64: string; isBlack: boolean } | null> {
+        try {
+            const container = this.docker.getContainer(containerId);
+
+            const pythonScript = [
+                'import Xlib.display, Xlib.X, io, base64',
+                'from PIL import Image',
+                "d = Xlib.display.Display(':1')",
+                'root = d.screen().root',
+                'geo = root.get_geometry()',
+                'raw = root.get_image(0, 0, geo.width, geo.height, Xlib.X.ZPixmap, 0xffffffff)',
+                "img = Image.frombytes('RGB', (geo.width, geo.height), raw.data, 'raw', 'BGRX')",
+                'pixels = img.load()',
+                'non_black = 0',
+                'step = max(1, (geo.width * geo.height) // 500)',
+                'for i in range(500):',
+                '    x = (i * step) % geo.width',
+                '    y = ((i * step) // geo.width) % geo.height',
+                '    r, g, b = pixels[x, y]',
+                '    if r > 10 or g > 10 or b > 10: non_black += 1',
+                "img = img.resize((640, 360), Image.LANCZOS)",
+                'buf = io.BytesIO()',
+                "img.save(buf, 'JPEG', quality=70)",
+                "b64 = base64.b64encode(buf.getvalue()).decode()",
+                "print(f'NB:{non_black}')",
+                "print(f'IMG:{b64}')",
+            ].join('\n');
+
+            const exec = await container.exec({
+                Cmd: ['python3', '-c', pythonScript],
+                User: 'abc',
+                Env: ['DISPLAY=:1'],
+                AttachStdout: true,
+                AttachStderr: true,
+            });
+
+            const stream = await exec.start({});
+            const chunks: Buffer[] = [];
+
+            return await new Promise<{ jpegBase64: string; isBlack: boolean } | null>((resolve) => {
+                const timer = setTimeout(() => {
+                    stream.destroy();
+                    this.logger.warn(`Screenshot timed out for ${containerId}`);
+                    resolve(null);
+                }, 10000);
+
+                stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+                stream.on('end', () => {
+                    clearTimeout(timer);
+                    try {
+                        const raw = Buffer.concat(chunks).toString();
+                        const nbMatch = raw.match(/NB:(\d+)/);
+
+                        // Extract base64 after 'IMG:' marker, stripping Docker
+                        // multiplex frame headers and whitespace
+                        const imgIdx = raw.indexOf('IMG:');
+                        if (imgIdx < 0) {
+                            this.logger.warn(`Screenshot: no IMG marker in output for ${containerId}. Raw(200): ${raw.substring(0, 200)}`);
+                            resolve(null);
+                            return;
+                        }
+                        const jpegBase64 = raw.substring(imgIdx + 4).replace(/[^A-Za-z0-9+/=]/g, '');
+
+                        if (jpegBase64.length < 100) {
+                            this.logger.warn(`Screenshot: base64 too short (${jpegBase64.length}) for ${containerId}`);
+                            resolve(null);
+                            return;
+                        }
+
+                        const nonBlack = nbMatch ? parseInt(nbMatch[1], 10) : 0;
+                        const isBlack = nonBlack < 25;
+
+                        this.logger.log(`Screenshot OK for ${containerId}: nonBlack=${nonBlack}, isBlack=${isBlack}, jpegLen=${jpegBase64.length}`);
+                        resolve({ jpegBase64, isBlack });
+                    } catch (err) {
+                        this.logger.warn(`Screenshot parse error for ${containerId}: ${err.message}`);
+                        resolve(null);
+                    }
+                });
+                stream.on('error', (err) => {
+                    clearTimeout(timer);
+                    this.logger.warn(`Screenshot stream error for ${containerId}: ${err.message}`);
+                    resolve(null);
+                });
+            });
+        } catch (err) {
+            this.logger.warn(`Screenshot exec failed for ${containerId}: ${err.message}`);
+            return null;
+        }
+    }
 
     async releaseContainer(poolId: string) {
         const container = this.pool.get(poolId);

@@ -15,6 +15,8 @@ export interface SessionLog {
     endedAt: string | null;
     reason: string | null;
     duration: number | null;
+    chromeConfirmed: boolean | null;
+    hasScreenshot: boolean;
 }
 
 @Injectable()
@@ -120,6 +122,20 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
             // Column already exists — ignore
         }
 
+        // Add screenshot verification columns (migration)
+        try {
+            this.db.exec(`ALTER TABLE session_logs ADD COLUMN screenshot TEXT`);
+            this.logger.log('Added screenshot column to session_logs');
+        } catch {
+            // Column already exists — ignore
+        }
+        try {
+            this.db.exec(`ALTER TABLE session_logs ADD COLUMN chrome_confirmed INTEGER`);
+            this.logger.log('Added chrome_confirmed column to session_logs');
+        } catch {
+            // Column already exists — ignore
+        }
+
         this.logger.log('Database schema initialized');
     }
 
@@ -172,6 +188,39 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * Save a session screenshot and chrome verification result
+     */
+    saveScreenshot(sessionId: string, screenshotBase64: string, chromeConfirmed: boolean): void {
+        try {
+            this.db.prepare(`
+                UPDATE session_logs 
+                SET screenshot = ?, chrome_confirmed = ?
+                WHERE session_id = ?
+            `).run(screenshotBase64, chromeConfirmed ? 1 : 0, sessionId);
+            this.logger.debug(`Saved screenshot for ${sessionId} (confirmed: ${chromeConfirmed})`);
+        } catch (err) {
+            this.logger.error(`Failed to save screenshot: ${err.message}`);
+        }
+    }
+
+    /**
+     * Get screenshot for a specific session
+     */
+    getScreenshot(sessionId: string): { screenshot: string; chromeConfirmed: boolean } | null {
+        try {
+            const row = this.db.prepare(`
+                SELECT screenshot, chrome_confirmed as chromeConfirmed
+                FROM session_logs WHERE session_id = ?
+            `).get(sessionId) as { screenshot: string | null; chromeConfirmed: number | null } | undefined;
+            if (!row || !row.screenshot) return null;
+            return { screenshot: row.screenshot, chromeConfirmed: row.chromeConfirmed === 1 };
+        } catch (err) {
+            this.logger.error(`Failed to get screenshot: ${err.message}`);
+            return null;
+        }
+    }
+
+    /**
      * Get session logs with pagination
      */
     getLogs(limit: number = 100, offset: number = 0): SessionLog[] {
@@ -185,7 +234,9 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 started_at as startedAt,
                 ended_at as endedAt,
                 reason,
-                duration
+                duration,
+                chrome_confirmed as chromeConfirmed,
+                CASE WHEN screenshot IS NOT NULL THEN 1 ELSE 0 END as hasScreenshot
             FROM session_logs
             ORDER BY started_at DESC
             LIMIT ? OFFSET ?
@@ -248,7 +299,9 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
                 started_at as startedAt,
                 ended_at as endedAt,
                 reason,
-                duration
+                duration,
+                chrome_confirmed as chromeConfirmed,
+                CASE WHEN screenshot IS NOT NULL THEN 1 ELSE 0 END as hasScreenshot
             FROM session_logs
             WHERE started_at >= ? AND started_at <= ?${searchCondition}
             ORDER BY started_at DESC

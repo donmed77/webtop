@@ -301,6 +301,20 @@ export class SessionService implements OnModuleInit {
             await this.containerService.waitForChromeWindow(container.containerId);
             // Paint buffer: give Chrome time to render before telling frontend it's ready
             await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Screenshot verification: capture what the user sees and persist as proof
+            try {
+                const capture = await this.containerService.captureScreenshot(container.containerId);
+                if (capture) {
+                    const chromeConfirmed = !capture.isBlack;
+                    this.loggingService.saveScreenshot(sessionId, capture.jpegBase64, chromeConfirmed);
+                    this.logger.log(`Screenshot saved for ${sessionId}: chromeConfirmed=${chromeConfirmed}`);
+                } else {
+                    this.logger.warn(`Screenshot capture returned null for ${sessionId}`);
+                }
+            } catch (err) {
+                this.logger.warn(`Screenshot failed for ${sessionId}: ${err.message}`);
+            }
         } catch (err) {
             this.logger.error(`Failed to launch Chrome for session ${sessionId}: ${err.message}`);
         }

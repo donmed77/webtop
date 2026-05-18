@@ -180,6 +180,8 @@ interface SessionLog {
     endedAt: string | null;
     reason: string | null;
     duration: number | null;
+    chromeConfirmed: boolean | null;
+    hasScreenshot: boolean;
 }
 
 interface RateLimitStat {
@@ -359,6 +361,10 @@ export default function AdminPage() {
     const [versionSpinning, setVersionSpinning] = useState(false);
     const [deployHistory, setDeployHistory] = useState<{ id: number; commitHash: string; branch: string; builtAt: string; deployedAt: string }[]>([]);
     const [showDeployHistory, setShowDeployHistory] = useState(false);
+
+    // Screenshot lightbox state
+    const [screenshotOverlay, setScreenshotOverlay] = useState<{ sessionId: string; screenshot: string; chromeConfirmed: boolean; url?: string; clientIp?: string; startedAt?: string } | null>(null);
+    const [screenshotLoading, setScreenshotLoading] = useState(false);
 
     // Config form state — track which sliders the user has touched
     const [newPoolSize, setNewPoolSize] = useState("");
@@ -881,6 +887,7 @@ export default function AdminPage() {
     }
 
     return (
+        <>
         <main className="min-h-screen bg-background p-6">
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex justify-between items-center">
@@ -1493,6 +1500,7 @@ export default function AdminPage() {
                                                     <th className="text-left p-2">Started</th>
                                                     <th className="text-left p-2">Duration</th>
                                                     <th className="text-left p-2">Reason</th>
+                                                    <th className="text-left p-2">Screen</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1514,6 +1522,33 @@ export default function AdminPage() {
                                                                 {log.reason || "active"}
                                                             </span>
                                                         </td>
+                                                        <td className="p-2">
+                                                            {log.hasScreenshot ? (
+                                                                <button
+                                                                    className={`cursor-pointer ${log.chromeConfirmed ? 'text-emerald-400' : 'text-red-400'}`}
+                                                                    title={log.chromeConfirmed ? 'Session verified — click to view' : 'Blank screen detected — click to view'}
+                                                                    onClick={async () => {
+                                                                        setScreenshotLoading(true);
+                                                                        try {
+                                                                            const res = await fetch(`${apiUrl}/api/admin/history/${log.sessionId}/screenshot`, { headers: getAuthHeaders() });
+                                                                            if (res.ok) {
+                                                                                const data = await res.json();
+                                                                                if (data.screenshot) {
+                                                                                    setScreenshotOverlay({ sessionId: log.sessionId, screenshot: data.screenshot, chromeConfirmed: data.chromeConfirmed, url: log.url, clientIp: log.clientIp, startedAt: log.startedAt });
+                                                                                }
+                                                                            }
+                                                                        } catch { /* ignore */ }
+                                                                        setScreenshotLoading(false);
+                                                                    }}
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                                                                </button>
+                                                            ) : (
+                                                                <span title="No screenshot">
+                                                                    <svg className="w-4 h-4 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                                                                </span>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1524,13 +1559,20 @@ export default function AdminPage() {
                                         {history.map((log) => (
                                             <div key={log.id} className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
                                                 <div className="flex items-center justify-between">
-                                                    <span className={`text-xs px-2 py-0.5 rounded ${log.reason === "expired" ? "bg-yellow-500/20 text-yellow-400" :
-                                                        log.reason === "user_ended" ? "bg-green-500/20 text-green-400" :
-                                                            log.reason === "admin_killed" ? "bg-red-500/20 text-red-400" :
-                                                                "bg-gray-500/20 text-gray-400"
-                                                        }`}>
-                                                        {log.reason || "active"}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs px-2 py-0.5 rounded ${log.reason === "expired" ? "bg-yellow-500/20 text-yellow-400" :
+                                                            log.reason === "user_ended" ? "bg-green-500/20 text-green-400" :
+                                                                log.reason === "admin_killed" ? "bg-red-500/20 text-red-400" :
+                                                                    "bg-gray-500/20 text-gray-400"
+                                                            }`}>
+                                                            {log.reason || "active"}
+                                                        </span>
+                                                        {log.hasScreenshot ? (
+                                                            <span title={log.chromeConfirmed ? 'Session verified' : 'Blank screen'}>
+                                                                <svg className={`w-3.5 h-3.5 shrink-0 ${log.chromeConfirmed ? 'text-emerald-400' : 'text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
                                                     <span className="text-xs text-muted-foreground">{log.duration ? formatTime(log.duration) : "—"}</span>
                                                 </div>
                                                 <p className="text-sm truncate">{log.url}</p>
@@ -3216,5 +3258,58 @@ export default function AdminPage() {
                 </div>
             )}
         </main>
+
+            {/* Screenshot lightbox overlay */}
+            {screenshotOverlay && (() => {
+                const ss = screenshotOverlay;
+                return (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+                    onClick={() => setScreenshotOverlay(null)}
+                >
+                    <div
+                        className="relative max-w-2xl w-full mx-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-zinc-800 border border-zinc-600 text-zinc-300 hover:text-white hover:bg-zinc-700 flex items-center justify-center text-lg cursor-pointer transition-colors"
+                            onClick={() => setScreenshotOverlay(null)}
+                        >
+                            ×
+                        </button>
+                        <div className={`rounded-xl overflow-hidden border-2 ${ss.chromeConfirmed ? 'border-emerald-500/50' : 'border-red-500/50'}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={`data:image/jpeg;base64,${ss.screenshot}`}
+                                alt="Session screenshot"
+                                className="w-full"
+                            />
+                            <div className="bg-zinc-900/95 px-4 py-3 space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <span className={`inline-flex items-center gap-1.5 text-sm font-semibold ${ss.chromeConfirmed ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        <span className={`w-2.5 h-2.5 rounded-full ${ss.chromeConfirmed ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                                        {ss.chromeConfirmed ? 'Session Verified' : 'Blank Screen Detected'}
+                                    </span>
+                                    <span className="text-xs text-zinc-500 font-mono">{ss.sessionId.slice(0, 12)}...</span>
+                                </div>
+                                {ss.url && (
+                                    <p className="text-xs text-zinc-400 truncate">{ss.url}</p>
+                                )}
+                                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                                    {ss.clientIp && <span>{ss.clientIp}</span>}
+                                    {ss.startedAt && <span>{(() => { try { return new Date(ss.startedAt).toLocaleString('en-GB', { timeZone: 'Africa/Algiers', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }); } catch { return ss.startedAt; } })()}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
+            {screenshotLoading && (
+                <div className="fixed inset-0 z-[99] flex items-center justify-center bg-black/50">
+                    <div className="animate-spin h-8 w-8 border-2 border-white border-t-transparent rounded-full" />
+                </div>
+            )}
+        </>
     );
 }

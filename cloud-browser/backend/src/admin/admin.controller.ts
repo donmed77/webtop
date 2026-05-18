@@ -203,6 +203,13 @@ export class AdminController {
         };
     }
 
+    @Get('history/:sessionId/screenshot')
+    getScreenshot(@Param('sessionId') sessionId: string) {
+        const data = this.loggingService.getScreenshot(sessionId);
+        if (!data) return { screenshot: null, chromeConfirmed: null };
+        return data;
+    }
+
     // ---- D5: Rate Limits ----
 
     @Get('rate-limits')
