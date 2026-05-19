@@ -29,6 +29,7 @@ export class SessionService implements OnModuleInit {
     private rateLimitPerDay: number;
     private checkInterval: NodeJS.Timeout;
     private sessionDurations: number[] = []; // Q5: Rolling avg of actual session durations
+    private filmstripAbortControllers: Map<string, AbortController> = new Map();
 
     // DT3: System controls
     private paused: boolean = false;
@@ -302,22 +303,42 @@ export class SessionService implements OnModuleInit {
             // Paint buffer: give Chrome time to render before telling frontend it's ready
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Screenshot verification: capture what the user sees and persist as proof
-            try {
-                const capture = await this.containerService.captureScreenshot(container.containerId);
-                if (capture) {
-                    const chromeConfirmed = !capture.isBlack;
-                    this.loggingService.saveScreenshot(sessionId, capture.jpegBase64, chromeConfirmed);
-                    this.logger.log(`Screenshot saved for ${sessionId}: chromeConfirmed=${chromeConfirmed}`);
-                } else {
-                    this.logger.warn(`Screenshot capture returned null for ${sessionId}`);
-                }
-            } catch (err) {
-                this.logger.warn(`Screenshot failed for ${sessionId}: ${err.message}`);
-            }
+            // Filmstrip verification: fire-and-forget adaptive capture (runs ~6-30s in background)
+            // User is already streaming at this point — zero impact
+            this.captureAndSaveFilmstrip(sessionId, container.containerId);
         } catch (err) {
             this.logger.error(`Failed to launch Chrome for session ${sessionId}: ${err.message}`);
         }
+    }
+
+    /**
+     * Fire-and-forget filmstrip capture. Runs async in background,
+     * never blocks session, never crashes on failure.
+     * Cancellable via AbortController when session ends early.
+     */
+    private captureAndSaveFilmstrip(sessionId: string, containerId: string): void {
+        const ac = new AbortController();
+        this.filmstripAbortControllers.set(sessionId, ac);
+
+        (async () => {
+            try {
+                const capture = await this.containerService.captureFilmstrip(containerId, ac.signal);
+                if (ac.signal.aborted) return; // Session ended during capture
+                if (capture) {
+                    const chromeConfirmed = !capture.isBlack;
+                    this.loggingService.saveScreenshot(sessionId, capture.gifBase64, chromeConfirmed);
+                    this.logger.log(`Filmstrip saved for ${sessionId}: confirmed=${chromeConfirmed}, frames=${capture.frameCount}`);
+                } else {
+                    this.logger.warn(`Filmstrip capture returned null for ${sessionId}`);
+                }
+            } catch (err) {
+                if (!ac.signal.aborted) {
+                    this.logger.warn(`Filmstrip failed for ${sessionId}: ${err.message}`);
+                }
+            } finally {
+                this.filmstripAbortControllers.delete(sessionId);
+            }
+        })();
     }
 
     getSession(sessionId: string): Session | undefined {
@@ -330,6 +351,14 @@ export class SessionService implements OnModuleInit {
 
         this.logger.log(`Ending session ${sessionId}: ${reason}`);
         session.status = 'ended';
+
+        // Cancel any in-progress filmstrip capture
+        const ac = this.filmstripAbortControllers.get(sessionId);
+        if (ac) {
+            ac.abort();
+            this.filmstripAbortControllers.delete(sessionId);
+            this.logger.debug(`Cancelled filmstrip capture for ${sessionId}`);
+        }
 
         // Q5: Track actual session duration for dynamic wait estimation
         const duration = (Date.now() - session.startedAt.getTime()) / 1000;

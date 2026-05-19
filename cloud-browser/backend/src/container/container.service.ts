@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Mutex } from 'async-mutex';
 import http from 'http';
 import * as fs from 'fs';
+import { PassThrough } from 'stream';
 import { TelegramService } from '../telegram/telegram.service';
 
 interface PooledContainer {
@@ -678,35 +679,58 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Capture a screenshot of the container's X11 display.
-     * Uses Python+PIL inside the container to capture, resize, and JPEG-encode.
-     * Returns { jpegBase64, isBlack } — the JPEG is only ~5KB.
+     * Capture an adaptive filmstrip of the container's X11 display.
+     * Takes up to 10 micro-thumbnails (160×90) over 30 seconds at 3s intervals,
+     * encoded as an animated GIF (~30-50KB). Stops early when 2 consecutive
+     * non-black frames are detected (adaptive behavior).
+     * Returns { gifBase64, isBlack, frameCount } or null on failure.
      */
-    async captureScreenshot(containerId: string): Promise<{ jpegBase64: string; isBlack: boolean } | null> {
+    async captureFilmstrip(containerId: string, abortSignal?: AbortSignal): Promise<{ gifBase64: string; isBlack: boolean; frameCount: number } | null> {
         try {
             const container = this.docker.getContainer(containerId);
 
             const pythonScript = [
-                'import Xlib.display, Xlib.X, io, base64',
+                'import Xlib.display, Xlib.X, io, base64, time, sys',
                 'from PIL import Image',
                 "d = Xlib.display.Display(':1')",
                 'root = d.screen().root',
-                'geo = root.get_geometry()',
-                'raw = root.get_image(0, 0, geo.width, geo.height, Xlib.X.ZPixmap, 0xffffffff)',
-                "img = Image.frombytes('RGB', (geo.width, geo.height), raw.data, 'raw', 'BGRX')",
-                'pixels = img.load()',
-                'non_black = 0',
-                'step = max(1, (geo.width * geo.height) // 500)',
-                'for i in range(500):',
-                '    x = (i * step) % geo.width',
-                '    y = ((i * step) // geo.width) % geo.height',
-                '    r, g, b = pixels[x, y]',
-                '    if r > 10 or g > 10 or b > 10: non_black += 1',
-                "img = img.resize((640, 360), Image.LANCZOS)",
+                'frames = []',
+                'non_black_counts = []',
+                'consecutive_ok = 0',
+                'for frame_i in range(10):',
+                '    try:',
+                '        geo = root.get_geometry()',
+                '        raw = root.get_image(0, 0, geo.width, geo.height, Xlib.X.ZPixmap, 0xffffffff)',
+                "        img = Image.frombytes('RGB', (geo.width, geo.height), raw.data, 'raw', 'BGRX')",
+                '        scale = 160 / geo.width',
+                '        tw = 160',
+                '        th = min(max(1, int(geo.height * scale)), 300)',
+                '        thumb = img.resize((tw, th), Image.LANCZOS)',
+                '        pixels = thumb.load()',
+                '        nb = 0',
+                '        for si in range(200):',
+                '            x = (si * 7) % tw',
+                '            y = (si * 3) % th',
+                '            r, g, b = pixels[x, y]',
+                '            if r > 10 or g > 10 or b > 10: nb += 1',
+                '        frames.append(thumb)',
+                '        non_black_counts.append(nb)',
+                '        if nb > 15: consecutive_ok += 1',
+                '        else: consecutive_ok = 0',
+                '        if consecutive_ok >= 2 and frame_i >= 2: break',
+                '    except: break',
+                '    if frame_i < 9: time.sleep(3)',
+                'if not frames:',
+                '    sys.exit(1)',
                 'buf = io.BytesIO()',
-                "img.save(buf, 'JPEG', quality=70)",
+                'if len(frames) == 1:',
+                "    frames[0].save(buf, 'GIF')",
+                'else:',
+                "    frames[0].save(buf, 'GIF', save_all=True, append_images=frames[1:], duration=3000, loop=0)",
                 "b64 = base64.b64encode(buf.getvalue()).decode()",
-                "print(f'NB:{non_black}')",
+                "final_nb = max(non_black_counts) if non_black_counts else 0",
+                "print(f'NB:{final_nb}')",
+                "print(f'FC:{len(frames)}')",
                 "print(f'IMG:{b64}')",
             ].join('\n');
 
@@ -719,56 +743,96 @@ export class ContainerService implements OnModuleInit, OnModuleDestroy {
             });
 
             const stream = await exec.start({});
+
+            // Use Docker modem to properly demux the multiplexed stream.
+            // Without this, raw multiplexed frames can cause truncated output.
+            const stdout = new PassThrough();
+            const stderr = new PassThrough();
+            this.docker.modem.demuxStream(stream, stdout, stderr);
+
+            // demuxStream doesn't propagate 'end' to PassThrough streams
+            stream.on('end', () => { stdout.end(); stderr.end(); });
+
             const chunks: Buffer[] = [];
 
-            return await new Promise<{ jpegBase64: string; isBlack: boolean } | null>((resolve) => {
+            return await new Promise<{ gifBase64: string; isBlack: boolean; frameCount: number } | null>((resolve) => {
+                let resolved = false;
+                const done = (val: { gifBase64: string; isBlack: boolean; frameCount: number } | null) => {
+                    if (resolved) return;
+                    resolved = true;
+                    clearTimeout(timer);
+                    resolve(val);
+                };
+
                 const timer = setTimeout(() => {
                     stream.destroy();
-                    this.logger.warn(`Screenshot timed out for ${containerId}`);
-                    resolve(null);
-                }, 10000);
+                    this.logger.warn(`Filmstrip timed out for ${containerId}`);
+                    done(null);
+                }, 45000);
 
-                stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-                stream.on('end', () => {
-                    clearTimeout(timer);
+                // Cancel capture if session ends early
+                if (abortSignal) {
+                    if (abortSignal.aborted) { stream.destroy(); done(null); return; }
+                    abortSignal.addEventListener('abort', () => {
+                        stream.destroy();
+                        this.logger.debug(`Filmstrip cancelled for ${containerId} (session ended)`);
+                        done(null);
+                    }, { once: true });
+                }
+
+                stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+                stdout.on('end', () => {
                     try {
                         const raw = Buffer.concat(chunks).toString();
                         const nbMatch = raw.match(/NB:(\d+)/);
+                        const fcMatch = raw.match(/FC:(\d+)/);
 
-                        // Extract base64 after 'IMG:' marker, stripping Docker
-                        // multiplex frame headers and whitespace
                         const imgIdx = raw.indexOf('IMG:');
                         if (imgIdx < 0) {
-                            this.logger.warn(`Screenshot: no IMG marker in output for ${containerId}. Raw(200): ${raw.substring(0, 200)}`);
-                            resolve(null);
+                            this.logger.warn(`Filmstrip: no IMG marker in output for ${containerId}. Raw(200): ${raw.substring(0, 200)}`);
+                            done(null);
                             return;
                         }
-                        const jpegBase64 = raw.substring(imgIdx + 4).replace(/[^A-Za-z0-9+/=]/g, '');
+                        const gifBase64 = raw.substring(imgIdx + 4).trim();
 
-                        if (jpegBase64.length < 100) {
-                            this.logger.warn(`Screenshot: base64 too short (${jpegBase64.length}) for ${containerId}`);
-                            resolve(null);
+                        if (gifBase64.length < 100) {
+                            this.logger.warn(`Filmstrip: base64 too short (${gifBase64.length}) for ${containerId}`);
+                            done(null);
+                            return;
+                        }
+
+                        // Validate the GIF binary: check magic bytes and trailer
+                        const gifBuf = Buffer.from(gifBase64, 'base64');
+                        const magic = gifBuf.slice(0, 6).toString('ascii');
+                        if (magic !== 'GIF89a' && magic !== 'GIF87a') {
+                            this.logger.warn(`Filmstrip: invalid GIF magic "${magic}" for ${containerId}`);
+                            done(null);
+                            return;
+                        }
+                        if (gifBuf[gifBuf.length - 1] !== 0x3B) {
+                            this.logger.warn(`Filmstrip: truncated GIF (no 0x3B trailer, got 0x${gifBuf[gifBuf.length - 1].toString(16)}) for ${containerId}, size=${gifBuf.length}`);
+                            done(null);
                             return;
                         }
 
                         const nonBlack = nbMatch ? parseInt(nbMatch[1], 10) : 0;
-                        const isBlack = nonBlack < 25;
+                        const isBlack = nonBlack < 15;
+                        const frameCount = fcMatch ? parseInt(fcMatch[1], 10) : 1;
 
-                        this.logger.log(`Screenshot OK for ${containerId}: nonBlack=${nonBlack}, isBlack=${isBlack}, jpegLen=${jpegBase64.length}`);
-                        resolve({ jpegBase64, isBlack });
+                        this.logger.log(`Filmstrip OK for ${containerId}: maxNonBlack=${nonBlack}, isBlack=${isBlack}, frames=${frameCount}, gifLen=${gifBase64.length}, gifBytes=${gifBuf.length}`);
+                        done({ gifBase64, isBlack, frameCount });
                     } catch (err) {
-                        this.logger.warn(`Screenshot parse error for ${containerId}: ${err.message}`);
-                        resolve(null);
+                        this.logger.warn(`Filmstrip parse error for ${containerId}: ${err.message}`);
+                        done(null);
                     }
                 });
                 stream.on('error', (err) => {
-                    clearTimeout(timer);
-                    this.logger.warn(`Screenshot stream error for ${containerId}: ${err.message}`);
-                    resolve(null);
+                    this.logger.warn(`Filmstrip stream error for ${containerId}: ${err.message}`);
+                    done(null);
                 });
             });
         } catch (err) {
-            this.logger.warn(`Screenshot exec failed for ${containerId}: ${err.message}`);
+            this.logger.warn(`Filmstrip exec failed for ${containerId}: ${err.message}`);
             return null;
         }
     }

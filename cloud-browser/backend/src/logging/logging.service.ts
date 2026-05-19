@@ -358,6 +358,16 @@ export class LoggingService implements OnModuleInit, OnModuleDestroy {
             this.cleanupOldLogs();
         }, 24 * 60 * 60 * 1000);
 
+        // WAL checkpoint every 30 minutes to prevent unbounded WAL growth
+        setInterval(() => {
+            try {
+                const result = this.db.pragma('wal_checkpoint(TRUNCATE)');
+                this.logger.debug(`WAL checkpoint: ${JSON.stringify(result)}`);
+            } catch (err) {
+                this.logger.warn(`WAL checkpoint failed: ${err.message}`);
+            }
+        }, 30 * 60 * 1000);
+
         // Also run once on startup
         this.cleanupOldLogs();
     }

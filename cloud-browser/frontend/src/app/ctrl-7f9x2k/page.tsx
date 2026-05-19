@@ -3280,9 +3280,10 @@ export default function AdminPage() {
                         <div className={`rounded-xl overflow-hidden border-2 ${ss.chromeConfirmed ? 'border-emerald-500/50' : 'border-red-500/50'}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                                src={`data:image/jpeg;base64,${ss.screenshot}`}
-                                alt="Session screenshot"
+                                src={`data:image/${ss.screenshot?.startsWith('R0lGOD') ? 'gif' : 'jpeg'};base64,${ss.screenshot}`}
+                                alt="Session filmstrip"
                                 className="w-full"
+                                style={{ maxHeight: '50vh', objectFit: 'contain', background: '#111' }}
                             />
                             <div className="bg-zinc-900/95 px-4 py-3 space-y-1">
                                 <div className="flex items-center justify-between">
